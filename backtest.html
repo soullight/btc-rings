@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC Swing Backtest — 20/60 Day Cycles</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
+    padding: 20px; max-width: 1200px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; letter-spacing: 4px; text-align: center; margin-bottom: 4px; }
+  .subtitle { font-size: 11px; color: rgba(255,255,255,0.3); text-align: center; letter-spacing: 2px; margin-bottom: 20px; }
+  .loading { text-align: center; padding: 80px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 14px 18px;
+  }
+  .stat-label { font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.35); margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 700; }
+  .stat-sub { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 4px; }
+
+  .green { color: #00E676; }
+  .red { color: #FF1744; }
+  .gold { color: #FFD700; }
+  .white { color: rgba(255,255,255,0.8); }
+
+  table {
+    width: 100%; border-collapse: collapse; font-size: 11px;
+    margin-bottom: 24px;
+  }
+  th {
+    text-align: left; padding: 8px 10px; font-size: 9px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.35); border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  td {
+    padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.7);
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .section-title {
+    font-size: 12px; letter-spacing: 3px; color: rgba(255,255,255,0.5);
+    margin: 24px 0 12px; padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  canvas { width: 100%; border-radius: 8px; margin-bottom: 24px; }
+
+  .signal-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 700;
+  }
+  .signal-buy { background: rgba(0,230,118,0.15); color: #00E676; }
+  .signal-sell { background: rgba(255,23,68,0.15); color: #FF1744; }
+  .signal-hold { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); }
+
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .comp-card {
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 18px;
+  }
+  .comp-title { font-size: 10px; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 10px; }
+
+  .footer { text-align: center; font-size: 9px; color: rgba(255,255,255,0.15); margin-top: 20px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<h1>SWING BACKTEST</h1>
+<div class="subtitle">20/60 DAY CYCLE SYSTEM · NOV 2022 → PRESENT · BTC/USD</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">FETCHING HISTORICAL DATA<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none;">
+  <div id="statsGrid" class="stats-grid"></div>
+  <div class="section-title">EQUITY CURVE — SWING SYSTEM vs BUY & HOLD</div>
+  <canvas id="equityChart" height="300"></canvas>
+  <div class="section-title">SIGNAL HISTORY</div>
+  <div class="comparison">
+    <div class="comp-card">
+      <div class="comp-title">SWING SYSTEM</div>
+      <div id="swingStats"></div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-title">BUY & HOLD</div>
+      <div id="holdStats"></div>
+    </div>
+  </div>
+  <div class="section-title">TRADE LOG</div>
+  <div style="max-height:500px; overflow-y:auto;">
+    <table id="tradeTable">
+      <thead>
+        <tr>
+          <th>#</th><th>SIGNAL</th><th>DATE</th><th>PRICE</th>
+          <th>EXIT DATE</th><th>EXIT PRICE</th><th>RETURN</th><th>HOLD DAYS</th>
+        </tr>
+      </thead>
+      <tbody id="tradeBody"></tbody>
+    </table>
+  </div>
+  <div class="section-title">DAILY SIGNAL LOG (LAST 60 DAYS)</div>
+  <div style="max-height:400px; overflow-y:auto;">
+    <table id="signalTable">
+      <thead>
+        <tr><th>DATE</th><th>PRICE</th><th>60D POS</th><th>20D POS</th><th>60D DIR</th><th>20D DIR</th><th>SIGNAL</th></tr>
+      </thead>
+      <tbody id="signalBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer">BACKTEST RESULTS · NOT FINANCIAL ADVICE · PAST PERFORMANCE ≠ FUTURE RESULTS</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// LOADING ANIMATION
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount + 1) % 4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING (same cascade as the viz)
+// ═══════════════════════════════════════════════
+async function fetchBTCData() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.prices.map(([ts,p]) => ({date:new Date(ts),price:p}));
+    if (d.length > 100) return {data:d, source:"CoinGecko"};
+  } catch(e) { console.warn("CoinGecko:",e); }
+  try {
+    const all = [];
+    let end = Date.now();
+    for (let i=0;i<8;i++) {
+      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
+      if (!r.ok) break;
+      const k = await r.json();
+      if (!k.length) break;
+      all.unshift(...k); end = k[0][0]-1;
+    }
+    if (all.length>100) {
+      const seen=new Set();
+      const d=all.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;})
+        .map(k=>({date:new Date(k[0]),price:+k[4]})).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"Binance"};
+    }
+  } catch(e) { console.warn("Binance:",e); }
+  try {
+    const all=[];
+    let toTs=Math.floor(Date.now()/1000);
+    for(let i=0;i<3;i++){
+      const r=await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
+      if(!r.ok)break;
+      const j=await r.json();
+      if(!j.Data?.Data?.length)break;
+      all.unshift(...j.Data.Data); toTs=j.Data.Data[0].time-1;
+    }
+    if(all.length>100){
+      const seen=new Set();
+      const d=all.filter(x=>{if(seen.has(x.time))return false;seen.add(x.time);return true;})
+        .map(x=>({date:new Date(x.time*1000),price:x.close}))
+        .filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"CryptoCompare"};
+    }
+  } catch(e) { console.warn("CryptoCompare:",e); }
+  return {data:[], source:"ERROR"};
+}
+
+// ═══════════════════════════════════════════════
+// SWING SIGNAL ENGINE
+// Exact same logic as the visualization
+// ═══════════════════════════════════════════════
+function computeSignals(data, startIdx) {
+  // We need at least 60 days of lookback
+  const signals = [];
+
+  for (let i = startIdx; i < data.length; i++) {
+    const prices = data.slice(0, i + 1).map(d => d.price);
+    const now = prices.length - 1;
+
+    // Rolling high/low for 20 and 60 day windows
+    function rollingHigh(period) {
+      let max = -Infinity, maxIdx = 0;
+      for (let j = Math.max(0, now - period); j <= now; j++) {
+        if (prices[j] > max) { max = prices[j]; maxIdx = j; }
+      }
+      return { price: max, daysAgo: now - maxIdx };
+    }
+    function rollingLow(period) {
+      let min = Infinity, minIdx = 0;
+      for (let j = Math.max(0, now - period); j <= now; j++) {
+        if (prices[j] < min) { min = prices[j]; minIdx = j; }
+      }
+      return { price: min, daysAgo: now - minIdx };
+    }
+
+    const h20 = rollingHigh(20), l20 = rollingLow(20);
+    const h60 = rollingHigh(60), l60 = rollingLow(60);
+    const current = prices[now];
+
+    const pos20 = h20.price !== l20.price ? (current - l20.price) / (h20.price - l20.price) : 0.5;
+    const pos60 = h60.price !== l60.price ? (current - l60.price) / (h60.price - l60.price) : 0.5;
+
+    const dir20 = h20.daysAgo < l20.daysAgo ? "peaked" : "bottomed";
+    const dir60 = h60.daysAgo < l60.daysAgo ? "peaked" : "bottomed";
+
+    // Combined signal logic (same as visualization)
+    let signal = "HOLD";
+    if (pos60 <= 0.25 && pos20 <= 0.30) signal = "STRONG BUY";
+    else if (pos60 <= 0.35 && dir60 === "bottomed") signal = "BUY";
+    else if (pos60 >= 0.80 && pos20 >= 0.75) signal = "TAKE PROFIT";
+    else if (pos60 >= 0.70 && dir60 === "peaked" && dir20 === "peaked") signal = "TAKE PROFIT";
+    else if (pos60 >= 0.65 && dir60 === "peaked") signal = "CAUTION";
+
+    signals.push({
+      date: data[i].date,
+      price: current,
+      pos20, pos60,
+      dir20, dir60,
+      signal,
+    });
+  }
+  return signals;
+}
+
+// ═══════════════════════════════════════════════
+// BACKTEST ENGINE
+// ═══════════════════════════════════════════════
+function runBacktest(signals) {
+  const trades = [];
+  let inPosition = false;
+  let entryPrice = 0, entryDate = null, entryIdx = 0;
+  let cash = 10000;
+  let btc = 0;
+  let equity = [];
+  let buyHoldStart = signals[0].price;
+  let prevSignal = "HOLD";
+
+  // Track signal transitions for trading
+  // BUY when: signal goes to STRONG BUY or BUY (and we're not in position)
+  // SELL when: signal goes to TAKE PROFIT (and we're in position)
+  // We add a 2-day confirmation to avoid whipsaw
+
+  let buyConfirm = 0, sellConfirm = 0;
+  const CONFIRM_DAYS = 2; // require 2 consecutive days of signal
+
+  for (let i = 0; i < signals.length; i++) {
+    const s = signals[i];
+    const isBuySignal = s.signal === "STRONG BUY" || s.signal === "BUY";
+    const isSellSignal = s.signal === "TAKE PROFIT";
+
+    if (isBuySignal) { buyConfirm++; sellConfirm = 0; }
+    else if (isSellSignal) { sellConfirm++; buyConfirm = 0; }
+    else { buyConfirm = 0; sellConfirm = 0; }
+
+    if (!inPosition && buyConfirm >= CONFIRM_DAYS) {
+      // BUY
+      inPosition = true;
+      entryPrice = s.price;
+      entryDate = s.date;
+      entryIdx = i;
+      btc = cash / s.price;
+      cash = 0;
+    } else if (inPosition && sellConfirm >= CONFIRM_DAYS) {
+      // SELL
+      cash = btc * s.price;
+      const ret = (s.price - entryPrice) / entryPrice;
+      const holdDays = Math.round((s.date - entryDate) / (1000*60*60*24));
+      trades.push({
+        entryDate, entryPrice,
+        exitDate: s.date, exitPrice: s.price,
+        returnPct: ret,
+        holdDays,
+      });
+      btc = 0;
+      inPosition = false;
+    }
+
+    // Track equity
+    const currentEquity = inPosition ? btc * s.price : cash;
+    const buyHoldEquity = 10000 * (s.price / buyHoldStart);
+    equity.push({
+      date: s.date,
+      swing: currentEquity,
+      buyHold: buyHoldEquity,
+      price: s.price,
+      signal: s.signal,
+    });
+  }
+
+  // If still in position at end, close it
+  if (inPosition) {
+    const last = signals[signals.length - 1];
+    cash = btc * last.price;
+    const ret = (last.price - entryPrice) / entryPrice;
+    const holdDays = Math.round((last.date - entryDate) / (1000*60*60*24));
+    trades.push({
+      entryDate, entryPrice,
+      exitDate: last.date, exitPrice: last.price,
+      returnPct: ret,
+      holdDays,
+      open: true,
+    });
+    btc = 0;
+  }
+
+  return { trades, equity, finalEquity: cash || btc * signals[signals.length-1].price };
+}
+
+// ═══════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en",{maximumFractionDigits:0}) : p.toFixed(2); }
+function fmtD(d) { return d.toISOString().slice(0,10); }
+function fmtPct(p) { return (p*100).toFixed(1)+"%"; }
+
+function renderStats(trades, equity, signals) {
+  const wins = trades.filter(t => t.returnPct > 0);
+  const losses = trades.filter(t => t.returnPct <= 0);
+  const winRate = trades.length ? (wins.length / trades.length * 100).toFixed(0) : 0;
+  const avgWin = wins.length ? (wins.reduce((s,t)=>s+t.returnPct,0)/wins.length*100).toFixed(1) : 0;
+  const avgLoss = losses.length ? (losses.reduce((s,t)=>s+t.returnPct,0)/losses.length*100).toFixed(1) : 0;
+  const totalReturn = equity.length ? ((equity[equity.length-1].swing / 10000 - 1) * 100).toFixed(1) : 0;
+  const buyHoldReturn = equity.length ? ((equity[equity.length-1].buyHold / 10000 - 1) * 100).toFixed(1) : 0;
+  const avgHold = trades.length ? Math.round(trades.reduce((s,t)=>s+t.holdDays,0)/trades.length) : 0;
+
+  // Max drawdown
+  let peak = 0, maxDD = 0;
+  equity.forEach(e => {
+    if (e.swing > peak) peak = e.swing;
+    const dd = (peak - e.swing) / peak;
+    if (dd > maxDD) maxDD = dd;
+  });
+
+  // Max drawdown for buy & hold
+  let bhPeak = 0, bhMaxDD = 0;
+  equity.forEach(e => {
+    if (e.buyHold > bhPeak) bhPeak = e.buyHold;
+    const dd = (bhPeak - e.buyHold) / bhPeak;
+    if (dd > bhMaxDD) bhMaxDD = dd;
+  });
+
+  // Time in market
+  let daysIn = 0;
+  trades.forEach(t => daysIn += t.holdDays);
+  const totalDays = equity.length;
+  const timeInMarket = totalDays ? (daysIn / totalDays * 100).toFixed(0) : 0;
+
+  // Profit factor
+  const grossProfit = wins.reduce((s,t)=>s+t.returnPct,0);
+  const grossLoss = Math.abs(losses.reduce((s,t)=>s+t.returnPct,0));
+  const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss).toFixed(2) : "∞";
+
+  // Best/worst trade
+  const bestTrade = trades.length ? Math.max(...trades.map(t=>t.returnPct)) : 0;
+  const worstTrade = trades.length ? Math.min(...trades.map(t=>t.returnPct)) : 0;
+
+  const swingColor = totalReturn >= buyHoldReturn ? "green" : "gold";
+  const finalSwing = equity.length ? equity[equity.length-1].swing.toFixed(0) : 10000;
+  const finalBH = equity.length ? equity[equity.length-1].buyHold.toFixed(0) : 10000;
+
+  document.getElementById("statsGrid").innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">SWING SYSTEM RETURN</div>
+      <div class="stat-value ${totalReturn >= 0 ? 'green' : 'red'}">${totalReturn}%</div>
+      <div class="stat-sub">$10,000 → $${Number(finalSwing).toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">BUY & HOLD RETURN</div>
+      <div class="stat-value ${buyHoldReturn >= 0 ? 'green' : 'red'}">${buyHoldReturn}%</div>
+      <div class="stat-sub">$10,000 → $${Number(finalBH).toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">WIN RATE</div>
+      <div class="stat-value white">${winRate}%</div>
+      <div class="stat-sub">${wins.length}W / ${losses.length}L of ${trades.length} trades</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">PROFIT FACTOR</div>
+      <div class="stat-value gold">${profitFactor}</div>
+      <div class="stat-sub">Gross win / gross loss</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">MAX DRAWDOWN — SWING</div>
+      <div class="stat-value red">−${(maxDD*100).toFixed(1)}%</div>
+      <div class="stat-sub">vs B&H: −${(bhMaxDD*100).toFixed(1)}%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">AVG TRADE</div>
+      <div class="stat-value white">${avgHold}d</div>
+      <div class="stat-sub">Win avg: +${avgWin}% · Loss avg: ${avgLoss}%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">TIME IN MARKET</div>
+      <div class="stat-value white">${timeInMarket}%</div>
+      <div class="stat-sub">${daysIn} of ${totalDays} days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">BEST / WORST TRADE</div>
+      <div class="stat-value white">${(bestTrade*100).toFixed(1)}%</div>
+      <div class="stat-sub">Worst: ${(worstTrade*100).toFixed(1)}%</div>
+    </div>
+  `;
+
+  // Comparison cards
+  document.getElementById("swingStats").innerHTML = `
+    <div style="font-size:22px;font-weight:700" class="${totalReturn>=0?'green':'red'}">$${Number(finalSwing).toLocaleString()}</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:6px">${trades.length} trades · ${timeInMarket}% exposure</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.4)">Max DD: −${(maxDD*100).toFixed(1)}%</div>
+  `;
+  document.getElementById("holdStats").innerHTML = `
+    <div style="font-size:22px;font-weight:700" class="${buyHoldReturn>=0?'green':'red'}">$${Number(finalBH).toLocaleString()}</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:6px">100% exposure · no trades</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.4)">Max DD: −${(bhMaxDD*100).toFixed(1)}%</div>
+  `;
+}
+
+function renderEquityChart(equity) {
+  const canvas = document.getElementById("equityChart");
+  const W = canvas.parentElement.clientWidth;
+  const H = 300;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + "px"; canvas.style.height = H + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const pad = { top: 20, right: 20, bottom: 30, left: 70 };
+  const w = W - pad.left - pad.right;
+  const h = H - pad.top - pad.bottom;
+
+  // Background
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(255,255,255,0.015)";
+  ctx.fillRect(pad.left, pad.top, w, h);
+
+  if (!equity.length) return;
+
+  const maxVal = Math.max(...equity.map(e => Math.max(e.swing, e.buyHold)));
+  const minVal = Math.min(...equity.map(e => Math.min(e.swing, e.buyHold)));
+  const range = maxVal - minVal || 1;
+
+  function x(i) { return pad.left + (i / (equity.length - 1)) * w; }
+  function y(v) { return pad.top + h - ((v - minVal) / range) * h; }
+
+  // Grid lines
+  ctx.strokeStyle = "rgba(255,255,255,0.04)"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const gy = pad.top + (i / 4) * h;
+    ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(pad.left + w, gy); ctx.stroke();
+    const val = maxVal - (i / 4) * range;
+    ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.font = "9px monospace";
+    ctx.textAlign = "right";
+    ctx.fillText("$" + val.toLocaleString("en", {maximumFractionDigits: 0}), pad.left - 8, gy + 3);
+  }
+
+  // Date labels
+  ctx.textAlign = "center";
+  const yearSteps = Math.max(1, Math.floor(equity.length / 5));
+  for (let i = 0; i < equity.length; i += yearSteps) {
+    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.font = "9px monospace";
+    ctx.fillText(fmtD(equity[i].date).slice(0,7), x(i), H - 8);
+  }
+
+  // Buy & Hold line
+  ctx.beginPath();
+  equity.forEach((e, i) => { i === 0 ? ctx.moveTo(x(i), y(e.buyHold)) : ctx.lineTo(x(i), y(e.buyHold)); });
+  ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Swing system line
+  ctx.beginPath();
+  equity.forEach((e, i) => { i === 0 ? ctx.moveTo(x(i), y(e.swing)) : ctx.lineTo(x(i), y(e.swing)); });
+  ctx.strokeStyle = "#00E676"; ctx.lineWidth = 2; ctx.stroke();
+
+  // Fill under swing
+  ctx.beginPath();
+  equity.forEach((e, i) => { i === 0 ? ctx.moveTo(x(i), y(e.swing)) : ctx.lineTo(x(i), y(e.swing)); });
+  ctx.lineTo(x(equity.length - 1), pad.top + h);
+  ctx.lineTo(x(0), pad.top + h);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(0,230,118,0.05)"; ctx.fill();
+
+  // Trade markers (buy = green triangle up, sell = red triangle down)
+  // We'll overlay these from the trade data we pass in
+
+  // Legend
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#00E676"; ctx.fillText("● SWING SYSTEM", pad.left + 10, pad.top + 14);
+  ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillText("● BUY & HOLD", pad.left + 160, pad.top + 14);
+}
+
+function renderTrades(trades) {
+  const tbody = document.getElementById("tradeBody");
+  tbody.innerHTML = trades.map((t, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><span class="signal-tag signal-buy">BUY</span></td>
+      <td>${fmtD(t.entryDate)}</td>
+      <td>$${fmtP(t.entryPrice)}</td>
+      <td>${t.open ? '<span style="color:#FFD700">OPEN</span>' : fmtD(t.exitDate)}</td>
+      <td>${t.open ? '—' : '$'+fmtP(t.exitPrice)}</td>
+      <td class="${t.returnPct >= 0 ? 'green' : 'red'}">${(t.returnPct*100).toFixed(1)}%</td>
+      <td>${t.holdDays}d</td>
+    </tr>
+  `).join("");
+}
+
+function renderSignalLog(signals) {
+  const recent = signals.slice(-60);
+  const tbody = document.getElementById("signalBody");
+  tbody.innerHTML = recent.map(s => {
+    const sigClass = s.signal.includes("BUY") ? "signal-buy" :
+                     s.signal === "TAKE PROFIT" ? "signal-sell" : "signal-hold";
+    return `<tr>
+      <td>${fmtD(s.date)}</td>
+      <td>$${fmtP(s.price)}</td>
+      <td>${(s.pos60*100).toFixed(0)}%</td>
+      <td>${(s.pos20*100).toFixed(0)}%</td>
+      <td style="color:${s.dir60==='peaked'?'#FF1744':'#00E676'}">${s.dir60}</td>
+      <td style="color:${s.dir20==='peaked'?'#FF1744':'#00E676'}">${s.dir20}</td>
+      <td><span class="signal-tag ${sigClass}">${s.signal}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+async function main() {
+  const result = await fetchBTCData();
+  clearInterval(dotTimer);
+
+  if (!result.data.length) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA — APIs unreachable</div>';
+    return;
+  }
+
+  // Filter to Nov 2022 onward (Cycle 4 bottom)
+  const startDate = new Date("2022-11-01");
+  const filtered = result.data.filter(d => d.date >= startDate);
+
+  if (filtered.length < 61) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NOT ENOUGH DATA</div>';
+    return;
+  }
+
+  // Need 60 days of lookback, so start signals from index 60
+  const signals = computeSignals(filtered, 60);
+
+  if (!signals.length) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO SIGNALS GENERATED</div>';
+    return;
+  }
+
+  const { trades, equity, finalEquity } = runBacktest(signals);
+
+  // Hide loading, show app
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  // Render everything
+  renderStats(trades, equity, signals);
+  renderEquityChart(equity);
+  renderTrades(trades);
+  renderSignalLog(signals);
+
+  console.log(`Backtest complete: ${signals.length} days, ${trades.length} trades, source: ${result.source}`);
+  console.log("Final equity:", finalEquity.toFixed(2), "vs B&H:", equity[equity.length-1].buyHold.toFixed(2));
+}
+
+main();
+</script>
+</body>
+</html>

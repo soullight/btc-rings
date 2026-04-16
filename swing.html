@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — Swing</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 6px; color: rgba(255,255,255,0.9); }
+  .subtitle { font-size: 11px; color: rgba(255,255,255,0.3); letter-spacing: 2px; margin-top: 4px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+  }
+  .badge.live { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2); }
+  .badge.cached { background: rgba(255,152,0,0.08); border: 1px solid rgba(255,152,0,0.2); }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .dot.live { background:#00E676; box-shadow:0 0 6px #00E676; }
+  .dot.cached { background:#FF9800; box-shadow:0 0 6px #FF9800; }
+  .status-bar {
+    display: flex; gap: 20px; margin-bottom: 12px; font-size: 12px;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .status-bar .label { color: rgba(255,255,255,0.4); }
+  canvas { border-radius: 8px; }
+  .panels { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; justify-content: center; max-width: 720px; width: 100%; }
+  .panel {
+    flex: 1; min-width: 200px; padding: 14px 18px;
+    background: rgba(255,255,255,0.025); border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06); font-size: 11px;
+  }
+  .panel h3 { font-size: 10px; letter-spacing: 2px; margin-bottom: 8px; }
+  .panel .row { display: flex; justify-content: space-between; margin: 4px 0; }
+  .legend {
+    display: flex; gap: 16px; margin-top: 14px; font-size: 9px;
+    flex-wrap: wrap; justify-content: center; color: rgba(255,255,255,0.4);
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-line { width: 16px; height: 2px; border-radius: 1px; }
+  .footer { margin-top: 12px; font-size: 9px; color: rgba(255,255,255,0.15); letter-spacing: 1px; text-align: center; }
+  .loading { text-align: center; padding: 80px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .loading-sub { font-size: 10px; color: rgba(255,255,255,0.2); margin-top: 8px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .gauge { width: 100%; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.06); margin: 6px 0; position: relative; overflow: hidden; }
+  .gauge-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+  .gauge-marker { position: absolute; top: -2px; width: 3px; height: 12px; border-radius: 2px; background: #fff; transition: left 0.3s ease; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center; margin-bottom:12px;">
+  <h1>BITCOIN RINGS</h1>
+  <div class="subtitle">SWING · 20/60 DAY CYCLES · WHERE ARE WE IN THE WAVE</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">FETCHING LIVE DATA<span id="dots"></span></div>
+  <div class="loading-sub">Trying CoinGecko → Binance → CryptoCompare</div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge"></div>
+  <div id="statusBar" class="status-bar"></div>
+  <canvas id="canvas"></canvas>
+  <div id="panels" class="panels"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-line" style="background:#FF1744; height:3px"></div>Swing Low (Buy Zone)</div>
+    <div class="legend-item"><div class="legend-line" style="background:#FFD700; height:3px"></div>Swing High (Sell Zone)</div>
+    <div class="legend-item"><div class="legend-line" style="background:#00E676"></div>Expanding</div>
+    <div class="legend-item"><div class="legend-line" style="background:#FF1744"></div>Contracting</div>
+    <div class="legend-item"><div class="legend-line" style="background:#4FC3F7; opacity:0.5"></div>20-Day Cycle</div>
+    <div class="legend-item"><div class="legend-line" style="background:#CE93D8; opacity:0.5"></div>60-Day Cycle</div>
+  </div>
+  <div class="footer">HOVER RINGS TO EXPLORE · SWING CYCLES · DUAL 20/60 DAY VIEW</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const GREEN = "#00E676", RED = "#FF1744", NEUTRAL = "#607D8B";
+const GOLD = "#FFD700", CYAN = "#4FC3F7", PURPLE = "#CE93D8";
+
+let allData = [];
+let dataSource = { source: "", detail: "" };
+let hoveredRing = null;
+let animProgress = 0;
+
+// ═══════════════════════════════════════════════
+// SWING CYCLE ANALYSIS
+// ═══════════════════════════════════════════════
+
+// Detect swing highs and lows using rolling windows
+function computeSwingData(data) {
+  if (data.length < 60) return null;
+
+  const prices = data.map(d => d.price);
+  const dates = data.map(d => d.date);
+  const len = prices.length;
+  const now = len - 1;
+
+  // Rolling highs and lows
+  function rollingHigh(period) {
+    let max = -Infinity, maxIdx = 0;
+    for (let i = Math.max(0, now - period); i <= now; i++) {
+      if (prices[i] > max) { max = prices[i]; maxIdx = i; }
+    }
+    return { price: max, idx: maxIdx, date: dates[maxIdx], daysAgo: now - maxIdx };
+  }
+  function rollingLow(period) {
+    let min = Infinity, minIdx = 0;
+    for (let i = Math.max(0, now - period); i <= now; i++) {
+      if (prices[i] < min) { min = prices[i]; minIdx = i; }
+    }
+    return { price: min, idx: minIdx, date: dates[minIdx], daysAgo: now - minIdx };
+  }
+
+  const h20 = rollingHigh(20);
+  const l20 = rollingLow(20);
+  const h60 = rollingHigh(60);
+  const l60 = rollingLow(60);
+  const current = { price: prices[now], date: dates[now] };
+
+  // Position within range (0 = at low, 1 = at high)
+  const pos20 = h20.price !== l20.price ? (current.price - l20.price) / (h20.price - l20.price) : 0.5;
+  const pos60 = h60.price !== l60.price ? (current.price - l60.price) / (h60.price - l60.price) : 0.5;
+
+  // Direction: is price closer to recent high or recent low in TIME?
+  // If the high is more recent than the low, we're in an upswing (peaked recently)
+  // If the low is more recent, we're in a downswing (bottomed recently)
+  const dir20 = h20.daysAgo < l20.daysAgo ? "peaked" : "bottomed";
+  const dir60 = h60.daysAgo < l60.daysAgo ? "peaked" : "bottomed";
+
+  // Momentum within cycle
+  const mom5 = now >= 5 ? (prices[now] - prices[now - 5]) / prices[now - 5] : 0;
+  const mom10 = now >= 10 ? (prices[now] - prices[now - 10]) / prices[now - 10] : 0;
+
+  // Estimate cycle day (days since last swing low)
+  // For 20-day: days since 20-day low
+  // For 60-day: days since 60-day low
+  const cycleDay20 = l20.daysAgo;
+  const cycleDay60 = l60.daysAgo;
+
+  // Recent price history for ring drawing (last 90 days)
+  const recentStart = Math.max(0, now - 90);
+  const recent = [];
+  for (let i = recentStart; i <= now; i++) {
+    recent.push({ price: prices[i], date: dates[i], idx: i - recentStart });
+  }
+
+  return {
+    current,
+    h20, l20, h60, l60,
+    pos20, pos60,
+    dir20, dir60,
+    mom5, mom10,
+    cycleDay20, cycleDay60,
+    recent,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+async function fetchBTCData() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.prices.map(([ts,p]) => ({date:new Date(ts),price:p}));
+    if (d.length > 100) return {data:d, source:"LIVE", detail:"CoinGecko"};
+  } catch(e) { console.warn("CoinGecko:",e); }
+  try {
+    const all = [];
+    let end = Date.now();
+    for (let i=0;i<8;i++) {
+      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
+      if (!r.ok) break;
+      const k = await r.json();
+      if (!k.length) break;
+      all.unshift(...k); end = k[0][0]-1;
+    }
+    if (all.length>100) {
+      const seen=new Set();
+      const d=all.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;})
+        .map(k=>({date:new Date(k[0]),price:+k[4]})).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"LIVE", detail:"Binance"};
+    }
+  } catch(e) { console.warn("Binance:",e); }
+  try {
+    const all=[];
+    let toTs=Math.floor(Date.now()/1000);
+    for(let i=0;i<3;i++){
+      const r=await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
+      if(!r.ok)break;
+      const j=await r.json();
+      if(!j.Data?.Data?.length)break;
+      all.unshift(...j.Data.Data); toTs=j.Data.Data[0].time-1;
+    }
+    if(all.length>100){
+      const seen=new Set();
+      const d=all.filter(x=>{if(seen.has(x.time))return false;seen.add(x.time);return true;})
+        .map(x=>({date:new Date(x.time*1000),price:x.close}))
+        .filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"LIVE", detail:"CryptoCompare"};
+    }
+  } catch(e) { console.warn("CryptoCompare:",e); }
+  return {data:[], source:"ERROR", detail:"No data source available"};
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function draw() {
+  const canvas = document.getElementById("canvas");
+  const container = canvas.parentElement;
+  const size = Math.min(container.clientWidth - 20, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  canvas.style.width = size+"px"; canvas.style.height = size+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const cx = size/2, cy = size/2;
+
+  const swing = computeSwingData(allData);
+  if (!swing) return;
+
+  // Scale: 60-day low → 60-day high with padding
+  const range60 = swing.h60.price - swing.l60.price;
+  const scaleFloor = swing.l60.price - range60 * 0.15;
+  const scaleCeil = swing.h60.price + range60 * 0.15;
+  const maxR = (size/2)*0.88, minR = 50;
+
+  function p2r(price) {
+    const t = (price - scaleFloor) / (scaleCeil - scaleFloor);
+    const clamped = Math.max(0, Math.min(1, t));
+    return minR + clamped * (maxR - minR) * animProgress;
+  }
+
+  // ── Background ──
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0,0,size,size);
+  const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,size/2);
+  bg.addColorStop(0,"rgba(18,18,35,0.6)"); bg.addColorStop(1,"rgba(10,10,15,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0,0,size,size);
+
+  // ═════════════════════════════════════════════
+  // 1. 60-DAY CYCLE ZONE — the big wave
+  // ═════════════════════════════════════════════
+  const r60h = p2r(swing.h60.price);
+  const r60l = p2r(swing.l60.price);
+
+  // Low zone glow (blood — buy zone)
+  const lowGlow = ctx.createRadialGradient(cx,cy,r60l*0.85,cx,cy,r60l*1.15);
+  lowGlow.addColorStop(0,"rgba(255,23,68,0.0)");
+  lowGlow.addColorStop(0.4,"rgba(255,23,68,0.08)");
+  lowGlow.addColorStop(0.7,"rgba(255,23,68,0.12)");
+  lowGlow.addColorStop(1,"rgba(255,23,68,0.0)");
+  ctx.beginPath(); ctx.arc(cx,cy,r60l*1.15,0,Math.PI*2);
+  ctx.arc(cx,cy,Math.max(r60l*0.85,minR*0.5),0,Math.PI*2,true); ctx.closePath();
+  ctx.fillStyle = lowGlow; ctx.fill();
+
+  // High zone glow (gold — sell zone)
+  const highGlow = ctx.createRadialGradient(cx,cy,r60h*0.92,cx,cy,r60h*1.08);
+  highGlow.addColorStop(0,"rgba(255,215,0,0.0)");
+  highGlow.addColorStop(0.4,"rgba(255,215,0,0.06)");
+  highGlow.addColorStop(0.7,"rgba(255,215,0,0.10)");
+  highGlow.addColorStop(1,"rgba(255,215,0,0.0)");
+  ctx.beginPath(); ctx.arc(cx,cy,r60h*1.08,0,Math.PI*2);
+  ctx.arc(cx,cy,r60h*0.92,0,Math.PI*2,true); ctx.closePath();
+  ctx.fillStyle = highGlow; ctx.fill();
+
+  // 60-day low ring
+  ctx.beginPath(); ctx.arc(cx,cy,r60l,0,Math.PI*2);
+  ctx.strokeStyle = RED; ctx.globalAlpha = 0.7; ctx.lineWidth = 3;
+  ctx.stroke(); ctx.globalAlpha = 1;
+  // Glow
+  ctx.beginPath(); ctx.arc(cx,cy,r60l,0,Math.PI*2);
+  ctx.strokeStyle = RED; ctx.globalAlpha = 0.15; ctx.lineWidth = 12;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // 60-day high ring
+  ctx.beginPath(); ctx.arc(cx,cy,r60h,0,Math.PI*2);
+  ctx.strokeStyle = GOLD; ctx.globalAlpha = 0.8; ctx.lineWidth = 3;
+  ctx.stroke(); ctx.globalAlpha = 1;
+  // Glow
+  ctx.beginPath(); ctx.arc(cx,cy,r60h,0,Math.PI*2);
+  ctx.strokeStyle = GOLD; ctx.globalAlpha = 0.15; ctx.lineWidth = 12;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Labels
+  ctx.textAlign = "center";
+  ctx.font = "bold 10px monospace"; ctx.fillStyle = RED; ctx.globalAlpha = 0.8;
+  ctx.fillText(`60D LOW  $${fmtP(swing.l60.price)}`, cx, cy + r60l + 16);
+  ctx.font = "8px monospace"; ctx.globalAlpha = 0.5;
+  ctx.fillText(`${swing.l60.daysAgo}d ago · BUY ZONE`, cx, cy + r60l + 28);
+
+  ctx.font = "bold 10px monospace"; ctx.fillStyle = GOLD; ctx.globalAlpha = 0.85;
+  ctx.fillText(`60D HIGH  $${fmtP(swing.h60.price)}`, cx, cy - r60h - 10);
+  ctx.font = "8px monospace"; ctx.globalAlpha = 0.5;
+  ctx.fillText(`${swing.h60.daysAgo}d ago · SELL ZONE`, cx, cy - r60h - 22);
+  ctx.textAlign = "left"; ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // 2. 20-DAY CYCLE — the fast wave (nested inside)
+  // ═════════════════════════════════════════════
+  const r20h = p2r(swing.h20.price);
+  const r20l = p2r(swing.l20.price);
+
+  // 20-day low ring
+  ctx.beginPath(); ctx.arc(cx,cy,r20l,0,Math.PI*2);
+  ctx.strokeStyle = CYAN; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5;
+  ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  // 20-day high ring
+  ctx.beginPath(); ctx.arc(cx,cy,r20h,0,Math.PI*2);
+  ctx.strokeStyle = CYAN; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5;
+  ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  // 20d labels — small, on the left side
+  ctx.font = "8px monospace"; ctx.fillStyle = CYAN; ctx.globalAlpha = 0.5;
+  const l20angle = Math.PI * 0.8;
+  ctx.fillText(`20D L $${fmtP(swing.l20.price)}`, cx + r20l*Math.cos(l20angle)-50, cy + r20l*Math.sin(l20angle));
+  const h20angle = Math.PI * 0.8;
+  ctx.fillText(`20D H $${fmtP(swing.h20.price)}`, cx + r20h*Math.cos(h20angle)-50, cy + r20h*Math.sin(h20angle));
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // 3. RECENT PRICE RINGS — last 90 days of movement
+  // ═════════════════════════════════════════════
+  const step = 3; // every 3 days
+  const totalRecent = swing.recent.length;
+  for (let i = 0; i < totalRecent; i += step) {
+    const pt = swing.recent[i];
+    const r = p2r(pt.price);
+    if (r <= 0) continue;
+    const isLast = i >= totalRecent - step;
+    const recency = i / Math.max(1, totalRecent - 1);
+
+    // Color based on whether price was rising or falling at that point
+    const prevPrice = i > 0 ? swing.recent[Math.max(0, i - step)].price : pt.price;
+    const rising = pt.price >= prevPrice;
+    const color = rising ? GREEN : RED;
+
+    let alpha = isLast ? 0 : (0.03 + recency * 0.15); // last one drawn separately
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle = color; ctx.globalAlpha = alpha;
+    ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // 4. CURRENT PRICE — the NOW ring
+  // ═════════════════════════════════════════════
+  const curR = p2r(swing.current.price);
+  const expanding = swing.mom5 > 0;
+  const curColor = expanding ? GREEN : RED;
+
+  // Bold ring
+  ctx.beginPath(); ctx.arc(cx,cy,curR,0,Math.PI*2);
+  ctx.strokeStyle = curColor; ctx.lineWidth = 4; ctx.stroke();
+  // Glow
+  [[14, 0.3],[28, 0.08]].forEach(([w,a]) => {
+    ctx.beginPath(); ctx.arc(cx,cy,curR,0,Math.PI*2);
+    ctx.strokeStyle = curColor; ctx.globalAlpha = a; ctx.lineWidth = w; ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+
+  // Price label
+  ctx.font = "bold 16px monospace"; ctx.fillStyle = curColor;
+  const pa = Math.PI/5;
+  ctx.fillText(`$${fmtP(swing.current.price)}`, cx + curR*Math.cos(pa)+14, cy - curR*Math.sin(pa)+2);
+  ctx.font = "bold 9px monospace"; ctx.globalAlpha = 0.6;
+  ctx.fillText(expanding ? "▲ EXPANDING" : "▼ CONTRACTING", cx + curR*Math.cos(pa)+14, cy - curR*Math.sin(pa)+14);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // 5. CENTER — cycle position gauge
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+  ctx.font = "bold 14px monospace"; ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.fillText("BTC", cx, cy - 16);
+  ctx.font = "bold 10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillText("SWING", cx, cy - 3);
+
+  // Position indicator text
+  const pos60pct = Math.round(swing.pos60 * 100);
+  const pos60color = pos60pct > 70 ? GOLD : pos60pct < 30 ? RED : "rgba(255,255,255,0.6)";
+  ctx.font = "bold 20px monospace"; ctx.fillStyle = pos60color;
+  ctx.fillText(`${pos60pct}%`, cx, cy + 22);
+  ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fillText("OF 60D RANGE", cx, cy + 34);
+  ctx.textAlign = "left";
+
+  // ═════════════════════════════════════════════
+  // 6. PRICE SCALE
+  // ═════════════════════════════════════════════
+  const step_price = range60 > 20000 ? 10000 : range60 > 5000 ? 5000 : 1000;
+  const scaleStart = Math.ceil(swing.l60.price / step_price) * step_price;
+  for (let p = scaleStart; p <= swing.h60.price; p += step_price) {
+    const r = p2r(p);
+    if (r < minR + 10 || r > maxR - 10) continue;
+    ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.fillText("$"+fmtP(p), cx + r*0.707 + 4, cy - r*0.707 + 3);
+  }
+
+  // ═════════════════════════════════════════════
+  // 7. HOVER TOOLTIP
+  // ═════════════════════════════════════════════
+  if (hoveredRing !== null && swing.recent[hoveredRing]) {
+    const pt = swing.recent[hoveredRing];
+    const r = p2r(pt.price);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle="#fff"; ctx.globalAlpha=0.5; ctx.lineWidth=2; ctx.stroke();
+    ctx.globalAlpha=1;
+    const tw=160,th=44;
+    const ta=-Math.PI/3;
+    const tx=cx+r*Math.cos(ta),ty=cy+r*Math.sin(ta);
+    const tooltipX=Math.min(Math.max(tx+10,10),size-tw-10);
+    const tooltipY=Math.max(ty-th-5,10);
+    roundRect(ctx,tooltipX,tooltipY,tw,th,6);
+    ctx.fillStyle="rgba(10,10,18,0.95)"; ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,0.12)"; ctx.lineWidth=1; ctx.stroke();
+    ctx.font="bold 12px monospace"; ctx.fillStyle="#fff";
+    ctx.fillText("$"+fmtP(pt.price),tooltipX+10,tooltipY+18);
+    ctx.font="9px monospace"; ctx.fillStyle="rgba(255,255,255,0.55)";
+    ctx.fillText(fmtD(pt.date),tooltipX+10,tooltipY+34);
+  }
+
+  updateUI(swing);
+}
+
+// ═══════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════
+function updateUI(s) {
+  const expanding = s.mom5 > 0;
+  const curColor = expanding ? GREEN : RED;
+  const dirLabel = expanding ? "▲ EXPANDING" : "▼ CONTRACTING";
+  const fromHigh = ((1 - s.current.price / s.h60.price) * 100).toFixed(1);
+  const fromLow = ((s.current.price / s.l60.price - 1) * 100).toFixed(1);
+
+  document.getElementById("statusBar").innerHTML = `
+    <div><span class="label">NOW </span><span style="color:${curColor};font-weight:700;font-size:14px">$${fmtP(s.current.price)}</span></div>
+    <div><span class="label">5D </span><span style="color:${s.mom5>0?GREEN:RED};font-weight:700">${(s.mom5*100).toFixed(1)}%</span></div>
+    <div><span class="label">DIRECTION </span><span style="color:${curColor};font-weight:700">${dirLabel}</span></div>
+    <div><span class="label">FROM 60D HIGH </span><span style="color:rgba(255,255,255,0.7)">−${fromHigh}%</span></div>
+  `;
+
+  const pos20pct = Math.round(s.pos20 * 100);
+  const pos60pct = Math.round(s.pos60 * 100);
+  const pos20color = pos20pct > 70 ? GOLD : pos20pct < 30 ? RED : "#fff";
+  const pos60color = pos60pct > 70 ? GOLD : pos60pct < 30 ? RED : "#fff";
+
+  // Reading: what does the position tell you?
+  let reading60 = "", reading20 = "";
+  if (pos60pct >= 80) reading60 = "Near 60D top — watch for reversal";
+  else if (pos60pct >= 60) reading60 = "Upper half of 60D range";
+  else if (pos60pct >= 40) reading60 = "Middle of 60D range — neutral";
+  else if (pos60pct >= 20) reading60 = "Lower half — approaching buy zone";
+  else reading60 = "Near 60D bottom — BUY ZONE";
+
+  if (pos20pct >= 80) reading20 = "Near 20D top — quick swing peaked";
+  else if (pos20pct >= 50) reading20 = "Upper half of fast cycle";
+  else if (pos20pct >= 20) reading20 = "Lower half — dip buying window";
+  else reading20 = "Near 20D bottom — local buy signal";
+
+  // Combined signal
+  let comboSignal = "", comboColor = NEUTRAL;
+  if (pos20pct < 30 && pos60pct < 30) { comboSignal = "STRONG BUY — both cycles bottoming"; comboColor = RED; }
+  else if (pos20pct < 30 && pos60pct < 50) { comboSignal = "BUY — fast cycle bottoming in lower range"; comboColor = "#FF8A65"; }
+  else if (pos20pct > 70 && pos60pct > 70) { comboSignal = "TAKE PROFIT — both cycles topping"; comboColor = GOLD; }
+  else if (pos20pct > 70 && pos60pct > 50) { comboSignal = "CAUTION — fast cycle peaked, watch 60D"; comboColor = "#FFD54F"; }
+  else { comboSignal = "HOLD — no clear signal from cycles"; comboColor = "rgba(255,255,255,0.5)"; }
+
+  document.getElementById("panels").innerHTML = `
+    <div class="panel">
+      <h3 style="color:${PURPLE}">60-DAY CYCLE</h3>
+      <div class="row"><span style="color:rgba(255,255,255,0.4)">Range</span><span>$${fmtP(s.l60.price)} — $${fmtP(s.h60.price)}</span></div>
+      <div class="row"><span style="color:rgba(255,255,255,0.4)">Position</span><span style="color:${pos60color};font-weight:700">${pos60pct}%</span></div>
+      <div class="gauge">
+        <div class="gauge-fill" style="width:${pos60pct}%;background:linear-gradient(90deg,${RED},${NEUTRAL},${GOLD})"></div>
+        <div class="gauge-marker" style="left:calc(${pos60pct}% - 1.5px)"></div>
+      </div>
+      <div class="row"><span style="color:rgba(255,255,255,0.4)">Day</span><span>Day ${s.cycleDay60} of ~60</span></div>
+      <div class="row"><span style="color:rgba(255,255,255,0.4)">Phase</span><span style="color:${s.dir60==='peaked'?GOLD:RED}">${s.dir60==='peaked'?'↘ Peaked':'↗ Bottomed'} ${s.dir60==='peaked'?s.h60.daysAgo:s.l60.daysAgo}d ago</span></div>
+      <div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,0.35)">${reading60}</div>
+    </div>
+    <div class="panel">
+      <h3 style="color:${CYAN}">20-DAY CYCLE</h3>
+      <div class="row"><span style="color:rgba(255,255,255,0.4)">Range</span><span>$${fmtP(s.l20.price)} — $${fmtP(s.h20.price)}</span></div>
+      <div class="row"><span style="color:rgba(255,255,255,0.4)">Position</span><span style="color:${pos20color};font-weight:700">${pos20pct}%</span></div>
+      <div class="gauge">
+        <div class="gauge-fill" style="width:${pos20pct}%;background:linear-gradient(90deg,${RED},${NEUTRAL},${GOLD})"></div>
+        <div class="gauge-marker" style="left:calc(${pos20pct}% - 1.5px)"></div>
+      </div>
+      <div class="row"><span style="color:rgba(255,255,255,0.4)">Day</span><span>Day ${s.cycleDay20} of ~20</span></div>
+      <div class="row"><span style="color:rgba(255,255,255,0.4)">Phase</span><span style="color:${s.dir20==='peaked'?GOLD:RED}">${s.dir20==='peaked'?'↘ Peaked':'↗ Bottomed'} ${s.dir20==='peaked'?s.h20.daysAgo:s.l20.daysAgo}d ago</span></div>
+      <div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,0.35)">${reading20}</div>
+    </div>
+    <div class="panel" style="flex-basis:100%;border-color:rgba(255,255,255,0.1)">
+      <div style="text-align:center">
+        <span style="color:rgba(255,255,255,0.4);font-size:10px;letter-spacing:2px">COMBINED SIGNAL</span><br>
+        <span style="color:${comboColor};font-weight:700;font-size:13px">${comboSignal}</span>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// MOUSE
+// ═══════════════════════════════════════════════
+document.getElementById("canvas").addEventListener("mousemove", function(e) {
+  if (!allData.length) return;
+  const swing = computeSwingData(allData);
+  if (!swing) return;
+  const rect = this.getBoundingClientRect();
+  const size = parseInt(this.style.width);
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  const cx=size/2, cy=size/2;
+  const dist = Math.sqrt((x-cx)**2+(y-cy)**2);
+
+  const range60 = swing.h60.price - swing.l60.price;
+  const scaleFloor = swing.l60.price - range60*0.15;
+  const scaleCeil = swing.h60.price + range60*0.15;
+  const maxR=(size/2)*0.88, minR=50;
+  function p2r(price) {
+    const t=(price-scaleFloor)/(scaleCeil-scaleFloor);
+    return minR+Math.max(0,Math.min(1,t))*(maxR-minR)*animProgress;
+  }
+
+  let nearest=null, nearestD=Infinity;
+  swing.recent.forEach((pt,i) => {
+    const r = p2r(pt.price);
+    const d = Math.abs(dist-r);
+    if (d<nearestD && d<12) { nearestD=d; nearest=i; }
+  });
+  if (nearest !== hoveredRing) { hoveredRing=nearest; this.style.cursor=nearest!==null?"crosshair":"default"; draw(); }
+});
+document.getElementById("canvas").addEventListener("mouseleave", function() { hoveredRing=null; draw(); });
+window.addEventListener("resize", () => { if(allData.length) draw(); });
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+function fmtP(p) {
+  if(p>=1000)return p.toLocaleString("en-US",{maximumFractionDigits:0});
+  if(p>=1)return p.toFixed(2);
+  return p.toFixed(4);
+}
+function fmtD(d) { return d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}); }
+function roundRect(ctx,x,y,w,h,r) {
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+(async function() {
+  let dots=0;
+  const di=setInterval(()=>{dots=(dots+1)%4;const el=document.getElementById("dots");if(el)el.textContent=".".repeat(dots);},400);
+  const result = await fetchBTCData();
+  clearInterval(di);
+  allData = result.data;
+  dataSource = {source:result.source, detail:result.detail};
+  document.getElementById("loading").style.display="none";
+  const app = document.getElementById("app");
+  app.style.display="flex";
+  const isLive = dataSource.source==="LIVE";
+  document.getElementById("badge").innerHTML=`
+    <div class="badge ${isLive?'live':'cached'}">
+      <span class="dot ${isLive?'live':'cached'}"></span>
+      <span style="color:${isLive?GREEN:'#FF9800'};font-weight:700;letter-spacing:1px">${dataSource.source}</span>
+      <span style="color:rgba(255,255,255,0.35)">${dataSource.detail} · ${allData.length.toLocaleString()} days</span>
+    </div>
+  `;
+  const start=Date.now(), duration=1800;
+  function animate(){
+    const p=Math.min(1,(Date.now()-start)/duration);
+    animProgress=1-Math.pow(1-p,3);
+    draw();
+    if(p<1)requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

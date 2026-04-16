@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff; min-height: 100vh;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  h1 { font-size: 28px; letter-spacing: 10px; margin-bottom: 8px; }
+  .sub { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; margin-bottom: 40px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; max-width: 600px; width: 100%; }
+  a.card {
+    display: block; padding: 24px 20px; border-radius: 10px; text-decoration: none;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.2s ease;
+  }
+  a.card:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); transform: translateY(-2px); }
+  .card-title { font-size: 14px; font-weight: 700; letter-spacing: 3px; margin-bottom: 8px; }
+  .card-desc { font-size: 10px; color: rgba(255,255,255,0.35); line-height: 1.5; }
+  .clear .card-title { color: #00E676; }
+  .swing .card-title { color: #4FC3F7; }
+  .macro .card-title { color: #FFD700; }
+  .backtest .card-title { color: #CE93D8; }
+  .footer { margin-top: 40px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; }
+</style>
+</head>
+<body>
+  <h1>BITCOIN RINGS</h1>
+  <div class="sub">BUY THE BLOOD · SELL THE GOLD</div>
+  <div class="cards">
+    <a href="index.html" class="card clear">
+      <div class="card-title">THE MAP</div>
+      <div class="card-desc">Stripped down. Four rings. Current price, ATH, projected low, projected high. One glance.</div>
+    </a>
+    <a href="swing.html" class="card swing">
+      <div class="card-title">SWING</div>
+      <div class="card-desc">20/60 day Bressert cycles. Where are we in the wave. Buy zones and sell zones.</div>
+    </a>
+    <a href="macro.html" class="card macro">
+      <div class="card-title">MACRO</div>
+      <div class="card-desc">Full Cycle 4 view. Blood zone, golden ring, momentum rings, pull lines.</div>
+    </a>
+    <a href="backtest.html" class="card backtest">
+      <div class="card-title">BACKTEST</div>
+      <div class="card-desc">20/60 swing system vs buy & hold. Nov 2022 to present. Trade log and equity curve.</div>
+    </a>
+  </div>
+  <div class="footer">LIVE DATA · ALL CLIENT-SIDE · NO TRACKING</div>
+</body>
+</html>
