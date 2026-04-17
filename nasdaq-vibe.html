@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NASDAQ Rings — Vibe</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: 8px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.2); letter-spacing: 3px; margin-top: 4px; }
+  canvas { border-radius: 12px; margin-top: 14px; }
+  .loading { text-align: center; padding: 100px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .loading-sub { font-size: 10px; color: rgba(255,255,255,0.2); margin-top: 8px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(100,180,255,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(100,180,255,0.08); border: 1px solid rgba(100,180,255,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:#64B5F6; box-shadow:0 0 6px #64B5F6; }
+  .context-bar {
+    margin-top: 14px; max-width: 640px; width: 100%;
+    padding: 12px 18px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    font-size: 10px; color: rgba(255,255,255,0.35); text-align: center; line-height: 1.7;
+  }
+  .instrument-bar {
+    display: flex; gap: 6px; margin: 10px 0; flex-wrap: wrap; justify-content: center;
+  }
+  .instrument-bar button {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.35); padding: 5px 14px; border-radius: 4px;
+    cursor: pointer; font-size: 10px; font-family: inherit; letter-spacing: 1px;
+    transition: all 0.15s ease;
+  }
+  .instrument-bar button.active {
+    background: rgba(100,180,255,0.12); border-color: rgba(100,180,255,0.3);
+    color: #fff; font-weight: 700;
+  }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>THE VIBE</h1>
+  <div class="subtitle">EQUITIES · 20/60 DAY CYCLES · VIX FEAR LAYER</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">READING THE PULSE<span id="dots"></span></div>
+  <div class="loading-sub">Fetching market data...</div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div class="instrument-bar" id="instrumentBar">
+    <button class="active" onclick="switchInstrument('QQQ')">QQQ</button>
+    <button onclick="switchInstrument('TQQQ')">TQQQ (3×)</button>
+    <button onclick="switchInstrument('SPY')">SPY</button>
+    <button onclick="switchInstrument('DIA')">DIA</button>
+  </div>
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="context" class="context-bar"></div>
+  <div class="footer">CATCH THE WAVE · RIDE THE PULSE · EQUITIES EDITION</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// EQUITIES VIBE — NASDAQ / S&P / DOW
+// ═══════════════════════════════════════════════
+//
+// Same philosophy as BTC vibe:
+//   DEPLOY at the trough
+//   RIDE the wave
+//   EXIT at the crest
+//
+// Added layer: VIX (fear index)
+//   VIX > 28 = fear spike = stronger deploy signal
+//   VIX < 14 = complacency = watch for exit
+//   VIX 14-28 = normal range
+//
+// Instruments:
+//   QQQ  = NASDAQ 100 (5-10% swings per 60d cycle)
+//   TQQQ = 3× leveraged NASDAQ (15-30% swings)
+//   SPY  = S&P 500 (3-7% swings)
+//   DIA  = Dow Jones (3-6% swings)
+//
+// ═══════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700";
+const CYAN = "#4FC3F7", BLUE = "#64B5F6", PURPLE = "#CE93D8";
+
+let priceData = {};  // keyed by symbol
+let vixData = [];
+let currentSymbol = "QQQ";
+let animProgress = 0;
+let dataSource = "";
+
+const LEVERAGE = { QQQ: 1, TQQQ: 3, SPY: 1, DIA: 1 };
+const DEPLOY_CAPITAL = 400000;
+
+// ─── Trough Detection ───
+function findTroughs(prices, halfWindow) {
+  const troughs = [];
+  for (let i = halfWindow; i < prices.length - halfWindow; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= halfWindow; j++) {
+      if (prices[i] > prices[i - j] || prices[i] > prices[i + j]) { isTrough = false; break; }
+    }
+    if (isTrough && (troughs.length === 0 || (i - troughs[troughs.length - 1]) >= halfWindow)) {
+      troughs.push(i);
+    }
+  }
+  return troughs;
+}
+
+function filterTroughs(troughs, prices, nominal, tol) {
+  if (troughs.length <= 1) return troughs;
+  const minGap = nominal * (1 - tol);
+  const filtered = [troughs[0]];
+  for (let i = 1; i < troughs.length; i++) {
+    const gap = troughs[i] - filtered[filtered.length - 1];
+    if (gap >= minGap) filtered.push(troughs[i]);
+    else if (prices[troughs[i]] < prices[filtered[filtered.length - 1]]) filtered[filtered.length - 1] = troughs[i];
+  }
+  return filtered;
+}
+
+function findCrest(prices, start, end) {
+  let max = -Infinity, idx = start;
+  for (let i = start; i <= Math.min(end, prices.length - 1); i++) {
+    if (prices[i] > max) { max = prices[i]; idx = i; }
+  }
+  return { idx, price: max };
+}
+
+// ─── VIX Analysis ───
+function readVix(vixPrices) {
+  if (!vixPrices || vixPrices.length < 5) return { level: 0, zone: "UNKNOWN", color: "rgba(255,255,255,0.3)" };
+  const current = vixPrices[vixPrices.length - 1];
+  const avg5 = vixPrices.slice(-5).reduce((a,b) => a+b, 0) / 5;
+  const avg20 = vixPrices.slice(-20).reduce((a,b) => a+b, 0) / Math.min(vixPrices.length, 20);
+  const rising = avg5 > avg20;
+
+  let zone, color, deployBoost = 0, exitBoost = 0;
+  if (current >= 30) {
+    zone = "FEAR SPIKE"; color = RED; deployBoost = 3;
+  } else if (current >= 24) {
+    zone = "ELEVATED FEAR"; color = "#FF9800"; deployBoost = 2;
+  } else if (current >= 18) {
+    zone = "NORMAL"; color = "rgba(255,255,255,0.5)";
+  } else if (current >= 14) {
+    zone = "CALM"; color = CYAN; exitBoost = 1;
+  } else {
+    zone = "COMPLACENT"; color = PURPLE; exitBoost = 2;
+  }
+
+  return { level: current, avg5, avg20, rising, zone, color, deployBoost, exitBoost };
+}
+
+// ─── Read the pulse ───
+function readPulse(data, vixPrices, symbol) {
+  if (data.length < 100) return null;
+
+  const prices = data.map(d => d.price);
+  const dates = data.map(d => d.date);
+  const now = prices.length - 1;
+  const currentPrice = prices[now];
+  const leverage = LEVERAGE[symbol] || 1;
+
+  // Find 60-day troughs
+  let t60 = findTroughs(prices, 12);
+  t60 = filterTroughs(t60, prices, 60, 0.5);
+  if (t60.length < 2) { t60 = findTroughs(prices, 8); t60 = filterTroughs(t60, prices, 60, 0.6); }
+
+  // Find 20-day troughs
+  let t20 = findTroughs(prices, 4);
+  t20 = filterTroughs(t20, prices, 20, 0.5);
+  if (t20.length < 2) { t20 = findTroughs(prices, 3); t20 = filterTroughs(t20, prices, 20, 0.6); }
+
+  if (t60.length < 1 || t20.length < 1) return null;
+
+  // Average 60-day cycle length
+  let avgLen60 = 60;
+  if (t60.length >= 2) {
+    const recent = [];
+    for (let i = Math.max(0, t60.length - 5); i < t60.length - 1; i++) recent.push(t60[i+1] - t60[i]);
+    if (recent.length) avgLen60 = recent.reduce((a,b) => a+b, 0) / recent.length;
+  }
+
+  // Average recent amplitude
+  let avgSwing = 0.06;
+  if (t60.length >= 2) {
+    const amps = [];
+    for (let i = Math.max(0, t60.length - 4); i < t60.length - 1; i++) {
+      const c = findCrest(prices, t60[i], t60[i+1]);
+      const low = Math.min(prices[t60[i]], prices[t60[i+1]]);
+      amps.push((c.price - low) / low);
+    }
+    if (amps.length) avgSwing = amps.reduce((a,b) => a+b, 0) / amps.length;
+  }
+
+  // Current 60-day cycle
+  const last60 = t60[t60.length - 1];
+  const daysSince60 = now - last60;
+  const progress60 = daysSince60 / avgLen60;
+  const troughPrice60 = prices[last60];
+  const crest60 = findCrest(prices, last60, now);
+  const moveFromTrough = (currentPrice - troughPrice60) / troughPrice60;
+  const moveFromCrest = (currentPrice - crest60.price) / crest60.price;
+  const pastCrest = currentPrice < crest60.price * 0.985;
+  const nearTrough = daysSince60 <= 8;
+
+  // Current 20-day cycle
+  const last20 = t20[t20.length - 1];
+  const daysSince20 = now - last20;
+  const near20Trough = daysSince20 <= 5;
+  const crest20 = findCrest(prices, last20, now);
+  const past20Crest = currentPrice < crest20.price * 0.985;
+
+  // VIX layer
+  const vix = readVix(vixPrices);
+
+  // ─── THE VIBE ───
+  let deployScore =
+    (nearTrough ? 3 : 0) +
+    (near20Trough ? 2 : 0) +
+    (progress60 < 0.2 ? 3 : progress60 < 0.35 ? 2 : 0) +
+    (moveFromTrough < 0.015 ? 2 : moveFromTrough < 0.03 ? 1 : 0) +
+    vix.deployBoost;
+
+  let exitScore =
+    (progress60 > 0.85 ? 3 : progress60 > 0.7 ? 2 : 0) +
+    (pastCrest ? 2 : 0) +
+    (past20Crest && progress60 > 0.5 ? 2 : 0) +
+    (moveFromCrest < -0.04 ? 2 : moveFromCrest < -0.02 ? 1 : 0) +
+    vix.exitBoost;
+
+  let vibe, vibeColor, vibeDesc;
+
+  if (deployScore >= 4) {
+    vibe = "DEPLOY";
+    vibeColor = GREEN;
+    vibeDesc = vix.deployBoost >= 2
+      ? "Wave reset + fear spike. Strong window."
+      : "The wave just reset. This is your window.";
+  } else if (exitScore >= 4) {
+    vibe = "EXIT";
+    vibeColor = RED;
+    vibeDesc = vix.exitBoost >= 2
+      ? "Wave cresting + market complacent. Take profit."
+      : "The wave is cresting. Take profit, wait.";
+  } else if (deployScore >= 2 && exitScore < 2) {
+    vibe = "DEPLOY";
+    vibeColor = GREEN;
+    vibeDesc = "Early in the wave. Window opening.";
+  } else if (exitScore >= 2 && progress60 > 0.6) {
+    vibe = "EXIT";
+    vibeColor = RED;
+    vibeDesc = "Wave getting tired. Consider taking profit.";
+  } else {
+    vibe = "RIDE";
+    vibeColor = GOLD;
+    vibeDesc = "You're in the wave. Let it move.";
+  }
+
+  const moveLeft = Math.max(0, avgSwing - moveFromTrough);
+  const daysLeft = Math.max(0, Math.round(avgLen60 - daysSince60));
+  const dollarOnMove = Math.round(moveFromTrough * leverage * DEPLOY_CAPITAL);
+  const dollarOnExpected = Math.round(moveLeft * leverage * DEPLOY_CAPITAL);
+  const dollarAvgSwing = Math.round(avgSwing * leverage * DEPLOY_CAPITAL);
+
+  return {
+    vibe, vibeColor, vibeDesc,
+    currentPrice, troughPrice60, troughPrice20: prices[last20],
+    crest60, crest20,
+    daysSince60, daysSince20, avgLen60, progress60,
+    moveFromTrough, moveFromCrest, moveLeft,
+    avgSwing, daysLeft,
+    dollarOnMove, dollarOnExpected, dollarAvgSwing,
+    near20Trough, nearTrough, pastCrest, past20Crest,
+    deployScore, exitScore,
+    vix, leverage, symbol,
+    t60, t20, prices, dates,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING — Yahoo Finance via AllOrigins proxy
+// ═══════════════════════════════════════════════
+async function fetchEquityData(symbol) {
+  // Try CryptoCompare-style free APIs that work for equities
+  // We'll use Alpha Vantage demo, Yahoo chart API via proxy, or fallback
+
+  // Method 1: Yahoo Finance chart API (often works client-side)
+  try {
+    const period1 = Math.floor((Date.now() - 730 * 86400000) / 1000); // 2 years ago
+    const period2 = Math.floor(Date.now() / 1000);
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=1d`;
+    const r = await fetch(url);
+    if (r.ok) {
+      const j = await r.json();
+      const result = j.chart?.result?.[0];
+      if (result && result.timestamp && result.indicators?.quote?.[0]?.close) {
+        const ts = result.timestamp;
+        const closes = result.indicators.quote[0].close;
+        const d = [];
+        for (let i = 0; i < ts.length; i++) {
+          if (closes[i] != null) d.push({ date: new Date(ts[i] * 1000), price: closes[i] });
+        }
+        if (d.length > 100) return { data: d, source: "Yahoo Finance" };
+      }
+    }
+  } catch(e) { console.warn("Yahoo:", e); }
+
+  // Method 2: Twelve Data free tier
+  try {
+    const r = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=500&apikey=demo`);
+    if (r.ok) {
+      const j = await r.json();
+      if (j.values && j.values.length > 100) {
+        const d = j.values.map(v => ({ date: new Date(v.datetime), price: parseFloat(v.close) }))
+          .filter(x => x.price > 0).reverse();
+        return { data: d, source: "Twelve Data" };
+      }
+    }
+  } catch(e) { console.warn("Twelve Data:", e); }
+
+  // Method 3: Stooq CSV (free, no API key)
+  try {
+    const r = await fetch(`https://stooq.com/q/d/l/?s=${symbol.toLowerCase()}.us&i=d`);
+    if (r.ok) {
+      const text = await r.text();
+      const lines = text.trim().split("\n").slice(1); // skip header
+      const d = lines.map(line => {
+        const parts = line.split(",");
+        if (parts.length >= 5) {
+          return { date: new Date(parts[0]), price: parseFloat(parts[4]) }; // close
+        }
+        return null;
+      }).filter(x => x && x.price > 0 && !isNaN(x.date.getTime()));
+      if (d.length > 100) return { data: d, source: "Stooq" };
+    }
+  } catch(e) { console.warn("Stooq:", e); }
+
+  return { data: [], source: "ERROR" };
+}
+
+async function fetchVixData() {
+  // Try to get VIX data
+  try {
+    const period1 = Math.floor((Date.now() - 365 * 86400000) / 1000);
+    const period2 = Math.floor(Date.now() / 1000);
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?period1=${period1}&period2=${period2}&interval=1d`;
+    const r = await fetch(url);
+    if (r.ok) {
+      const j = await r.json();
+      const result = j.chart?.result?.[0];
+      if (result && result.indicators?.quote?.[0]?.close) {
+        return result.indicators.quote[0].close.filter(x => x != null);
+      }
+    }
+  } catch(e) { console.warn("VIX Yahoo:", e); }
+
+  try {
+    const r = await fetch(`https://api.twelvedata.com/time_series?symbol=VIX&interval=1day&outputsize=250&apikey=demo`);
+    if (r.ok) {
+      const j = await r.json();
+      if (j.values) return j.values.map(v => parseFloat(v.close)).filter(x => x > 0).reverse();
+    }
+  } catch(e) { console.warn("VIX Twelve:", e); }
+
+  try {
+    const r = await fetch(`https://stooq.com/q/d/l/?s=vix.us&i=d`);
+    if (r.ok) {
+      const text = await r.text();
+      const lines = text.trim().split("\n").slice(1);
+      return lines.map(l => parseFloat(l.split(",")[4])).filter(x => x > 0);
+    }
+  } catch(e) { console.warn("VIX Stooq:", e); }
+
+  return [];
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function fmtP(p) {
+  if (p >= 1000) return p.toLocaleString("en", { maximumFractionDigits: 2 });
+  return p.toFixed(2);
+}
+
+function draw() {
+  const data = priceData[currentSymbol];
+  if (!data || !data.length) return;
+
+  const canvas = document.getElementById("canvas");
+  const container = canvas.parentElement;
+  const size = Math.min(container.clientWidth - 20, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  canvas.style.width = size+"px"; canvas.style.height = size+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const cx = size/2, cy = size/2;
+
+  const pulse = readPulse(data, vixData, currentSymbol);
+  if (!pulse) return;
+
+  // ── Background ──
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0,0,size,size);
+  const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,size/2);
+  bg.addColorStop(0,"rgba(15,15,35,0.5)"); bg.addColorStop(1,"rgba(10,10,15,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0,0,size,size);
+
+  const maxR = (size/2) * 0.88;
+  const startAngle = -Math.PI / 2;
+
+  // ═════════════════════════════════════════════
+  // VIX RING — outermost, the fear layer
+  // ═════════════════════════════════════════════
+  if (pulse.vix.level > 0) {
+    const rVix = maxR * 0.96;
+    // VIX as a thin ring, colored by fear level
+    ctx.beginPath(); ctx.arc(cx, cy, rVix, 0, Math.PI*2);
+    ctx.strokeStyle = pulse.vix.color; ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.4; ctx.stroke(); ctx.globalAlpha = 1;
+    // Glow scales with VIX level
+    const vixGlow = Math.min(pulse.vix.level / 20, 2.5);
+    ctx.beginPath(); ctx.arc(cx, cy, rVix, 0, Math.PI*2);
+    ctx.strokeStyle = pulse.vix.color; ctx.lineWidth = 10 * vixGlow;
+    ctx.globalAlpha = 0.05 * vixGlow; ctx.stroke(); ctx.globalAlpha = 1;
+    // Label
+    ctx.font = "bold 8px monospace"; ctx.fillStyle = pulse.vix.color;
+    ctx.globalAlpha = 0.5; ctx.textAlign = "center";
+    ctx.fillText(`VIX ${pulse.vix.level.toFixed(1)} · ${pulse.vix.zone}`, cx, cy - rVix - 8);
+    ctx.globalAlpha = 1;
+  }
+
+  // ═════════════════════════════════════════════
+  // 60-DAY BREATH — main ring
+  // ═════════════════════════════════════════════
+  const r60 = maxR * 0.82;
+  const progress = Math.min(pulse.progress60, 1.3);
+  const progressAngle = startAngle + progress * Math.PI * 2;
+
+  // Zone arcs
+  const deployEnd = startAngle + 0.30 * Math.PI * 2;
+  const rideEnd = startAngle + 0.65 * Math.PI * 2;
+
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, deployEnd);
+  ctx.strokeStyle = "rgba(0,230,118,0.07)"; ctx.lineWidth = 18; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r60, deployEnd, rideEnd);
+  ctx.strokeStyle = "rgba(255,215,0,0.05)"; ctx.lineWidth = 18; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r60, rideEnd, startAngle + Math.PI*2);
+  ctx.strokeStyle = "rgba(255,23,68,0.05)"; ctx.lineWidth = 18; ctx.stroke();
+
+  // Zone labels
+  ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
+  const dAngle = startAngle + 0.15 * Math.PI * 2;
+  ctx.fillStyle = GREEN; ctx.globalAlpha = 0.25;
+  ctx.fillText("DEPLOY", cx + (r60+22)*Math.cos(dAngle), cy + (r60+22)*Math.sin(dAngle)+3);
+  const riAngle = startAngle + 0.475 * Math.PI * 2;
+  ctx.fillStyle = GOLD; ctx.globalAlpha = 0.2;
+  ctx.fillText("RIDE", cx + (r60+22)*Math.cos(riAngle), cy + (r60+22)*Math.sin(riAngle)+3);
+  const eAngle = startAngle + 0.825 * Math.PI * 2;
+  ctx.fillStyle = RED; ctx.globalAlpha = 0.2;
+  ctx.fillText("EXIT", cx + (r60+22)*Math.cos(eAngle), cy + (r60+22)*Math.sin(eAngle)+3);
+  ctx.globalAlpha = 1;
+
+  // Elapsed arc
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, progressAngle);
+  ctx.strokeStyle = pulse.vibeColor; ctx.lineWidth = 8; ctx.globalAlpha = 0.8 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, progressAngle);
+  ctx.strokeStyle = pulse.vibeColor; ctx.lineWidth = 24; ctx.globalAlpha = 0.08 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Trough marker
+  ctx.beginPath(); ctx.arc(cx, cy - r60, 5, 0, Math.PI*2);
+  ctx.fillStyle = GREEN; ctx.globalAlpha = 0.6; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.font = "7px monospace"; ctx.fillStyle = GREEN; ctx.globalAlpha = 0.4;
+  ctx.fillText("TROUGH", cx, cy - r60 - 10);
+  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillText(`$${fmtP(pulse.troughPrice60)}`, cx, cy - r60 - 22);
+  ctx.globalAlpha = 1;
+
+  // Crest marker
+  if (pulse.crest60) {
+    const crestPct = (pulse.crest60.idx - pulse.t60[pulse.t60.length-1]) / Math.max(pulse.daysSince60, 1);
+    const crestAngle = startAngle + crestPct * progress * Math.PI * 2;
+    const cX = cx + (r60 - 18) * Math.cos(crestAngle);
+    const cY = cy + (r60 - 18) * Math.sin(crestAngle);
+    ctx.beginPath(); ctx.arc(cX, cY, 4, 0, Math.PI*2);
+    ctx.fillStyle = GOLD; ctx.globalAlpha = 0.8; ctx.fill();
+    ctx.beginPath(); ctx.arc(cX, cY, 9, 0, Math.PI*2);
+    ctx.fillStyle = GOLD; ctx.globalAlpha = 0.1; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.font = "7px monospace"; ctx.fillStyle = GOLD; ctx.globalAlpha = 0.5;
+    ctx.fillText(`$${fmtP(pulse.crest60.price)}`, cX, cY - 10);
+    ctx.globalAlpha = 1;
+  }
+
+  // NOW marker (pulses)
+  const nowX = cx + r60 * Math.cos(progressAngle);
+  const nowY = cy + r60 * Math.sin(progressAngle);
+  const pulseScale = 1 + 0.15 * Math.sin(Date.now() / 600);
+  ctx.beginPath(); ctx.arc(nowX, nowY, 22*pulseScale, 0, Math.PI*2);
+  ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.06; ctx.fill();
+  ctx.beginPath(); ctx.arc(nowX, nowY, 14, 0, Math.PI*2);
+  ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.12; ctx.fill();
+  ctx.beginPath(); ctx.arc(nowX, nowY, 8, 0, Math.PI*2);
+  ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.95 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // 20-DAY PULSE — inner ring
+  // ═════════════════════════════════════════════
+  const r20 = maxR * 0.48;
+  const prog20 = Math.min(pulse.daysSince20 / 20, 1.3);
+  const pAngle20 = startAngle + prog20 * Math.PI * 2;
+  const c20 = pulse.near20Trough ? GREEN : pulse.past20Crest ? RED : CYAN;
+
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, startAngle + 0.25 * Math.PI*2);
+  ctx.strokeStyle = "rgba(0,230,118,0.04)"; ctx.lineWidth = 10; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle + 0.25*Math.PI*2, startAngle + 0.6*Math.PI*2);
+  ctx.strokeStyle = "rgba(79,195,247,0.03)"; ctx.lineWidth = 10; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle + 0.6*Math.PI*2, startAngle + Math.PI*2);
+  ctx.strokeStyle = "rgba(255,23,68,0.03)"; ctx.lineWidth = 10; ctx.stroke();
+
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, pAngle20);
+  ctx.strokeStyle = c20; ctx.lineWidth = 4; ctx.globalAlpha = 0.6 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, pAngle20);
+  ctx.strokeStyle = c20; ctx.lineWidth = 14; ctx.globalAlpha = 0.05 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  const m20x = cx + r20 * Math.cos(pAngle20);
+  const m20y = cy + r20 * Math.sin(pAngle20);
+  ctx.beginPath(); ctx.arc(m20x, m20y, 5, 0, Math.PI*2);
+  ctx.fillStyle = c20; ctx.globalAlpha = 0.8 * animProgress; ctx.fill(); ctx.globalAlpha = 1;
+
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = c20; ctx.globalAlpha = 0.4;
+  ctx.textAlign = "center";
+  ctx.fillText("20D PULSE", cx, cy - r20 - 10);
+  ctx.font = "7px monospace";
+  ctx.fillText(`DAY ${pulse.daysSince20}`, cx, cy - r20 - 22);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // CENTER — THE VIBE
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+
+  // Symbol
+  ctx.font = "bold 12px monospace"; ctx.fillStyle = BLUE; ctx.globalAlpha = 0.4;
+  ctx.fillText(currentSymbol, cx, cy - 44);
+  if (pulse.leverage > 1) {
+    ctx.font = "9px monospace"; ctx.fillStyle = PURPLE; ctx.globalAlpha = 0.3;
+    ctx.fillText(`${pulse.leverage}× LEVERAGED`, cx, cy - 32);
+  }
+  ctx.globalAlpha = 1;
+
+  // The word
+  ctx.font = "bold 40px monospace"; ctx.fillStyle = pulse.vibeColor;
+  ctx.globalAlpha = 0.95 * animProgress;
+  ctx.fillText(pulse.vibe, cx, cy + 2);
+  ctx.globalAlpha = 1;
+
+  // Description
+  ctx.font = "10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText(pulse.vibeDesc, cx, cy + 20);
+
+  // Price
+  ctx.font = "bold 14px monospace"; ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.7;
+  ctx.fillText(`$${fmtP(pulse.currentPrice)}`, cx, cy + 40);
+  ctx.globalAlpha = 1;
+
+  // Move
+  ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.25)";
+  const mStr = pulse.moveFromTrough >= 0
+    ? `+${(pulse.moveFromTrough*100).toFixed(1)}% from trough`
+    : `${(pulse.moveFromTrough*100).toFixed(1)}% from trough`;
+  ctx.fillText(mStr, cx, cy + 56);
+
+  // Dollar context
+  if (pulse.vibe === "RIDE" || pulse.vibe === "EXIT") {
+    ctx.font = "9px monospace"; ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.4;
+    const dStr = pulse.dollarOnMove >= 0
+      ? `+$${Number(pulse.dollarOnMove).toLocaleString()} on $400K`
+      : `-$${Number(Math.abs(pulse.dollarOnMove)).toLocaleString()} on $400K`;
+    ctx.fillText(dStr, cx, cy + 70);
+    ctx.globalAlpha = 1;
+  }
+  if (pulse.vibe === "DEPLOY") {
+    ctx.font = "9px monospace"; ctx.fillStyle = GREEN; ctx.globalAlpha = 0.4;
+    ctx.fillText(`Avg swing: ~${(pulse.avgSwing*100).toFixed(1)}% · ~$${Number(pulse.dollarAvgSwing).toLocaleString()} on $400K`, cx, cy + 70);
+    ctx.globalAlpha = 1;
+  }
+
+  // Day count
+  ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillText(`60D: day ${pulse.daysSince60} of ~${Math.round(pulse.avgLen60)} · ${pulse.daysLeft}d left`, cx, cy + 86);
+
+  // ═════════════════════════════════════════════
+  // CONTEXT BAR
+  // ═════════════════════════════════════════════
+  const fromCrest = pulse.moveFromCrest < 0
+    ? `${(pulse.moveFromCrest*100).toFixed(1)}% from wave high ($${fmtP(pulse.crest60.price)})`
+    : `at wave high`;
+  const moveLeftStr = pulse.moveLeft > 0.005
+    ? `~${(pulse.moveLeft*100).toFixed(1)}% move remaining (~$${Number(pulse.dollarOnExpected).toLocaleString()})`
+    : `move appears spent`;
+  const vixStr = pulse.vix.level > 0
+    ? `VIX ${pulse.vix.level.toFixed(1)} <span style="color:${pulse.vix.color}">${pulse.vix.zone}</span>`
+    : "";
+
+  document.getElementById("context").innerHTML = `
+    <span style="color:${pulse.vibeColor};font-weight:700">${currentSymbol} · ${pulse.vibe}</span> ·
+    60D: day ${pulse.daysSince60} of ~${Math.round(pulse.avgLen60)} ·
+    20D: day ${pulse.daysSince20} ·
+    ${fromCrest} · ${moveLeftStr}
+    ${vixStr ? ' · ' + vixStr : ''} ·
+    <span style="color:rgba(255,255,255,0.5)">~${pulse.daysLeft}d to next trough</span>
+  `;
+
+  if (animProgress >= 1) requestAnimationFrame(() => draw());
+}
+
+// ═══════════════════════════════════════════════
+// INSTRUMENT SWITCHING
+// ═══════════════════════════════════════════════
+async function switchInstrument(symbol) {
+  currentSymbol = symbol;
+  document.querySelectorAll(".instrument-bar button").forEach(b => {
+    b.classList.toggle("active", b.textContent.startsWith(symbol));
+  });
+
+  if (!priceData[symbol]) {
+    document.getElementById("badgeText").textContent = `Loading ${symbol}...`;
+    const result = await fetchEquityData(symbol);
+    if (result.data.length) {
+      priceData[symbol] = result.data;
+      dataSource = result.source;
+    }
+  }
+  document.getElementById("badgeText").textContent = `LIVE · ${dataSource}`;
+  draw();
+}
+
+// ═══════════════════════════════════════════════
+// ANIMATION & MAIN
+// ═══════════════════════════════════════════════
+function animate() {
+  if (animProgress < 1) {
+    animProgress += 0.025;
+    if (animProgress > 1) animProgress = 1;
+    draw();
+    requestAnimationFrame(animate);
+  } else {
+    draw();
+  }
+}
+
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount+1)%4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  // Fetch QQQ (default) and VIX in parallel
+  const [qqq, vix] = await Promise.all([
+    fetchEquityData("QQQ"),
+    fetchVixData(),
+  ]);
+  clearInterval(dotTimer);
+
+  if (!qqq.data.length) {
+    document.getElementById("loading").innerHTML = `
+      <div class="loading-text" style="color:#FF1744">COULDN'T FETCH DATA</div>
+      <div class="loading-sub" style="margin-top:12px;color:rgba(255,255,255,0.3)">
+        Yahoo Finance, Twelve Data, and Stooq all blocked or unavailable.<br>
+        Try opening this file directly in your browser (not from an iframe).
+      </div>
+    `;
+    return;
+  }
+
+  priceData["QQQ"] = qqq.data;
+  vixData = vix;
+  dataSource = qqq.source;
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("badgeText").textContent = `LIVE · ${qqq.source}`;
+
+  animate();
+  window.addEventListener("resize", draw);
+}
+
+main();
+</script>
+</body>
+</html>
