@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — Bressert Cycles</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 6px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; margin-top: 4px; }
+  canvas { border-radius: 12px; margin-top: 14px; }
+  .loading { text-align: center; padding: 100px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:#00E676; box-shadow:0 0 6px #00E676; }
+  .panels {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-top: 16px; max-width: 700px; width: 100%;
+  }
+  .panel {
+    padding: 16px; border-radius: 8px;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
+  }
+  .panel-title { font-size: 9px; letter-spacing: 2px; margin-bottom: 10px; }
+  .panel .row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 11px; }
+  .panel .row .lbl { color: rgba(255,255,255,0.35); }
+  .panel .row .val { font-weight: 700; }
+  .translation-bar {
+    width: 100%; height: 10px; border-radius: 5px;
+    background: rgba(255,255,255,0.06); margin: 8px 0; position: relative; overflow: visible;
+  }
+  .translation-bar .midline {
+    position: absolute; left: 50%; top: -2px; width: 1px; height: 14px;
+    background: rgba(255,255,255,0.15);
+  }
+  .translation-bar .crest-marker {
+    position: absolute; top: -3px; width: 8px; height: 16px; border-radius: 4px;
+    transition: left 0.3s ease;
+  }
+  .translation-bar .fill {
+    height: 100%; border-radius: 5px; transition: width 0.3s ease;
+  }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.12); letter-spacing: 1px; text-align: center; }
+  @media (max-width: 600px) { .panels { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>BITCOIN RINGS</h1>
+  <div class="subtitle">BRESSERT CYCLES · LOW TO LOW · 20D / 60D · TIMING</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">LOADING<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="panels" class="panels"></div>
+  <div class="footer">BRESSERT CYCLE THEORY · LOW→LOW · TRANSLATION ANALYSIS · LIVE DATA</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// BRESSERT CYCLE ENGINE
+// ═══════════════════════════════════════════════
+//
+// Cycles are measured TROUGH to TROUGH (low to low).
+//
+// The 60-day intermediate cycle:
+//   - Typical length: 40–80 days, nominal 60
+//   - Contains 2-3 nested 20-day trading cycles
+//
+// The 20-day trading cycle:
+//   - Typical length: 14–28 days, nominal 20
+//   - The smallest tradeable cycle
+//
+// TRANSLATION:
+//   - Right translation: crest occurs AFTER the cycle midpoint → BULLISH
+//     (the rally phase is longer than the decline)
+//   - Left translation: crest occurs BEFORE the cycle midpoint → BEARISH
+//     (the decline phase is longer than the rally)
+//
+// Phase:
+//   Trough → Rally → Crest → Decline → Next Trough
+//   We estimate where we are in this progression.
+//
+// ═══════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700", CYAN = "#4FC3F7";
+const PURPLE = "#CE93D8", NEUTRAL = "#607D8B";
+
+let allData = [];
+let animProgress = 0;
+
+// ─── Trough Detection ───
+// A trough is a local minimum where price is lower than
+// the surrounding N days on each side.
+// We use different window sizes for 60d and 20d cycles.
+function findTroughs(prices, halfWindow) {
+  const troughs = [];
+  for (let i = halfWindow; i < prices.length - halfWindow; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= halfWindow; j++) {
+      if (prices[i] > prices[i - j] || prices[i] > prices[i + j]) {
+        isTrough = false;
+        break;
+      }
+    }
+    if (isTrough) {
+      // Avoid duplicate troughs too close together
+      if (troughs.length === 0 || (i - troughs[troughs.length - 1]) >= halfWindow) {
+        troughs.push(i);
+      }
+    }
+  }
+  return troughs;
+}
+
+// Filter troughs to match expected cycle length
+// Keep troughs that are approximately `nominalLen` apart
+function filterTroughsByCycleLength(troughs, prices, nominalLen, tolerance) {
+  if (troughs.length <= 1) return troughs;
+
+  const minLen = nominalLen * (1 - tolerance);
+  const maxLen = nominalLen * (1 + tolerance);
+  const filtered = [troughs[0]];
+
+  for (let i = 1; i < troughs.length; i++) {
+    const gap = troughs[i] - filtered[filtered.length - 1];
+    if (gap >= minLen) {
+      filtered.push(troughs[i]);
+    } else {
+      // If two troughs are too close, keep the lower one
+      if (prices[troughs[i]] < prices[filtered[filtered.length - 1]]) {
+        filtered[filtered.length - 1] = troughs[i];
+      }
+    }
+  }
+  return filtered;
+}
+
+// Find the crest (highest point) between two troughs
+function findCrest(prices, startIdx, endIdx) {
+  let maxP = -Infinity, maxIdx = startIdx;
+  for (let i = startIdx; i <= endIdx; i++) {
+    if (prices[i] > maxP) { maxP = prices[i]; maxIdx = i; }
+  }
+  return { idx: maxIdx, price: maxP };
+}
+
+// Analyze a complete cycle (between two troughs)
+function analyzeCycle(prices, troughStart, troughEnd) {
+  const length = troughEnd - troughStart;
+  const midpoint = troughStart + length / 2;
+  const crest = findCrest(prices, troughStart, troughEnd);
+  const crestPosition = (crest.idx - troughStart) / length; // 0-1, where in cycle the crest fell
+  const translation = crestPosition > 0.5 ? "RIGHT" : "LEFT";
+  const isBullish = translation === "RIGHT";
+
+  return {
+    startIdx: troughStart,
+    endIdx: troughEnd,
+    length,
+    midpoint,
+    crest,
+    crestPosition,
+    translation,
+    isBullish,
+    startPrice: prices[troughStart],
+    endPrice: prices[troughEnd],
+    amplitude: (crest.price - Math.min(prices[troughStart], prices[troughEnd])) / Math.min(prices[troughStart], prices[troughEnd]),
+  };
+}
+
+// Compute full cycle analysis
+function computeCycleAnalysis(data) {
+  if (data.length < 120) return null;
+
+  const prices = data.map(d => d.price);
+  const dates = data.map(d => d.date);
+  const now = prices.length - 1;
+
+  // ─── 60-DAY INTERMEDIATE CYCLE ───
+  // Use halfWindow=12 for trough detection (look 12 days each side)
+  let troughs60raw = findTroughs(prices, 12);
+  let troughs60 = filterTroughsByCycleLength(troughs60raw, prices, 60, 0.5); // 30-90 day tolerance
+
+  // If we don't find enough, relax detection
+  if (troughs60.length < 2) {
+    troughs60raw = findTroughs(prices, 8);
+    troughs60 = filterTroughsByCycleLength(troughs60raw, prices, 60, 0.6);
+  }
+
+  // ─── 20-DAY TRADING CYCLE ───
+  let troughs20raw = findTroughs(prices, 4);
+  let troughs20 = filterTroughsByCycleLength(troughs20raw, prices, 20, 0.5); // 10-30 day tolerance
+
+  if (troughs20.length < 2) {
+    troughs20raw = findTroughs(prices, 3);
+    troughs20 = filterTroughsByCycleLength(troughs20raw, prices, 20, 0.6);
+  }
+
+  // ─── Analyze completed cycles ───
+  const completedCycles60 = [];
+  for (let i = 0; i < troughs60.length - 1; i++) {
+    completedCycles60.push(analyzeCycle(prices, troughs60[i], troughs60[i + 1]));
+  }
+
+  const completedCycles20 = [];
+  for (let i = 0; i < troughs20.length - 1; i++) {
+    completedCycles20.push(analyzeCycle(prices, troughs20[i], troughs20[i + 1]));
+  }
+
+  // ─── Average cycle length from recent data ───
+  const recent60 = completedCycles60.slice(-6);
+  const avgLen60 = recent60.length ? recent60.reduce((s, c) => s + c.length, 0) / recent60.length : 60;
+
+  const recent20 = completedCycles20.slice(-6);
+  const avgLen20 = recent20.length ? recent20.reduce((s, c) => s + c.length, 0) / recent20.length : 20;
+
+  // ─── Current (open) cycle — from last trough to now ───
+  const lastTrough60 = troughs60.length ? troughs60[troughs60.length - 1] : null;
+  const lastTrough20 = troughs20.length ? troughs20[troughs20.length - 1] : null;
+
+  let current60 = null;
+  if (lastTrough60 !== null) {
+    const daysSinceTrough = now - lastTrough60;
+    const crest = findCrest(prices, lastTrough60, now);
+    const progressPct = daysSinceTrough / avgLen60; // >1 means overdue
+    const expectedNextTrough = lastTrough60 + Math.round(avgLen60);
+    const daysUntilNextTrough = expectedNextTrough - now;
+    const crestPos = (crest.idx - lastTrough60) / Math.max(1, daysSinceTrough);
+    const midpointDay = avgLen60 / 2;
+    const pastMidpoint = daysSinceTrough > midpointDay;
+    // Translation of current cycle so far
+    const translation = crestPos > 0.5 ? "RIGHT" : "LEFT";
+    // Phase: if price is still above crest * 0.98, we might still be rallying
+    const phase = prices[now] >= crest.price * 0.97 ? "RALLY" :
+                  daysSinceTrough < midpointDay ? "RALLY" : "DECLINE";
+
+    current60 = {
+      troughIdx: lastTrough60,
+      troughDate: dates[lastTrough60],
+      troughPrice: prices[lastTrough60],
+      daysSinceTrough,
+      avgLen: avgLen60,
+      progressPct,
+      expectedNextTrough,
+      expectedNextTroughDate: lastTrough60 + Math.round(avgLen60) < dates.length
+        ? dates[lastTrough60 + Math.round(avgLen60)]
+        : new Date(dates[lastTrough60].getTime() + avgLen60 * 86400000),
+      daysUntilNextTrough,
+      crest,
+      crestPosition: crestPos,
+      translation,
+      phase,
+      pastMidpoint,
+      currentPrice: prices[now],
+    };
+  }
+
+  let current20 = null;
+  if (lastTrough20 !== null) {
+    const daysSinceTrough = now - lastTrough20;
+    const crest = findCrest(prices, lastTrough20, now);
+    const progressPct = daysSinceTrough / avgLen20;
+    const expectedNextTrough = lastTrough20 + Math.round(avgLen20);
+    const daysUntilNextTrough = expectedNextTrough - now;
+    const crestPos = (crest.idx - lastTrough20) / Math.max(1, daysSinceTrough);
+    const midpointDay = avgLen20 / 2;
+    const phase = prices[now] >= crest.price * 0.97 ? "RALLY" :
+                  daysSinceTrough < midpointDay ? "RALLY" : "DECLINE";
+    const translation = crestPos > 0.5 ? "RIGHT" : "LEFT";
+
+    current20 = {
+      troughIdx: lastTrough20,
+      troughDate: dates[lastTrough20],
+      troughPrice: prices[lastTrough20],
+      daysSinceTrough,
+      avgLen: avgLen20,
+      progressPct,
+      expectedNextTrough,
+      expectedNextTroughDate: lastTrough20 + Math.round(avgLen20) < dates.length
+        ? dates[lastTrough20 + Math.round(avgLen20)]
+        : new Date(dates[lastTrough20].getTime() + avgLen20 * 86400000),
+      daysUntilNextTrough,
+      crest,
+      crestPosition: crestPos,
+      translation,
+      phase,
+      pastMidpoint: daysSinceTrough > midpointDay,
+      currentPrice: prices[now],
+    };
+  }
+
+  // ─── Translation history (last several cycles) ───
+  const translationHistory60 = completedCycles60.slice(-5).map(c => c.translation);
+  const translationHistory20 = completedCycles20.slice(-5).map(c => c.translation);
+  const bullPct60 = translationHistory60.length ? translationHistory60.filter(t => t === "RIGHT").length / translationHistory60.length : 0.5;
+  const bullPct20 = translationHistory20.length ? translationHistory20.filter(t => t === "RIGHT").length / translationHistory20.length : 0.5;
+
+  return {
+    current60, current20,
+    completedCycles60, completedCycles20,
+    troughs60, troughs20,
+    avgLen60, avgLen20,
+    translationHistory60, translationHistory20,
+    bullPct60, bullPct20,
+    prices, dates,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+async function fetchBTCData() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.prices.map(([ts,p]) => ({date:new Date(ts),price:p}));
+    if (d.length > 100) return {data:d, source:"CoinGecko"};
+  } catch(e) { console.warn("CoinGecko:",e); }
+  try {
+    const all = [];
+    let end = Date.now();
+    for (let i=0;i<8;i++) {
+      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
+      if (!r.ok) break;
+      const k = await r.json();
+      if (!k.length) break;
+      all.unshift(...k); end = k[0][0]-1;
+    }
+    if (all.length>100) {
+      const seen=new Set();
+      const d=all.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;})
+        .map(k=>({date:new Date(k[0]),price:+k[4]})).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"Binance"};
+    }
+  } catch(e) { console.warn("Binance:",e); }
+  try {
+    const all=[];
+    let toTs=Math.floor(Date.now()/1000);
+    for(let i=0;i<3;i++){
+      const r=await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
+      if(!r.ok)break;
+      const j=await r.json();
+      if(!j.Data?.Data?.length)break;
+      all.unshift(...j.Data.Data); toTs=j.Data.Data[0].time-1;
+    }
+    if(all.length>100){
+      const seen=new Set();
+      const d=all.filter(x=>{if(seen.has(x.time))return false;seen.add(x.time);return true;})
+        .map(x=>({date:new Date(x.time*1000),price:x.close}))
+        .filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"CryptoCompare"};
+    }
+  } catch(e) { console.warn("CryptoCompare:",e); }
+  return {data:[], source:"ERROR"};
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en",{maximumFractionDigits:0}) : p.toFixed(2); }
+function fmtD(d) { return d instanceof Date ? d.toISOString().slice(0,10) : "—"; }
+
+function draw() {
+  const canvas = document.getElementById("canvas");
+  const container = canvas.parentElement;
+  const size = Math.min(container.clientWidth - 20, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  canvas.style.width = size+"px"; canvas.style.height = size+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const cx = size/2, cy = size/2;
+
+  // Filter to recent data (last 2 years for cycle detection)
+  const cutoff = new Date(Date.now() - 730 * 86400000);
+  const recentData = allData.filter(d => d.date >= cutoff);
+  const analysis = computeCycleAnalysis(recentData);
+  if (!analysis || !analysis.current60) return;
+
+  const c60 = analysis.current60;
+  const c20 = analysis.current20;
+
+  // ── Background ──
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0,0,size,size);
+  const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,size/2);
+  bg.addColorStop(0,"rgba(15,15,30,0.5)"); bg.addColorStop(1,"rgba(10,10,15,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0,0,size,size);
+
+  // ═════════════════════════════════════════════
+  // THE CYCLE CLOCK
+  // Rings represent TIME, not price.
+  // Inner = cycle start (trough, day 0)
+  // Outer = expected cycle end (next trough)
+  // Current position = where we are in the cycle
+  // ═════════════════════════════════════════════
+
+  const maxR = (size/2) * 0.88;
+  const minR = 50;
+
+  // ── 60-DAY CYCLE — the outer clock ──
+  const progress60 = Math.min(c60.progressPct, 1.4); // allow overshoot
+  const r60full = maxR; // full cycle = max radius
+  const r60now = minR + progress60 * (maxR - minR) * animProgress;
+  const r60mid = minR + 0.5 * (maxR - minR); // midpoint ring
+
+  // Translation determines color
+  const color60 = c60.translation === "RIGHT" ? GREEN : RED;
+  const label60 = c60.translation === "RIGHT" ? "RIGHT TRANSLATION · BULLISH" : "LEFT TRANSLATION · BEARISH";
+
+  // Phase arc — filled to show progress
+  // Full circle = full cycle length
+  const startAngle = -Math.PI / 2; // 12 o'clock
+  const progressAngle = startAngle + (progress60 * Math.PI * 2);
+
+  // Outer boundary ring — the expected cycle end
+  ctx.beginPath(); ctx.arc(cx, cy, r60full, 0, Math.PI*2);
+  ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 2; ctx.stroke();
+
+  // Midpoint ring — dashed
+  ctx.beginPath(); ctx.arc(cx, cy, r60mid, 0, Math.PI*2);
+  ctx.setLineDash([6,6]);
+  ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Progress arc — the main visual
+  ctx.beginPath(); ctx.arc(cx, cy, r60now, startAngle, progressAngle);
+  ctx.strokeStyle = color60; ctx.lineWidth = 6; ctx.globalAlpha = 0.7 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Progress glow
+  ctx.beginPath(); ctx.arc(cx, cy, r60now, startAngle, progressAngle);
+  ctx.strokeStyle = color60; ctx.lineWidth = 20; ctx.globalAlpha = 0.08 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Filled zone from center to current progress
+  const grad60 = ctx.createRadialGradient(cx, cy, minR, cx, cy, r60now);
+  grad60.addColorStop(0, color60.replace(")", ",0.02)").replace("rgb","rgba"));
+  grad60.addColorStop(0.7, color60.replace(")", ",0.06)").replace("rgb","rgba"));
+  grad60.addColorStop(1, color60.replace(")", ",0.0)").replace("rgb","rgba"));
+  // Use the actual hex → we need to convert
+  const c60rgba = color60 === GREEN ? "rgba(0,230,118," : "rgba(255,23,68,";
+  const grad60b = ctx.createRadialGradient(cx, cy, minR, cx, cy, r60now);
+  grad60b.addColorStop(0, c60rgba + "0.01)");
+  grad60b.addColorStop(0.5, c60rgba + "0.04)");
+  grad60b.addColorStop(1, c60rgba + "0.0)");
+  ctx.beginPath(); ctx.arc(cx, cy, r60now, 0, Math.PI*2); ctx.fillStyle = grad60b; ctx.fill();
+
+  // Current position marker on the arc
+  const markerAngle = progressAngle;
+  const mx = cx + r60now * Math.cos(markerAngle);
+  const my = cy + r60now * Math.sin(markerAngle);
+  ctx.beginPath(); ctx.arc(mx, my, 8, 0, Math.PI*2);
+  ctx.fillStyle = color60; ctx.globalAlpha = 0.9 * animProgress; ctx.fill();
+  ctx.beginPath(); ctx.arc(mx, my, 14, 0, Math.PI*2);
+  ctx.fillStyle = color60; ctx.globalAlpha = 0.15; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // ── Crest marker on the arc (where the high occurred) ──
+  if (c60.crest) {
+    const crestAngle = startAngle + (c60.crestPosition * progress60 * Math.PI * 2);
+    const crestX = cx + (r60now - 15) * Math.cos(crestAngle);
+    const crestY = cy + (r60now - 15) * Math.sin(crestAngle);
+    ctx.beginPath(); ctx.arc(crestX, crestY, 4, 0, Math.PI*2);
+    ctx.fillStyle = GOLD; ctx.globalAlpha = 0.8; ctx.fill();
+    ctx.globalAlpha = 1;
+    // Small label
+    ctx.font = "7px monospace"; ctx.fillStyle = GOLD; ctx.globalAlpha = 0.5;
+    ctx.textAlign = "center";
+    ctx.fillText("CREST", crestX, crestY - 8);
+    ctx.globalAlpha = 1;
+  }
+
+  // ── 20-DAY CYCLE — inner clock ──
+  if (c20) {
+    const innerMaxR = minR + 0.35 * (maxR - minR); // 20d lives in the inner 35% of the space
+    const innerMinR = minR + 10;
+    const progress20 = Math.min(c20.progressPct, 1.4);
+    const r20now = innerMinR + progress20 * (innerMaxR - innerMinR) * animProgress;
+    const color20 = c20.translation === "RIGHT" ? CYAN : PURPLE;
+    const progressAngle20 = startAngle + (progress20 * Math.PI * 2);
+
+    // 20-day boundary
+    ctx.beginPath(); ctx.arc(cx, cy, innerMaxR, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+
+    // 20-day progress arc
+    ctx.beginPath(); ctx.arc(cx, cy, r20now, startAngle, progressAngle20);
+    ctx.strokeStyle = color20; ctx.lineWidth = 3; ctx.globalAlpha = 0.5 * animProgress;
+    ctx.stroke(); ctx.globalAlpha = 1;
+
+    // 20d marker
+    const mx20 = cx + r20now * Math.cos(progressAngle20);
+    const my20 = cy + r20now * Math.sin(progressAngle20);
+    ctx.beginPath(); ctx.arc(mx20, my20, 5, 0, Math.PI*2);
+    ctx.fillStyle = color20; ctx.globalAlpha = 0.7 * animProgress; ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // 20d crest
+    if (c20.crest) {
+      const crestAngle20 = startAngle + (c20.crestPosition * progress20 * Math.PI * 2);
+      const cX20 = cx + (r20now - 10) * Math.cos(crestAngle20);
+      const cY20 = cy + (r20now - 10) * Math.sin(crestAngle20);
+      ctx.beginPath(); ctx.arc(cX20, cY20, 3, 0, Math.PI*2);
+      ctx.fillStyle = GOLD; ctx.globalAlpha = 0.6; ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ═════════════════════════════════════════════
+  // LABELS ON CANVAS
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+
+  // 60-day cycle label at top
+  ctx.font = "bold 10px monospace"; ctx.fillStyle = color60; ctx.globalAlpha = 0.8;
+  ctx.fillText("60-DAY CYCLE", cx, cy - maxR - 12);
+  ctx.font = "8px monospace"; ctx.globalAlpha = 0.45;
+  ctx.fillText(label60, cx, cy - maxR + 2);
+  ctx.globalAlpha = 1;
+
+  // Day markers around the outer ring (like a clock face)
+  const dayMarkers = [0, 15, 30, 45, 60, 75, 90];
+  dayMarkers.forEach(day => {
+    const angle = startAngle + (day / Math.max(c60.avgLen, 60)) * Math.PI * 2;
+    const x1 = cx + (maxR + 2) * Math.cos(angle);
+    const y1 = cy + (maxR + 2) * Math.sin(angle);
+    const x2 = cx + (maxR + 8) * Math.cos(angle);
+    const y2 = cy + (maxR + 8) * Math.sin(angle);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.stroke();
+    if (day <= c60.avgLen * 1.2) {
+      ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+      const tx = cx + (maxR + 16) * Math.cos(angle);
+      const ty = cy + (maxR + 16) * Math.sin(angle);
+      ctx.fillText(`D${day}`, tx, ty + 3);
+    }
+  });
+
+  // "TROUGH" label at 12 o'clock (start)
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = RED; ctx.globalAlpha = 0.5;
+  ctx.fillText("TROUGH", cx, cy - maxR + 16);
+  ctx.globalAlpha = 1;
+
+  // "MIDPOINT" label at 6 o'clock
+  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillText("MIDPOINT", cx, cy + r60mid + 14);
+
+  // ═════════════════════════════════════════════
+  // CENTER — cycle status
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+
+  // Day count
+  ctx.font = "bold 36px monospace"; ctx.fillStyle = color60;
+  ctx.fillText(`${c60.daysSinceTrough}`, cx, cy + 8);
+
+  ctx.font = "bold 9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText(`OF ~${Math.round(c60.avgLen)} DAYS`, cx, cy + 22);
+
+  // Phase
+  ctx.font = "bold 11px monospace"; ctx.fillStyle = color60; ctx.globalAlpha = 0.7;
+  ctx.fillText(c60.phase, cx, cy - 20);
+  ctx.globalAlpha = 1;
+
+  // Days until next trough
+  if (c60.daysUntilNextTrough > 0) {
+    ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.fillText(`~${c60.daysUntilNextTrough}d TO NEXT LOW`, cx, cy + 36);
+  } else {
+    ctx.font = "bold 9px monospace"; ctx.fillStyle = RED; ctx.globalAlpha = 0.7;
+    ctx.fillText("TROUGH OVERDUE", cx, cy + 36);
+    ctx.globalAlpha = 1;
+  }
+
+  // 20d status
+  if (c20) {
+    ctx.font = "8px monospace"; ctx.fillStyle = c20.translation === "RIGHT" ? CYAN : PURPLE;
+    ctx.globalAlpha = 0.5;
+    ctx.fillText(`20D: DAY ${c20.daysSinceTrough} · ${c20.phase} · ${c20.translation}`, cx, cy + 50);
+    ctx.globalAlpha = 1;
+  }
+
+  // ═════════════════════════════════════════════
+  // INFO PANELS
+  // ═════════════════════════════════════════════
+  updatePanels(analysis);
+}
+
+function updatePanels(a) {
+  const c60 = a.current60;
+  const c20 = a.current20;
+  const color60 = c60.translation === "RIGHT" ? GREEN : RED;
+  const color20 = c20 ? (c20.translation === "RIGHT" ? CYAN : PURPLE) : NEUTRAL;
+
+  // Translation bar position (0 = far left, 1 = far right)
+  const crestPct60 = Math.round(c60.crestPosition * 100);
+  const crestPct20 = c20 ? Math.round(c20.crestPosition * 100) : 50;
+
+  // Recent translation history
+  const hist60 = a.translationHistory60.map(t =>
+    `<span style="color:${t === 'RIGHT' ? GREEN : RED};font-weight:700">${t === 'RIGHT' ? 'R' : 'L'}</span>`
+  ).join(" ");
+  const hist20 = a.translationHistory20.slice(-5).map(t =>
+    `<span style="color:${t === 'RIGHT' ? CYAN : PURPLE};font-weight:700">${t === 'RIGHT' ? 'R' : 'L'}</span>`
+  ).join(" ");
+
+  document.getElementById("panels").innerHTML = `
+    <div class="panel">
+      <div class="panel-title" style="color:${color60}">60-DAY INTERMEDIATE CYCLE</div>
+      <div class="row"><span class="lbl">CYCLE DAY</span><span class="val" style="color:${color60}">${c60.daysSinceTrough} of ~${Math.round(c60.avgLen)}</span></div>
+      <div class="row"><span class="lbl">PHASE</span><span class="val">${c60.phase}</span></div>
+      <div class="row"><span class="lbl">LAST TROUGH</span><span class="val">$${fmtP(c60.troughPrice)} · ${fmtD(c60.troughDate)}</span></div>
+      <div class="row"><span class="lbl">CYCLE CREST</span><span class="val" style="color:${GOLD}">$${fmtP(c60.crest.price)}</span></div>
+      <div class="row"><span class="lbl">NEXT LOW EST</span><span class="val">${c60.daysUntilNextTrough > 0 ? '~' + c60.daysUntilNextTrough + 'd' : 'OVERDUE'}</span></div>
+      <div class="row"><span class="lbl">TRANSLATION</span><span class="val" style="color:${color60}">${c60.translation} · ${c60.translation === 'RIGHT' ? 'BULLISH' : 'BEARISH'}</span></div>
+      <div style="margin-top:8px;">
+        <div style="font-size:8px;color:rgba(255,255,255,0.25);margin-bottom:4px">CREST POSITION (LEFT ← → RIGHT)</div>
+        <div class="translation-bar">
+          <div class="midline"></div>
+          <div class="fill" style="width:${crestPct60}%;background:${color60};opacity:0.3"></div>
+          <div class="crest-marker" style="left:calc(${crestPct60}% - 4px);background:${color60}"></div>
+        </div>
+      </div>
+      <div class="row"><span class="lbl">RECENT</span><span class="val">${hist60 || '—'}</span></div>
+      <div class="row"><span class="lbl">BULL BIAS</span><span class="val">${Math.round(a.bullPct60 * 100)}%</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title" style="color:${color20}">20-DAY TRADING CYCLE</div>
+      ${c20 ? `
+        <div class="row"><span class="lbl">CYCLE DAY</span><span class="val" style="color:${color20}">${c20.daysSinceTrough} of ~${Math.round(c20.avgLen)}</span></div>
+        <div class="row"><span class="lbl">PHASE</span><span class="val">${c20.phase}</span></div>
+        <div class="row"><span class="lbl">LAST TROUGH</span><span class="val">$${fmtP(c20.troughPrice)} · ${fmtD(c20.troughDate)}</span></div>
+        <div class="row"><span class="lbl">CYCLE CREST</span><span class="val" style="color:${GOLD}">$${fmtP(c20.crest.price)}</span></div>
+        <div class="row"><span class="lbl">NEXT LOW EST</span><span class="val">${c20.daysUntilNextTrough > 0 ? '~' + c20.daysUntilNextTrough + 'd' : 'OVERDUE'}</span></div>
+        <div class="row"><span class="lbl">TRANSLATION</span><span class="val" style="color:${color20}">${c20.translation} · ${c20.translation === 'RIGHT' ? 'BULLISH' : 'BEARISH'}</span></div>
+        <div style="margin-top:8px;">
+          <div style="font-size:8px;color:rgba(255,255,255,0.25);margin-bottom:4px">CREST POSITION (LEFT ← → RIGHT)</div>
+          <div class="translation-bar">
+            <div class="midline"></div>
+            <div class="fill" style="width:${crestPct20}%;background:${color20};opacity:0.3"></div>
+            <div class="crest-marker" style="left:calc(${crestPct20}% - 4px);background:${color20}"></div>
+          </div>
+        </div>
+        <div class="row"><span class="lbl">RECENT</span><span class="val">${hist20 || '—'}</span></div>
+        <div class="row"><span class="lbl">BULL BIAS</span><span class="val">${Math.round(a.bullPct20 * 100)}%</span></div>
+      ` : '<div style="color:rgba(255,255,255,0.2);font-size:10px">Insufficient data</div>'}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════
+function animate() {
+  if (animProgress < 1) {
+    animProgress += 0.02;
+    if (animProgress > 1) animProgress = 1;
+    draw();
+    requestAnimationFrame(animate);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount + 1) % 4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  const result = await fetchBTCData();
+  clearInterval(dotTimer);
+
+  if (!result.data.length) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
+    return;
+  }
+
+  allData = result.data;
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("badgeText").textContent = `LIVE · ${result.source}`;
+
+  animate();
+  window.addEventListener("resize", () => { if (animProgress >= 1) draw(); });
+}
+
+main();
+</script>
+</body>
+</html>
