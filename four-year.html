@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — 4-Year Cycle</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 6px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; margin-top: 4px; }
+  canvas { border-radius: 12px; margin-top: 14px; }
+  .loading { text-align: center; padding: 100px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:#00E676; box-shadow:0 0 6px #00E676; }
+  .panels {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-top: 16px; max-width: 720px; width: 100%;
+  }
+  .panel {
+    padding: 16px; border-radius: 8px;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
+  }
+  .panel-title { font-size: 9px; letter-spacing: 2px; margin-bottom: 10px; }
+  .panel .row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 11px; }
+  .panel .row .lbl { color: rgba(255,255,255,0.35); }
+  .panel .row .val { font-weight: 700; }
+  .history-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-top: 16px; max-width: 720px; width: 100%;
+  }
+  .history-card {
+    padding: 12px 10px; border-radius: 8px; text-align: center;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+  }
+  .history-card .cyc { font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
+  .history-card .mult { font-size: 16px; font-weight: 700; }
+  .history-card .dates { font-size: 8px; color: rgba(255,255,255,0.2); margin-top: 4px; }
+  .history-card .dd { font-size: 9px; margin-top: 2px; }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.12); letter-spacing: 1px; text-align: center; }
+  @media (max-width: 600px) {
+    .panels { grid-template-columns: 1fr; }
+    .history-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>BITCOIN RINGS</h1>
+  <div class="subtitle">4-YEAR HALVING CYCLE · LOW TO LOW · WHERE ARE WE</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">LOADING<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="panels" class="panels"></div>
+  <div id="history" class="history-grid"></div>
+  <div class="footer">4-YEAR HALVING CYCLE · BRESSERT LOW→LOW · LOUKAS MODEL · LIVE DATA</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// 4-YEAR BITCOIN HALVING CYCLE
+// ═══════════════════════════════════════════════
+//
+// Bressert: cycles are measured LOW to LOW
+// Loukas: Bitcoin's 4-year cycle syncs with halving
+//
+// KNOWN CYCLE LOWS (troughs):
+//   Cycle 1: 2011-11-18  $2.01    (post first bubble)
+//   Cycle 2: 2015-01-14  $172     (post Mt. Gox)
+//   Cycle 3: 2018-12-15  $3,148   (post ICO mania)
+//   Cycle 4: 2022-11-21  $15,800  (post FTX/Luna)
+//
+// KNOWN CYCLE TOPS (crests):
+//   Cycle 1: 2013-11-29  $1,163   (579× from low)
+//   Cycle 2: 2017-12-17  $19,783  (115× from C1 low, 6.3× from C2 low)
+//   Cycle 3: 2021-11-10  $69,000  (21.9× from C3 low)
+//   Cycle 4: TBD         ATH~$109K so far (6.9× from C4 low so far)
+//
+// HALVINGS:
+//   2012-11-28, 2016-07-09, 2020-05-11, 2024-04-20
+//
+// Pattern: bottom ~12-14 months after top, top ~12-18 months after halving
+// ═══════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700";
+const CYAN = "#4FC3F7", PURPLE = "#CE93D8";
+
+// Hard-coded cycle landmarks (these are historical facts)
+const CYCLES = [
+  {
+    id: 1, label: "CYCLE 1",
+    low: { date: new Date("2011-11-18"), price: 2.01 },
+    top: { date: new Date("2013-11-29"), price: 1163 },
+    halving: new Date("2012-11-28"),
+    nextLow: { date: new Date("2015-01-14"), price: 172 },
+  },
+  {
+    id: 2, label: "CYCLE 2",
+    low: { date: new Date("2015-01-14"), price: 172 },
+    top: { date: new Date("2017-12-17"), price: 19783 },
+    halving: new Date("2016-07-09"),
+    nextLow: { date: new Date("2018-12-15"), price: 3148 },
+  },
+  {
+    id: 3, label: "CYCLE 3",
+    low: { date: new Date("2018-12-15"), price: 3148 },
+    top: { date: new Date("2021-11-10"), price: 69000 },
+    halving: new Date("2020-05-11"),
+    nextLow: { date: new Date("2022-11-21"), price: 15800 },
+  },
+  {
+    id: 4, label: "CYCLE 4",
+    low: { date: new Date("2022-11-21"), price: 15800 },
+    top: null, // TBD — we'll use ATH from live data
+    halving: new Date("2024-04-20"),
+    nextLow: null, // projected
+  },
+];
+
+let allData = [];
+let animProgress = 0;
+
+function daysBetween(a, b) {
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+function computeFourYearAnalysis(data) {
+  if (!data.length) return null;
+
+  const prices = data.map(d => d.price);
+  const dates = data.map(d => d.date);
+  const now = dates[dates.length - 1];
+  const currentPrice = prices[prices.length - 1];
+  const ath = Math.max(...prices);
+
+  // ── Analyze completed cycles ──
+  const completed = CYCLES.slice(0, 3).map(c => {
+    const lengthDays = daysBetween(c.low.date, c.nextLow.date);
+    const topDay = daysBetween(c.low.date, c.top.date);
+    const crestPosition = topDay / lengthDays; // translation
+    const multiplier = c.top.price / c.low.price;
+    const drawdown = (c.top.price - c.nextLow.price) / c.top.price;
+    const halvingDay = daysBetween(c.low.date, c.halving);
+    const halvingPct = halvingDay / lengthDays;
+    const topAfterHalving = daysBetween(c.halving, c.top.date);
+    return {
+      ...c, lengthDays, topDay, crestPosition,
+      multiplier, drawdown, halvingDay, halvingPct, topAfterHalving,
+      translation: crestPosition > 0.5 ? "RIGHT" : "LEFT",
+    };
+  });
+
+  // ── Average cycle length ──
+  const avgLength = completed.reduce((s, c) => s + c.lengthDays, 0) / completed.length;
+  const avgCrestPos = completed.reduce((s, c) => s + c.crestPosition, 0) / completed.length;
+  const avgTopAfterHalving = completed.reduce((s, c) => s + c.topAfterHalving, 0) / completed.length;
+
+  // ── Current cycle (Cycle 4) ──
+  const c4 = CYCLES[3];
+  const daysSinceLow = daysBetween(c4.low.date, now);
+  const daysSinceHalving = daysBetween(c4.halving, now);
+  const progress = daysSinceLow / avgLength;
+
+  // Projected top: ~avgTopAfterHalving days after halving
+  const projectedTopDate = new Date(c4.halving.getTime() + avgTopAfterHalving * 86400000);
+  const daysToProjectedTop = daysBetween(now, projectedTopDate);
+
+  // Projected next low: avgLength days after cycle 4 low
+  const projectedNextLowDate = new Date(c4.low.date.getTime() + avgLength * 86400000);
+  const daysToProjectedLow = daysBetween(now, projectedNextLowDate);
+
+  // Current cycle crest position (so far)
+  // Find ATH date
+  let athIdx = 0;
+  for (let i = 0; i < prices.length; i++) {
+    if (prices[i] >= ath) athIdx = i;
+  }
+  const athDate = dates[athIdx];
+  const athDay = daysBetween(c4.low.date, athDate);
+  const currentCrestPos = athDay / Math.max(daysSinceLow, 1);
+  const currentTranslation = currentCrestPos > 0.5 ? "RIGHT" : "LEFT";
+
+  // Multiplier from bottom
+  const currentMultiplier = currentPrice / c4.low.price;
+  const athMultiplier = ath / c4.low.price;
+
+  // Phase determination
+  // Halving is a key marker — pre-halving is accumulation, post-halving is typically expansion
+  const phase = daysSinceHalving < 0 ? "PRE-HALVING" :
+                daysToProjectedTop > 0 && currentPrice >= ath * 0.9 ? "EXPANSION" :
+                daysToProjectedTop <= 0 && currentPrice < ath * 0.8 ? "DISTRIBUTION" :
+                progress > 0.85 ? "LATE CYCLE" :
+                progress > 0.5 ? "MID CYCLE" : "EARLY CYCLE";
+
+  // Diminishing returns trend
+  const multipliers = completed.map(c => c.multiplier);
+  const drawdowns = completed.map(c => c.drawdown);
+
+  return {
+    completed, c4, currentPrice, ath, athDate, athDay,
+    daysSinceLow, daysSinceHalving, avgLength, avgCrestPos,
+    progress, projectedTopDate, daysToProjectedTop,
+    projectedNextLowDate, daysToProjectedLow,
+    currentCrestPos, currentTranslation,
+    currentMultiplier, athMultiplier,
+    phase, multipliers, drawdowns, avgTopAfterHalving,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+async function fetchBTCData() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.prices.map(([ts,p]) => ({date:new Date(ts),price:p}));
+    if (d.length > 100) return {data:d, source:"CoinGecko"};
+  } catch(e) { console.warn("CoinGecko:",e); }
+  try {
+    const all = [];
+    let end = Date.now();
+    for (let i=0;i<8;i++) {
+      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
+      if (!r.ok) break;
+      const k = await r.json();
+      if (!k.length) break;
+      all.unshift(...k); end = k[0][0]-1;
+    }
+    if (all.length>100) {
+      const seen=new Set();
+      const d=all.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;})
+        .map(k=>({date:new Date(k[0]),price:+k[4]})).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"Binance"};
+    }
+  } catch(e) { console.warn("Binance:",e); }
+  try {
+    const all=[];
+    let toTs=Math.floor(Date.now()/1000);
+    for(let i=0;i<3;i++){
+      const r=await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
+      if(!r.ok)break;
+      const j=await r.json();
+      if(!j.Data?.Data?.length)break;
+      all.unshift(...j.Data.Data); toTs=j.Data.Data[0].time-1;
+    }
+    if(all.length>100){
+      const seen=new Set();
+      const d=all.filter(x=>{if(seen.has(x.time))return false;seen.add(x.time);return true;})
+        .map(x=>({date:new Date(x.time*1000),price:x.close}))
+        .filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"CryptoCompare"};
+    }
+  } catch(e) { console.warn("CryptoCompare:",e); }
+  return {data:[], source:"ERROR"};
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en",{maximumFractionDigits:0}) : p < 10 ? p.toFixed(2) : p.toFixed(0); }
+function fmtD(d) { return d instanceof Date ? d.toISOString().slice(0,10) : "—"; }
+function fmtMonth(d) { return d instanceof Date ? d.toLocaleDateString("en",{month:"short",year:"numeric"}) : "—"; }
+
+function draw() {
+  const canvas = document.getElementById("canvas");
+  const container = canvas.parentElement;
+  const size = Math.min(container.clientWidth - 20, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  canvas.style.width = size+"px"; canvas.style.height = size+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const cx = size/2, cy = size/2;
+
+  const a = computeFourYearAnalysis(allData);
+  if (!a) return;
+
+  // ── Background ──
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0,0,size,size);
+  const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,size/2);
+  bg.addColorStop(0,"rgba(15,15,30,0.5)"); bg.addColorStop(1,"rgba(10,10,15,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0,0,size,size);
+
+  const maxR = (size/2) * 0.88;
+  const startAngle = -Math.PI / 2; // 12 o'clock = cycle low (trough)
+
+  // ═════════════════════════════════════════════
+  // OUTER RING: 4-YEAR CYCLE (Cycle 4)
+  // Full circle = one complete cycle (~1400 days avg)
+  // Arc fills as time progresses from the C4 low
+  // ═════════════════════════════════════════════
+  const r4y = maxR * 0.88;
+  const progress4y = Math.min(a.progress, 1.3);
+  const progressAngle4y = startAngle + progress4y * Math.PI * 2;
+
+  // Translation color for current cycle
+  const color4y = a.currentTranslation === "RIGHT" ? GREEN : RED;
+  const c4yRgba = color4y === GREEN ? "rgba(0,230,118," : "rgba(255,23,68,";
+
+  // ── Remaining (dashed) ──
+  ctx.beginPath(); ctx.arc(cx, cy, r4y, progressAngle4y, startAngle + Math.PI*2);
+  ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 10;
+  ctx.setLineDash([4,6]); ctx.stroke(); ctx.setLineDash([]);
+
+  // ── Elapsed (solid, glowing) ──
+  ctx.beginPath(); ctx.arc(cx, cy, r4y, startAngle, progressAngle4y);
+  ctx.strokeStyle = color4y; ctx.lineWidth = 10; ctx.globalAlpha = 0.7 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Glow on elapsed
+  ctx.beginPath(); ctx.arc(cx, cy, r4y, startAngle, progressAngle4y);
+  ctx.strokeStyle = color4y; ctx.lineWidth = 30; ctx.globalAlpha = 0.08 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Subtle glow on remaining
+  ctx.beginPath(); ctx.arc(cx, cy, r4y, progressAngle4y, startAngle + Math.PI*2);
+  ctx.strokeStyle = c4yRgba + "0.02)"; ctx.lineWidth = 30; ctx.stroke();
+
+  // ── Percentage label ──
+  const pct4y = Math.round(progress4y * 100);
+  const pctAngle4y = startAngle + (progress4y * 0.5) * Math.PI * 2;
+  ctx.font = "bold 12px monospace"; ctx.fillStyle = color4y; ctx.globalAlpha = 0.5;
+  ctx.textAlign = "center";
+  const px4y = cx + (r4y + 24) * Math.cos(pctAngle4y);
+  const py4y = cy + (r4y + 24) * Math.sin(pctAngle4y);
+  ctx.fillText(`${pct4y}%`, px4y, py4y + 4);
+  ctx.globalAlpha = 1;
+
+  // ── Key markers on the ring ──
+
+  // TROUGH marker at 12 o'clock
+  const troughX = cx, troughY = cy - r4y;
+  ctx.beginPath(); ctx.arc(troughX, troughY, 6, 0, Math.PI*2);
+  ctx.fillStyle = RED; ctx.globalAlpha = 0.7; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = RED; ctx.globalAlpha = 0.6;
+  ctx.fillText("TROUGH", troughX, troughY - 14);
+  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText(`$${fmtP(a.c4.low.price)} · ${fmtMonth(a.c4.low.date)}`, troughX, troughY - 26);
+  ctx.globalAlpha = 1;
+
+  // HALVING marker
+  const halvingDayPct = daysBetween(a.c4.low.date, a.c4.halving) / a.avgLength;
+  const halvingAngle = startAngle + halvingDayPct * Math.PI * 2;
+  const hx = cx + r4y * Math.cos(halvingAngle);
+  const hy = cy + r4y * Math.sin(halvingAngle);
+  ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI*2);
+  ctx.fillStyle = CYAN; ctx.globalAlpha = 0.8; ctx.fill();
+  ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI*2);
+  ctx.fillStyle = CYAN; ctx.globalAlpha = 0.15; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = CYAN; ctx.globalAlpha = 0.6;
+  const hlx = hx + 16 * Math.cos(halvingAngle);
+  const hly = hy + 16 * Math.sin(halvingAngle);
+  ctx.textAlign = halvingAngle > 0 ? "left" : "center";
+  ctx.fillText("HALVING", hlx, hly - 4);
+  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText(fmtMonth(a.c4.halving), hlx, hly + 8);
+  ctx.globalAlpha = 1;
+
+  // ATH / CREST marker (gold)
+  const athPct = a.athDay / a.avgLength;
+  const athAngle = startAngle + athPct * Math.PI * 2;
+  const athX = cx + r4y * Math.cos(athAngle);
+  const athY = cy + r4y * Math.sin(athAngle);
+  ctx.beginPath(); ctx.arc(athX, athY, 5, 0, Math.PI*2);
+  ctx.fillStyle = GOLD; ctx.globalAlpha = 0.9; ctx.fill();
+  ctx.beginPath(); ctx.arc(athX, athY, 10, 0, Math.PI*2);
+  ctx.fillStyle = GOLD; ctx.globalAlpha = 0.15; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = GOLD; ctx.globalAlpha = 0.7;
+  const alx = athX + 16 * Math.cos(athAngle);
+  const aly = athY + 16 * Math.sin(athAngle);
+  ctx.textAlign = athAngle > -Math.PI/2 && athAngle < Math.PI/2 ? "left" : "right";
+  ctx.fillText("ATH", alx, aly - 4);
+  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText(`$${fmtP(a.ath)} · ${fmtMonth(a.athDate)}`, alx, aly + 8);
+  ctx.globalAlpha = 1;
+
+  // PROJECTED TOP marker (if in the future)
+  if (a.daysToProjectedTop > 0) {
+    const projTopPct = daysBetween(a.c4.low.date, a.projectedTopDate) / a.avgLength;
+    const projTopAngle = startAngle + projTopPct * Math.PI * 2;
+    const ptx = cx + r4y * Math.cos(projTopAngle);
+    const pty = cy + r4y * Math.sin(projTopAngle);
+    ctx.beginPath(); ctx.arc(ptx, pty, 4, 0, Math.PI*2);
+    ctx.fillStyle = GOLD; ctx.globalAlpha = 0.4; ctx.fill();
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.arc(ptx, pty, 9, 0, Math.PI*2);
+    ctx.strokeStyle = GOLD; ctx.globalAlpha = 0.3; ctx.lineWidth = 1; ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.font = "7px monospace"; ctx.fillStyle = GOLD; ctx.globalAlpha = 0.4;
+    ctx.textAlign = "center";
+    ctx.fillText("PROJ TOP", ptx, pty - 14);
+    ctx.fillText(`~${fmtMonth(a.projectedTopDate)}`, ptx, pty - 4);
+    ctx.globalAlpha = 1;
+  }
+
+  // PROJECTED NEXT LOW marker
+  const projLowPct = daysBetween(a.c4.low.date, a.projectedNextLowDate) / a.avgLength;
+  if (projLowPct <= 1.15) {
+    const projLowAngle = startAngle + Math.min(projLowPct, 1.0) * Math.PI * 2;
+    const plx = cx + r4y * Math.cos(projLowAngle);
+    const ply = cy + r4y * Math.sin(projLowAngle);
+    ctx.beginPath(); ctx.arc(plx, ply, 4, 0, Math.PI*2);
+    ctx.fillStyle = RED; ctx.globalAlpha = 0.4; ctx.fill();
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.arc(plx, ply, 9, 0, Math.PI*2);
+    ctx.strokeStyle = RED; ctx.globalAlpha = 0.3; ctx.lineWidth = 1; ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.font = "7px monospace"; ctx.fillStyle = RED; ctx.globalAlpha = 0.4;
+    ctx.textAlign = "center";
+    ctx.fillText("PROJ LOW", plx, ply + 18);
+    ctx.fillText(`~${fmtMonth(a.projectedNextLowDate)}`, plx, ply + 28);
+    ctx.globalAlpha = 1;
+  }
+
+  // ── YOU ARE HERE marker ──
+  const nowX = cx + r4y * Math.cos(progressAngle4y);
+  const nowY = cy + r4y * Math.sin(progressAngle4y);
+  ctx.beginPath(); ctx.arc(nowX, nowY, 10, 0, Math.PI*2);
+  ctx.fillStyle = color4y; ctx.globalAlpha = 0.95 * animProgress; ctx.fill();
+  ctx.beginPath(); ctx.arc(nowX, nowY, 18, 0, Math.PI*2);
+  ctx.fillStyle = color4y; ctx.globalAlpha = 0.15; ctx.fill();
+  ctx.beginPath(); ctx.arc(nowX, nowY, 28, 0, Math.PI*2);
+  ctx.fillStyle = color4y; ctx.globalAlpha = 0.05; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // "NOW" label with connector
+  const nowLabelAngle = progressAngle4y;
+  const nlx = cx + (r4y - 30) * Math.cos(nowLabelAngle);
+  const nly = cy + (r4y - 30) * Math.sin(nowLabelAngle);
+  ctx.font = "bold 9px monospace"; ctx.fillStyle = color4y; ctx.globalAlpha = 0.8;
+  ctx.textAlign = "center";
+  ctx.fillText("NOW", nlx, nly);
+  ctx.font = "7px monospace"; ctx.globalAlpha = 0.5;
+  ctx.fillText(`$${fmtP(a.currentPrice)}`, nlx, nly + 12);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // INNER RING: Previous cycles overlay (ghost rings)
+  // Show where C1, C2, C3 crests fell on the clock
+  // ═════════════════════════════════════════════
+  const rGhost = maxR * 0.60;
+
+  // Ghost ring outline
+  ctx.beginPath(); ctx.arc(cx, cy, rGhost, 0, Math.PI*2);
+  ctx.strokeStyle = "rgba(255,255,255,0.03)"; ctx.lineWidth = 2; ctx.stroke();
+
+  // Plot previous cycle crests
+  const cycleColors = ["rgba(255,255,255,0.2)", "rgba(255,255,255,0.25)", "rgba(255,255,255,0.3)"];
+  a.completed.forEach((c, i) => {
+    const crestAngle = startAngle + c.crestPosition * Math.PI * 2;
+    const gx = cx + rGhost * Math.cos(crestAngle);
+    const gy = cy + rGhost * Math.sin(crestAngle);
+    ctx.beginPath(); ctx.arc(gx, gy, 3, 0, Math.PI*2);
+    ctx.fillStyle = cycleColors[i]; ctx.fill();
+    ctx.font = "7px monospace"; ctx.fillStyle = cycleColors[i];
+    ctx.textAlign = "center";
+    ctx.fillText(`C${c.id}`, gx, gy - 8);
+  });
+
+  // Average crest position
+  const avgCrestAngle = startAngle + a.avgCrestPos * Math.PI * 2;
+  const acx = cx + rGhost * Math.cos(avgCrestAngle);
+  const acy = cy + rGhost * Math.sin(avgCrestAngle);
+  ctx.setLineDash([2,3]);
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(acx, acy);
+  ctx.strokeStyle = "rgba(255,215,0,0.15)"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = "7px monospace"; ctx.fillStyle = GOLD; ctx.globalAlpha = 0.3;
+  ctx.fillText("AVG TOP", acx, acy - 8);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // YEAR MARKERS around the ring
+  // ═════════════════════════════════════════════
+  const yearMarkers = [0, 365, 730, 1095, 1460];
+  const yearLabels = ["Y0", "Y1", "Y2", "Y3", "Y4"];
+  yearMarkers.forEach((day, i) => {
+    const angle = startAngle + (day / a.avgLength) * Math.PI * 2;
+    if (day / a.avgLength > 1.1) return;
+    const x1 = cx + (r4y + 4) * Math.cos(angle);
+    const y1 = cy + (r4y + 4) * Math.sin(angle);
+    const x2 = cx + (r4y + 12) * Math.cos(angle);
+    const y2 = cy + (r4y + 12) * Math.sin(angle);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.textAlign = "center";
+    const tx = cx + (r4y + 22) * Math.cos(angle);
+    const ty = cy + (r4y + 22) * Math.sin(angle);
+    ctx.fillText(yearLabels[i], tx, ty + 3);
+  });
+
+  // ═════════════════════════════════════════════
+  // CENTER — the summary
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+
+  ctx.font = "bold 10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText("4-YEAR CYCLE", cx, cy - 36);
+
+  // Day count
+  ctx.font = "bold 11px monospace"; ctx.fillStyle = color4y; ctx.globalAlpha = 0.6;
+  ctx.fillText(a.phase, cx, cy - 20);
+  ctx.globalAlpha = 1;
+
+  ctx.font = "bold 38px monospace"; ctx.fillStyle = color4y;
+  ctx.fillText(`${a.daysSinceLow}`, cx, cy + 12);
+  ctx.font = "bold 9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText(`OF ~${Math.round(a.avgLength)} DAYS`, cx, cy + 26);
+
+  // Translation
+  ctx.font = "bold 9px monospace"; ctx.fillStyle = color4y; ctx.globalAlpha = 0.6;
+  const transLabel = a.currentTranslation === "RIGHT" ? "RIGHT TRANSLATION · BULLISH" : "LEFT TRANSLATION · BEARISH";
+  ctx.fillText(transLabel, cx, cy + 42);
+  ctx.globalAlpha = 1;
+
+  // Multiplier
+  ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillText(`${a.currentMultiplier.toFixed(1)}× FROM BOTTOM`, cx, cy + 56);
+
+  // ═════════════════════════════════════════════
+  // UI PANELS
+  // ═════════════════════════════════════════════
+  updatePanels(a);
+  updateHistory(a);
+}
+
+function updatePanels(a) {
+  const color4y = a.currentTranslation === "RIGHT" ? GREEN : RED;
+
+  document.getElementById("panels").innerHTML = `
+    <div class="panel">
+      <div class="panel-title" style="color:${color4y}">CYCLE 4 — CURRENT</div>
+      <div class="row"><span class="lbl">CYCLE DAY</span><span class="val" style="color:${color4y}">${a.daysSinceLow} of ~${Math.round(a.avgLength)}</span></div>
+      <div class="row"><span class="lbl">PHASE</span><span class="val">${a.phase}</span></div>
+      <div class="row"><span class="lbl">PROGRESS</span><span class="val">${Math.round(a.progress * 100)}%</span></div>
+      <div class="row"><span class="lbl">BOTTOM</span><span class="val">$${fmtP(a.c4.low.price)} · ${fmtMonth(a.c4.low.date)}</span></div>
+      <div class="row"><span class="lbl">ATH</span><span class="val" style="color:${GOLD}">$${fmtP(a.ath)} · ${fmtMonth(a.athDate)}</span></div>
+      <div class="row"><span class="lbl">CURRENT</span><span class="val" style="color:${color4y}">$${fmtP(a.currentPrice)}</span></div>
+      <div class="row"><span class="lbl">MULTIPLIER</span><span class="val">${a.athMultiplier.toFixed(1)}× (ATH) · ${a.currentMultiplier.toFixed(1)}× (now)</span></div>
+      <div class="row"><span class="lbl">TRANSLATION</span><span class="val" style="color:${color4y}">${a.currentTranslation}</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title" style="color:rgba(255,255,255,0.5)">PROJECTIONS</div>
+      <div class="row"><span class="lbl">AVG CYCLE LENGTH</span><span class="val">${Math.round(a.avgLength)}d (~${(a.avgLength/365).toFixed(1)}y)</span></div>
+      <div class="row"><span class="lbl">AVG CREST POSITION</span><span class="val">${Math.round(a.avgCrestPos * 100)}% into cycle</span></div>
+      <div class="row"><span class="lbl">AVG TOP AFTER HALVING</span><span class="val">${Math.round(a.avgTopAfterHalving)}d (~${(a.avgTopAfterHalving/30).toFixed(0)}mo)</span></div>
+      <div class="row"><span class="lbl">PROJECTED TOP</span><span class="val" style="color:${GOLD}">~${fmtMonth(a.projectedTopDate)}${a.daysToProjectedTop > 0 ? ' ('+a.daysToProjectedTop+'d)' : ' (PAST)'}</span></div>
+      <div class="row"><span class="lbl">PROJECTED NEXT LOW</span><span class="val" style="color:${RED}">~${fmtMonth(a.projectedNextLowDate)}${a.daysToProjectedLow > 0 ? ' ('+a.daysToProjectedLow+'d)' : ' (PAST)'}</span></div>
+      <div class="row"><span class="lbl">HALVING</span><span class="val" style="color:${CYAN}">${fmtMonth(a.c4.halving)} · ${a.daysSinceHalving}d ago</span></div>
+      <div class="row"><span class="lbl">DAYS SINCE HALVING</span><span class="val">${a.daysSinceHalving}d</span></div>
+      <div class="row"><span class="lbl">DIMINISHING RETURNS</span><span class="val">${a.multipliers.map(m => m.toFixed(0)+'×').join(' → ')} → ?</span></div>
+    </div>
+  `;
+}
+
+function updateHistory(a) {
+  document.getElementById("history").innerHTML = a.completed.map(c => `
+    <div class="history-card">
+      <div class="cyc">${c.label}</div>
+      <div class="mult" style="color:${GOLD}">${c.multiplier.toFixed(0)}×</div>
+      <div class="dates">${fmtMonth(c.low.date)} → ${fmtMonth(c.top.date)}</div>
+      <div class="dd" style="color:${RED}">−${(c.drawdown*100).toFixed(0)}% dd</div>
+      <div class="dates">${c.lengthDays}d · crest ${Math.round(c.crestPosition*100)}%</div>
+      <div class="dates" style="color:${c.translation === 'RIGHT' ? GREEN : RED}">${c.translation}</div>
+    </div>
+  `).join("") + `
+    <div class="history-card" style="border-color:${a.currentTranslation === 'RIGHT' ? 'rgba(0,230,118,0.15)' : 'rgba(255,23,68,0.15)'}">
+      <div class="cyc" style="color:${a.currentTranslation === 'RIGHT' ? GREEN : RED}">CYCLE 4</div>
+      <div class="mult" style="color:${GOLD}">${a.athMultiplier.toFixed(1)}×</div>
+      <div class="dates">${fmtMonth(a.c4.low.date)} → ?</div>
+      <div class="dd" style="color:rgba(255,255,255,0.3)">IN PROGRESS</div>
+      <div class="dates">${a.daysSinceLow}d · crest ${Math.round(a.currentCrestPos*100)}%</div>
+      <div class="dates" style="color:${a.currentTranslation === 'RIGHT' ? GREEN : RED}">${a.currentTranslation}</div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════
+function animate() {
+  if (animProgress < 1) {
+    animProgress += 0.02;
+    if (animProgress > 1) animProgress = 1;
+    draw();
+    requestAnimationFrame(animate);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount + 1) % 4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  const result = await fetchBTCData();
+  clearInterval(dotTimer);
+
+  if (!result.data.length) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
+    return;
+  }
+
+  allData = result.data;
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("badgeText").textContent = `LIVE · ${result.source}`;
+
+  animate();
+  window.addEventListener("resize", () => { if (animProgress >= 1) draw(); });
+}
+
+main();
+</script>
+</body>
+</html>
