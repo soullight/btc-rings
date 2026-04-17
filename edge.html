@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — The Edge</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    padding: 20px; max-width: 1100px; margin: 0 auto;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 6px; text-align: center; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; text-align: center; margin-top: 4px; margin-bottom: 20px; }
+  .loading { text-align: center; padding: 80px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+
+  .signal-box {
+    text-align: center; padding: 24px; border-radius: 10px;
+    margin-bottom: 20px;
+  }
+  .signal-box.buy { background: rgba(0,230,118,0.06); border: 2px solid rgba(0,230,118,0.2); }
+  .signal-box.sell { background: rgba(255,23,68,0.06); border: 2px solid rgba(255,23,68,0.2); }
+  .signal-box.wait { background: rgba(255,255,255,0.02); border: 2px solid rgba(255,255,255,0.06); }
+  .signal-label { font-size: 10px; letter-spacing: 3px; margin-bottom: 8px; }
+  .signal-action { font-size: 28px; font-weight: 700; letter-spacing: 4px; }
+  .signal-reason { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 8px; line-height: 1.6; }
+  .signal-confidence { font-size: 12px; margin-top: 8px; font-weight: 700; }
+
+  .stats-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px; margin-bottom: 20px;
+  }
+  .stat {
+    padding: 14px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    text-align: center;
+  }
+  .stat .lbl { font-size: 8px; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
+  .stat .val { font-size: 18px; font-weight: 700; }
+  .stat .sub { font-size: 9px; color: rgba(255,255,255,0.25); margin-top: 4px; }
+
+  .section { font-size: 11px; letter-spacing: 3px; color: rgba(255,255,255,0.4); margin: 20px 0 10px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+  canvas { width: 100%; border-radius: 8px; margin-bottom: 16px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
+  th { text-align: left; padding: 8px 8px; font-size: 8px; letter-spacing: 2px; color: rgba(255,255,255,0.3); border-bottom: 1px solid rgba(255,255,255,0.06); }
+  td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); color: rgba(255,255,255,0.65); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .green { color: #00E676; } .red { color: #FF1744; } .gold { color: #FFD700; } .cyan { color: #4FC3F7; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; }
+  .tag-buy { background: rgba(0,230,118,0.12); color: #00E676; }
+  .tag-sell { background: rgba(255,23,68,0.12); color: #FF1744; }
+  .tag-wait { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.4); }
+  .tag-size { background: rgba(255,215,0,0.1); color: #FFD700; }
+
+  .footer { text-align: center; font-size: 9px; color: rgba(255,255,255,0.12); margin-top: 20px; letter-spacing: 1px; }
+
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .comp-card { padding: 16px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); }
+  .comp-title { font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.35); margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h1>THE EDGE</h1>
+<div class="subtitle">BRESSERT 20/60 NESTED CYCLES · TRANSLATION FILTER · 4-YEAR CONTEXT</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">ANALYZING<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none;">
+  <div id="signalBox"></div>
+  <div id="statsRow" class="stats-row"></div>
+  <div class="section">EQUITY CURVE — EDGE SYSTEM vs BUY & HOLD</div>
+  <canvas id="equityChart" height="280"></canvas>
+  <div id="comparison" class="comparison"></div>
+  <div class="section">TRADE LOG</div>
+  <div style="max-height:500px; overflow-y:auto;">
+    <table><thead><tr>
+      <th>#</th><th>ENTRY</th><th>PRICE</th><th>EXIT</th><th>PRICE</th>
+      <th>RETURN</th><th>DAYS</th><th>SIZE</th><th>SIGNAL</th>
+    </tr></thead><tbody id="tradeBody"></tbody></table>
+  </div>
+  <div class="section">CURRENT SIGNAL DETAIL</div>
+  <div id="signalDetail"></div>
+</div>
+
+<div class="footer">BRESSERT EDGE ENGINE · NOT FINANCIAL ADVICE · PAST ≠ FUTURE</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// THE EDGE ENGINE
+// ═══════════════════════════════════════════════
+//
+// ENTRY: Buy when 20-day cycle trough aligns with
+//        60-day cycle uptrend (first half or right-translated)
+//
+// EXIT:  Sell when 20-day cycle crests AND 60-day is
+//        past midpoint or left-translating
+//
+// SIZE:  Scale position based on:
+//        - Translation history (bullish = bigger)
+//        - 4-year cycle phase (post-halving expansion = bigger)
+//        - Cycle day (closer to expected trough = bigger)
+//
+// FILTER: Skip entries when:
+//        - 60-day cycle is left-translated AND past midpoint
+//        - Recent troughs are breaking lower (downtrend)
+//        - 4-year cycle is in distribution phase
+//
+// ═══════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700", CYAN = "#4FC3F7";
+
+// 4-year cycle context
+const C4_LOW_DATE = new Date("2022-11-21");
+const HALVING_DATE = new Date("2024-04-20");
+const AVG_CYCLE_LENGTH = 1400; // days
+
+let allData = [];
+
+// ─── Trough Detection (same as cycles.html) ───
+function findTroughs(prices, halfWindow) {
+  const troughs = [];
+  for (let i = halfWindow; i < prices.length - halfWindow; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= halfWindow; j++) {
+      if (prices[i] > prices[i - j] || prices[i] > prices[i + j]) {
+        isTrough = false; break;
+      }
+    }
+    if (isTrough) {
+      if (troughs.length === 0 || (i - troughs[troughs.length - 1]) >= halfWindow) {
+        troughs.push(i);
+      }
+    }
+  }
+  return troughs;
+}
+
+function filterTroughs(troughs, prices, nominal, tolerance) {
+  if (troughs.length <= 1) return troughs;
+  const minLen = nominal * (1 - tolerance);
+  const filtered = [troughs[0]];
+  for (let i = 1; i < troughs.length; i++) {
+    const gap = troughs[i] - filtered[filtered.length - 1];
+    if (gap >= minLen) {
+      filtered.push(troughs[i]);
+    } else if (prices[troughs[i]] < prices[filtered[filtered.length - 1]]) {
+      filtered[filtered.length - 1] = troughs[i];
+    }
+  }
+  return filtered;
+}
+
+function findCrest(prices, start, end) {
+  let max = -Infinity, idx = start;
+  for (let i = start; i <= end; i++) {
+    if (prices[i] > max) { max = prices[i]; idx = i; }
+  }
+  return { idx, price: max };
+}
+
+// ─── Cycle Analysis at any point in time ───
+function analyzeCyclesAt(prices, dates, dayIdx) {
+  if (dayIdx < 80) return null;
+
+  const slice = prices.slice(0, dayIdx + 1);
+
+  // Find 60-day troughs
+  let t60 = findTroughs(slice, 12);
+  t60 = filterTroughs(t60, slice, 60, 0.5);
+  if (t60.length < 2) {
+    t60 = findTroughs(slice, 8);
+    t60 = filterTroughs(t60, slice, 60, 0.6);
+  }
+
+  // Find 20-day troughs
+  let t20 = findTroughs(slice, 4);
+  t20 = filterTroughs(t20, slice, 20, 0.5);
+  if (t20.length < 2) {
+    t20 = findTroughs(slice, 3);
+    t20 = filterTroughs(t20, slice, 20, 0.6);
+  }
+
+  if (t60.length < 2 || t20.length < 2) return null;
+
+  // Analyze last few completed 60-day cycles
+  const completed60 = [];
+  for (let i = Math.max(0, t60.length - 5); i < t60.length - 1; i++) {
+    const start = t60[i], end = t60[i + 1];
+    const len = end - start;
+    const crest = findCrest(slice, start, end);
+    const crestPos = (crest.idx - start) / len;
+    completed60.push({
+      startIdx: start, endIdx: end, length: len,
+      crest, crestPosition: crestPos,
+      translation: crestPos > 0.5 ? "RIGHT" : "LEFT",
+      amplitude: (crest.price - Math.min(slice[start], slice[end])) / Math.min(slice[start], slice[end]),
+      troughPrice: slice[start],
+      nextTroughPrice: slice[end],
+      higherLow: i > 0 ? slice[end] > slice[t60[i]] : true,
+    });
+  }
+
+  // Current open 60-day cycle
+  const last60 = t60[t60.length - 1];
+  const daysSince60 = dayIdx - last60;
+  const avgLen60 = completed60.length
+    ? completed60.reduce((s, c) => s + c.length, 0) / completed60.length : 60;
+  const progress60 = daysSince60 / avgLen60;
+  const crest60 = findCrest(slice, last60, dayIdx);
+  const crestPos60 = daysSince60 > 0 ? (crest60.idx - last60) / daysSince60 : 0;
+
+  // Recent translation bias
+  const recentTranslations = completed60.slice(-3).map(c => c.translation);
+  const bullBias = recentTranslations.filter(t => t === "RIGHT").length / Math.max(recentTranslations.length, 1);
+
+  // Are troughs making higher lows?
+  const recentTroughPrices = t60.slice(-4).map(i => slice[i]);
+  const higherLows = recentTroughPrices.length >= 2 &&
+    recentTroughPrices[recentTroughPrices.length - 1] > recentTroughPrices[recentTroughPrices.length - 2];
+
+  // Average amplitude of recent cycles
+  const avgAmplitude = completed60.length
+    ? completed60.slice(-4).reduce((s, c) => s + c.amplitude, 0) / Math.min(completed60.length, 4) : 0.15;
+
+  // 20-day cycle info
+  const last20 = t20[t20.length - 1];
+  const daysSince20 = dayIdx - last20;
+  const avgLen20 = 20; // roughly stable
+
+  // Is the 20-day cycle near a trough?
+  const near20Trough = daysSince20 <= 5 || daysSince20 >= 16; // just bottomed or about to
+
+  // 4-year cycle context
+  const currentDate = dates[dayIdx];
+  const daysSinceC4Low = Math.round((currentDate - C4_LOW_DATE) / 86400000);
+  const daysSinceHalving = Math.round((currentDate - HALVING_DATE) / 86400000);
+  const fourYearProgress = daysSinceC4Low / AVG_CYCLE_LENGTH;
+  const postHalvingExpansion = daysSinceHalving > 0 && daysSinceHalving < 730; // 2 years post halving
+
+  return {
+    completed60, t60, t20,
+    last60, daysSince60, avgLen60, progress60,
+    crest60, crestPos60,
+    last20, daysSince20, avgLen20, near20Trough,
+    bullBias, higherLows, avgAmplitude,
+    fourYearProgress, postHalvingExpansion, daysSinceHalving,
+    recentTranslations,
+    currentPrice: slice[dayIdx],
+    troughPrice60: slice[last60],
+  };
+}
+
+// ─── Signal Generator ───
+function generateSignal(analysis) {
+  if (!analysis) return { action: "WAIT", confidence: 0, reason: "Insufficient data", size: 0 };
+
+  const a = analysis;
+  let score = 0; // -100 to +100, positive = buy, negative = sell
+  let reasons = [];
+  let sizeMultiplier = 1.0;
+
+  // ══ ENTRY CONDITIONS (positive score) ══
+
+  // 1. 20-day cycle just troughed (within 5 days of a detected low)
+  if (a.daysSince20 <= 5) {
+    score += 25;
+    reasons.push("20D cycle just troughed (day " + a.daysSince20 + ")");
+  }
+
+  // 2. 60-day cycle in first half (uptrend expected)
+  if (a.progress60 < 0.45) {
+    score += 20;
+    reasons.push("60D cycle early (day " + a.daysSince60 + " of ~" + Math.round(a.avgLen60) + ")");
+  } else if (a.progress60 < 0.6) {
+    score += 10;
+    reasons.push("60D cycle mid-phase");
+  }
+
+  // 3. Recent 60-day cycles are right-translated (bullish bias)
+  if (a.bullBias >= 0.67) {
+    score += 15;
+    sizeMultiplier *= 1.3;
+    reasons.push("Bullish translation bias (" + Math.round(a.bullBias * 100) + "%)");
+  } else if (a.bullBias <= 0.33) {
+    score -= 15;
+    sizeMultiplier *= 0.6;
+    reasons.push("Bearish translation bias");
+  }
+
+  // 4. Troughs making higher lows (trend confirmation)
+  if (a.higherLows) {
+    score += 15;
+    sizeMultiplier *= 1.2;
+    reasons.push("60D troughs making higher lows");
+  } else {
+    score -= 10;
+    sizeMultiplier *= 0.7;
+    reasons.push("60D troughs breaking lower — caution");
+  }
+
+  // 5. Post-halving expansion phase (4-year context)
+  if (a.postHalvingExpansion) {
+    score += 10;
+    sizeMultiplier *= 1.2;
+    reasons.push("Post-halving expansion window");
+  } else if (a.fourYearProgress > 0.75) {
+    score -= 10;
+    sizeMultiplier *= 0.5;
+    reasons.push("Late 4-year cycle — reduced exposure");
+  }
+
+  // ══ EXIT CONDITIONS (negative score) ══
+
+  // 6. 60-day cycle past midpoint and price declining from crest
+  if (a.progress60 > 0.55 && a.currentPrice < a.crest60.price * 0.97) {
+    score -= 20;
+    reasons.push("60D past midpoint, price declining from crest");
+  }
+
+  // 7. 20-day cycle near expected top (day 8-14 of ~20)
+  if (a.daysSince20 >= 8 && a.daysSince20 <= 16) {
+    score -= 10;
+    reasons.push("20D cycle in topping zone (day " + a.daysSince20 + ")");
+  }
+
+  // 8. 60-day cycle overdue (past expected length)
+  if (a.progress60 > 0.9) {
+    score -= 15;
+    reasons.push("60D cycle overdue — trough imminent");
+  }
+
+  // ══ GENERATE ACTION ══
+  let action, confidence;
+  if (score >= 40) {
+    action = "BUY"; confidence = Math.min(score, 95);
+  } else if (score >= 20) {
+    action = "LEAN BUY"; confidence = score;
+  } else if (score <= -30) {
+    action = "EXIT"; confidence = Math.min(Math.abs(score), 95);
+  } else if (score <= -10) {
+    action = "LEAN EXIT"; confidence = Math.abs(score);
+  } else {
+    action = "WAIT"; confidence = 50 - Math.abs(score);
+  }
+
+  // Size: 0-3 scale
+  // 0 = no position, 1 = quarter, 2 = half, 3 = full
+  let size = 0;
+  if (action === "BUY") size = Math.min(3, Math.round(sizeMultiplier * 2));
+  else if (action === "LEAN BUY") size = Math.min(2, Math.round(sizeMultiplier * 1));
+
+  return { action, confidence, reasons, score, size, sizeMultiplier,
+           expectedMove: a.avgAmplitude };
+}
+
+// ═══════════════════════════════════════════════
+// BACKTEST
+// ═══════════════════════════════════════════════
+function runBacktest(data) {
+  const prices = data.map(d => d.price);
+  const dates = data.map(d => d.date);
+  const trades = [];
+  const equity = [];
+  let cash = 10000;
+  let btcHolding = 0;
+  let inPosition = false;
+  let entryPrice = 0, entryDate = null, entrySize = 0;
+  let prevAction = "WAIT";
+  let confirmDays = 0;
+  const CONFIRM = 2;
+
+  for (let i = 80; i < data.length; i++) {
+    const analysis = analyzeCyclesAt(prices, dates, i);
+    const signal = generateSignal(analysis);
+    const price = prices[i];
+
+    // Confirmation: need 2 consecutive days of same signal direction
+    const isBuy = signal.action === "BUY" || signal.action === "LEAN BUY";
+    const isSell = signal.action === "EXIT" || signal.action === "LEAN EXIT";
+
+    if (isBuy && !inPosition) {
+      if (prevAction === "BUY" || prevAction === "LEAN BUY") confirmDays++;
+      else confirmDays = 1;
+      prevAction = signal.action;
+
+      if (confirmDays >= CONFIRM) {
+        // Enter position
+        const sizeAlloc = signal.size === 3 ? 1.0 : signal.size === 2 ? 0.5 : 0.25;
+        const deployCash = cash * sizeAlloc;
+        btcHolding = deployCash / price;
+        cash -= deployCash;
+        inPosition = true;
+        entryPrice = price;
+        entryDate = dates[i];
+        entrySize = signal.size;
+        confirmDays = 0;
+      }
+    } else if (isSell && inPosition) {
+      if (prevAction === "EXIT" || prevAction === "LEAN EXIT") confirmDays++;
+      else confirmDays = 1;
+      prevAction = signal.action;
+
+      if (confirmDays >= CONFIRM) {
+        // Exit position
+        cash += btcHolding * price;
+        const ret = (price - entryPrice) / entryPrice;
+        const holdDays = Math.round((dates[i] - entryDate) / 86400000);
+        trades.push({
+          entryDate, entryPrice,
+          exitDate: dates[i], exitPrice: price,
+          returnPct: ret, holdDays,
+          size: entrySize,
+          signal: signal.action,
+        });
+        btcHolding = 0;
+        inPosition = false;
+        confirmDays = 0;
+      }
+    } else {
+      prevAction = signal.action;
+      confirmDays = 0;
+    }
+
+    // Stop loss: if price drops 12% from entry, exit
+    if (inPosition && price < entryPrice * 0.88) {
+      cash += btcHolding * price;
+      const ret = (price - entryPrice) / entryPrice;
+      const holdDays = Math.round((dates[i] - entryDate) / 86400000);
+      trades.push({
+        entryDate, entryPrice,
+        exitDate: dates[i], exitPrice: price,
+        returnPct: ret, holdDays,
+        size: entrySize,
+        signal: "STOP LOSS",
+      });
+      btcHolding = 0;
+      inPosition = false;
+      confirmDays = 0;
+    }
+
+    const currentEquity = cash + btcHolding * price;
+    const buyHoldEquity = 10000 * (price / prices[80]);
+    equity.push({ date: dates[i], edge: currentEquity, buyHold: buyHoldEquity, price });
+  }
+
+  // Close open position
+  if (inPosition) {
+    const lastPrice = prices[prices.length - 1];
+    cash += btcHolding * lastPrice;
+    const ret = (lastPrice - entryPrice) / entryPrice;
+    const holdDays = Math.round((dates[dates.length-1] - entryDate) / 86400000);
+    trades.push({
+      entryDate, entryPrice,
+      exitDate: dates[dates.length-1], exitPrice: lastPrice,
+      returnPct: ret, holdDays, size: entrySize,
+      signal: "OPEN",
+    });
+  }
+
+  // Get current signal
+  const currentAnalysis = analyzeCyclesAt(prices, dates, prices.length - 1);
+  const currentSignal = generateSignal(currentAnalysis);
+
+  return { trades, equity, finalEquity: cash + btcHolding * prices[prices.length-1],
+           currentSignal, currentAnalysis };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+async function fetchBTCData() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.prices.map(([ts,p]) => ({date:new Date(ts),price:p}));
+    if (d.length > 100) return {data:d, source:"CoinGecko"};
+  } catch(e) { console.warn("CoinGecko:",e); }
+  try {
+    const all = [];
+    let end = Date.now();
+    for (let i=0;i<8;i++) {
+      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
+      if (!r.ok) break;
+      const k = await r.json();
+      if (!k.length) break;
+      all.unshift(...k); end = k[0][0]-1;
+    }
+    if (all.length>100) {
+      const seen=new Set();
+      const d=all.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;})
+        .map(k=>({date:new Date(k[0]),price:+k[4]})).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"Binance"};
+    }
+  } catch(e) { console.warn("Binance:",e); }
+  try {
+    const all=[];
+    let toTs=Math.floor(Date.now()/1000);
+    for(let i=0;i<3;i++){
+      const r=await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
+      if(!r.ok)break;
+      const j=await r.json();
+      if(!j.Data?.Data?.length)break;
+      all.unshift(...j.Data.Data); toTs=j.Data.Data[0].time-1;
+    }
+    if(all.length>100){
+      const seen=new Set();
+      const d=all.filter(x=>{if(seen.has(x.time))return false;seen.add(x.time);return true;})
+        .map(x=>({date:new Date(x.time*1000),price:x.close}))
+        .filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"CryptoCompare"};
+    }
+  } catch(e) { console.warn("CryptoCompare:",e); }
+  return {data:[], source:"ERROR"};
+}
+
+// ═══════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en",{maximumFractionDigits:0}) : p.toFixed(2); }
+function fmtD(d) { return d instanceof Date ? d.toISOString().slice(0,10) : "—"; }
+
+function renderSignalBox(signal, analysis) {
+  const boxClass = signal.action.includes("BUY") ? "buy" : signal.action.includes("EXIT") ? "sell" : "wait";
+  const color = signal.action.includes("BUY") ? GREEN : signal.action.includes("EXIT") ? RED : "rgba(255,255,255,0.4)";
+
+  const sizeLabel = signal.size === 3 ? "FULL SIZE" : signal.size === 2 ? "HALF SIZE" : signal.size === 1 ? "QUARTER SIZE" : "NO POSITION";
+  const sizeColor = signal.size >= 2 ? GREEN : signal.size === 1 ? GOLD : "rgba(255,255,255,0.3)";
+
+  document.getElementById("signalBox").innerHTML = `
+    <div class="signal-box ${boxClass}">
+      <div class="signal-label" style="color:${color}">CURRENT SIGNAL</div>
+      <div class="signal-action" style="color:${color}">${signal.action}</div>
+      <div class="signal-confidence" style="color:${color}">CONFIDENCE: ${signal.confidence}% · SCORE: ${signal.score > 0 ? '+' : ''}${signal.score}</div>
+      <div style="margin-top:8px;font-size:12px;font-weight:700;color:${sizeColor}">${sizeLabel}</div>
+      <div class="signal-reason">${signal.reasons.join(" · ")}</div>
+      ${analysis ? `<div style="margin-top:10px;font-size:10px;color:rgba(255,255,255,0.3)">
+        60D: Day ${analysis.daysSince60} of ~${Math.round(analysis.avgLen60)} · 20D: Day ${analysis.daysSince20} ·
+        Avg swing: ${(analysis.avgAmplitude*100).toFixed(0)}% · Translation bias: ${Math.round(analysis.bullBias*100)}% bull
+      </div>` : ""}
+    </div>
+  `;
+}
+
+function renderStats(trades, equity) {
+  const wins = trades.filter(t => t.returnPct > 0);
+  const losses = trades.filter(t => t.returnPct <= 0);
+  const winRate = trades.length ? (wins.length / trades.length * 100).toFixed(0) : 0;
+  const avgWin = wins.length ? (wins.reduce((s,t)=>s+t.returnPct,0)/wins.length*100).toFixed(1) : 0;
+  const avgLoss = losses.length ? (losses.reduce((s,t)=>s+t.returnPct,0)/losses.length*100).toFixed(1) : 0;
+  const totalReturn = equity.length ? ((equity[equity.length-1].edge / 10000 - 1) * 100).toFixed(0) : 0;
+  const bhReturn = equity.length ? ((equity[equity.length-1].buyHold / 10000 - 1) * 100).toFixed(0) : 0;
+
+  let peak = 0, maxDD = 0;
+  equity.forEach(e => { if (e.edge > peak) peak = e.edge; const dd = (peak-e.edge)/peak; if (dd>maxDD) maxDD=dd; });
+  let bhPeak = 0, bhDD = 0;
+  equity.forEach(e => { if (e.buyHold > bhPeak) bhPeak = e.buyHold; const dd = (bhPeak-e.buyHold)/bhPeak; if (dd>bhDD) bhDD=dd; });
+
+  const grossProfit = wins.reduce((s,t)=>s+t.returnPct,0);
+  const grossLoss = Math.abs(losses.reduce((s,t)=>s+t.returnPct,0));
+  const pf = grossLoss > 0 ? (grossProfit/grossLoss).toFixed(2) : "∞";
+
+  let daysIn = trades.reduce((s,t)=>s+t.holdDays,0);
+  const exposure = equity.length ? (daysIn/equity.length*100).toFixed(0) : 0;
+
+  const finalEdge = equity.length ? equity[equity.length-1].edge : 10000;
+  const finalBH = equity.length ? equity[equity.length-1].buyHold : 10000;
+
+  // Per-trade average on $400K deployed per swing
+  const avgRetPerTrade = trades.length ? trades.reduce((s,t)=>s+t.returnPct,0)/trades.length : 0;
+  const per400K = (avgRetPerTrade * 400000).toFixed(0);
+  const totalExtracted = trades.length ? (trades.reduce((s,t)=>s+t.returnPct,0) * 400000).toFixed(0) : 0;
+
+  document.getElementById("statsRow").innerHTML = `
+    <div class="stat"><div class="lbl">EDGE RETURN</div><div class="val ${Number(totalReturn)>=0?'green':'red'}">${totalReturn}%</div><div class="sub">$10K → $${fmtP(finalEdge)}</div></div>
+    <div class="stat"><div class="lbl">BUY & HOLD</div><div class="val ${Number(bhReturn)>=0?'green':'red'}">${bhReturn}%</div><div class="sub">$10K → $${fmtP(finalBH)}</div></div>
+    <div class="stat"><div class="lbl">WIN RATE</div><div class="val">${winRate}%</div><div class="sub">${wins.length}W / ${losses.length}L</div></div>
+    <div class="stat"><div class="lbl">PROFIT FACTOR</div><div class="val gold">${pf}</div><div class="sub">Win avg +${avgWin}%</div></div>
+    <div class="stat"><div class="lbl">MAX DRAWDOWN</div><div class="val red">−${(maxDD*100).toFixed(1)}%</div><div class="sub">B&H: −${(bhDD*100).toFixed(1)}%</div></div>
+    <div class="stat"><div class="lbl">EXPOSURE</div><div class="val">${exposure}%</div><div class="sub">${trades.length} trades</div></div>
+    <div class="stat"><div class="lbl">AVG PER SWING</div><div class="val ${avgRetPerTrade>=0?'green':'red'}">${(avgRetPerTrade*100).toFixed(1)}%</div><div class="sub">~$${Number(per400K).toLocaleString()} on $400K</div></div>
+    <div class="stat"><div class="lbl">TOTAL EXTRACTED</div><div class="val gold">$${Number(totalExtracted).toLocaleString()}</div><div class="sub">${trades.length} swings on $400K</div></div>
+  `;
+
+  // Comparison
+  document.getElementById("comparison").innerHTML = `
+    <div class="comp-card">
+      <div class="comp-title" style="color:${GREEN}">EDGE SYSTEM</div>
+      <div style="font-size:24px;font-weight:700" class="${Number(totalReturn)>=0?'green':'red'}">$${fmtP(finalEdge)}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:6px">${trades.length} trades · ${exposure}% exposure · DD −${(maxDD*100).toFixed(1)}%</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-title">BUY & HOLD</div>
+      <div style="font-size:24px;font-weight:700" class="${Number(bhReturn)>=0?'green':'red'}">$${fmtP(finalBH)}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:6px">100% exposure · DD −${(bhDD*100).toFixed(1)}%</div>
+    </div>
+  `;
+}
+
+function renderEquity(equity) {
+  const canvas = document.getElementById("equityChart");
+  const W = canvas.parentElement.clientWidth;
+  const H = 280;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  canvas.style.width = W+"px"; canvas.style.height = H+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const pad = {top:20,right:20,bottom:30,left:70};
+  const w = W-pad.left-pad.right, h = H-pad.top-pad.bottom;
+
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = "rgba(255,255,255,0.01)"; ctx.fillRect(pad.left,pad.top,w,h);
+
+  if (!equity.length) return;
+
+  const maxVal = Math.max(...equity.map(e => Math.max(e.edge, e.buyHold)));
+  const minVal = Math.min(...equity.map(e => Math.min(e.edge, e.buyHold)));
+  const range = maxVal - minVal || 1;
+
+  function x(i) { return pad.left + (i/(equity.length-1))*w; }
+  function y(v) { return pad.top + h - ((v-minVal)/range)*h; }
+
+  // Grid
+  for (let i=0;i<=4;i++) {
+    const gy = pad.top+(i/4)*h;
+    ctx.beginPath(); ctx.moveTo(pad.left,gy); ctx.lineTo(pad.left+w,gy);
+    ctx.strokeStyle="rgba(255,255,255,0.03)"; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,0.15)"; ctx.font="9px monospace"; ctx.textAlign="right";
+    ctx.fillText("$"+(maxVal-(i/4)*range).toLocaleString("en",{maximumFractionDigits:0}), pad.left-8, gy+3);
+  }
+
+  // B&H line
+  ctx.beginPath();
+  equity.forEach((e,i) => i===0?ctx.moveTo(x(i),y(e.buyHold)):ctx.lineTo(x(i),y(e.buyHold)));
+  ctx.strokeStyle="rgba(255,255,255,0.2)"; ctx.lineWidth=1.5; ctx.stroke();
+
+  // Edge line
+  ctx.beginPath();
+  equity.forEach((e,i) => i===0?ctx.moveTo(x(i),y(e.edge)):ctx.lineTo(x(i),y(e.edge)));
+  ctx.strokeStyle=GREEN; ctx.lineWidth=2; ctx.stroke();
+
+  // Fill
+  ctx.beginPath();
+  equity.forEach((e,i) => i===0?ctx.moveTo(x(i),y(e.edge)):ctx.lineTo(x(i),y(e.edge)));
+  ctx.lineTo(x(equity.length-1),pad.top+h); ctx.lineTo(x(0),pad.top+h); ctx.closePath();
+  ctx.fillStyle="rgba(0,230,118,0.04)"; ctx.fill();
+
+  // Legend
+  ctx.font="10px monospace"; ctx.textAlign="left";
+  ctx.fillStyle=GREEN; ctx.fillText("● EDGE SYSTEM", pad.left+10, pad.top+14);
+  ctx.fillStyle="rgba(255,255,255,0.3)"; ctx.fillText("● BUY & HOLD", pad.left+150, pad.top+14);
+}
+
+function renderTrades(trades) {
+  document.getElementById("tradeBody").innerHTML = trades.map((t,i) => {
+    const tagClass = t.signal === "STOP LOSS" ? "tag-sell" : t.returnPct >= 0 ? "tag-buy" : "tag-sell";
+    const sizeLabel = t.size === 3 ? "FULL" : t.size === 2 ? "HALF" : "QTR";
+    return `<tr>
+      <td>${i+1}</td>
+      <td>${fmtD(t.entryDate)}</td><td>$${fmtP(t.entryPrice)}</td>
+      <td>${t.signal==="OPEN"?'<span class="gold">OPEN</span>':fmtD(t.exitDate)}</td>
+      <td>${t.signal==="OPEN"?'—':'$'+fmtP(t.exitPrice)}</td>
+      <td class="${t.returnPct>=0?'green':'red'}">${(t.returnPct*100).toFixed(1)}%</td>
+      <td>${t.holdDays}d</td>
+      <td><span class="tag tag-size">${sizeLabel}</span></td>
+      <td><span class="tag ${tagClass}">${t.signal}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+function renderSignalDetail(signal, analysis) {
+  if (!analysis) { document.getElementById("signalDetail").innerHTML = ""; return; }
+  const a = analysis;
+  document.getElementById("signalDetail").innerHTML = `
+    <div class="stats-row">
+      <div class="stat"><div class="lbl">60D CYCLE DAY</div><div class="val">${a.daysSince60}</div><div class="sub">of ~${Math.round(a.avgLen60)}</div></div>
+      <div class="stat"><div class="lbl">60D PROGRESS</div><div class="val">${Math.round(a.progress60*100)}%</div><div class="sub">${a.progress60>0.9?'OVERDUE':a.progress60>0.5?'2ND HALF':'1ST HALF'}</div></div>
+      <div class="stat"><div class="lbl">20D CYCLE DAY</div><div class="val">${a.daysSince20}</div><div class="sub">of ~${Math.round(a.avgLen20)}</div></div>
+      <div class="stat"><div class="lbl">TRANSLATION BIAS</div><div class="val ${a.bullBias>=0.5?'green':'red'}">${Math.round(a.bullBias*100)}%</div><div class="sub">${a.recentTranslations.join(' ')}</div></div>
+      <div class="stat"><div class="lbl">HIGHER LOWS</div><div class="val ${a.higherLows?'green':'red'}">${a.higherLows?'YES':'NO'}</div><div class="sub">60D troughs</div></div>
+      <div class="stat"><div class="lbl">AVG SWING</div><div class="val gold">${(a.avgAmplitude*100).toFixed(0)}%</div><div class="sub">Recent 60D cycles</div></div>
+      <div class="stat"><div class="lbl">4-YEAR PHASE</div><div class="val ${a.postHalvingExpansion?'green':'gold'}">${a.postHalvingExpansion?'EXPANSION':'LATE'}</div><div class="sub">${a.daysSinceHalving}d post-halving</div></div>
+      <div class="stat"><div class="lbl">CURRENT PRICE</div><div class="val">$${fmtP(a.currentPrice)}</div><div class="sub">60D trough: $${fmtP(a.troughPrice60)}</div></div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount+1)%4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  const result = await fetchBTCData();
+  clearInterval(dotTimer);
+
+  if (!result.data.length) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text red">NO DATA</div>';
+    return;
+  }
+
+  // Filter from Nov 2022 (Cycle 4)
+  const startDate = new Date("2022-11-01");
+  const filtered = result.data.filter(d => d.date >= startDate);
+
+  if (filtered.length < 100) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text red">INSUFFICIENT DATA</div>';
+    return;
+  }
+
+  allData = filtered;
+  const { trades, equity, finalEquity, currentSignal, currentAnalysis } = runBacktest(filtered);
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  renderSignalBox(currentSignal, currentAnalysis);
+  renderStats(trades, equity);
+  renderEquity(equity);
+  renderTrades(trades);
+  renderSignalDetail(currentSignal, currentAnalysis);
+}
+
+main();
+</script>
+</body>
+</html>

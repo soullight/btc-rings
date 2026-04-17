@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — Vibe</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: 8px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.2); letter-spacing: 3px; margin-top: 4px; }
+  canvas { border-radius: 12px; margin-top: 14px; }
+  .loading { text-align: center; padding: 100px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:#00E676; box-shadow:0 0 6px #00E676; }
+  .context-bar {
+    margin-top: 14px; max-width: 600px; width: 100%;
+    padding: 12px 18px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    font-size: 10px; color: rgba(255,255,255,0.35); text-align: center; line-height: 1.7;
+  }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>THE VIBE</h1>
+  <div class="subtitle">CATCH THE WAVE · RIDE THE PULSE · STACK FOR THE BLOOD</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">READING THE PULSE<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="context" class="context-bar"></div>
+  <div class="footer">THE GRAVITY IS DOWN · WE'RE JUST CATCHING WAVES ON THE WAY</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// THE VIBE
+// ═══════════════════════════════════════════════
+//
+// You know the destination: cycle bottom, ~Nov 2026.
+// The gravity pulls everything down eventually.
+// But the ocean doesn't fall in a straight line.
+// It breathes. 60-day inhale, 60-day exhale.
+// Inside each breath, smaller 20-day pulses.
+//
+// This tool reads the pulse.
+// It tells you three things:
+//
+//   DEPLOY  — the wave just reset, price is near a trough,
+//             this is your window to put $400K to work
+//
+//   RIDE    — you're in the wave, it's moving, hold your position
+//
+//   EXIT    — the wave is cresting or crested,
+//             take your profit and wait for the next one
+//
+// That's it. No scores. No confidence intervals.
+// Just the rhythm of the market breathing.
+//
+// ═══════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700", CYAN = "#4FC3F7";
+
+let allData = [];
+let animProgress = 0;
+
+// ─── Trough Detection ───
+function findTroughs(prices, halfWindow) {
+  const troughs = [];
+  for (let i = halfWindow; i < prices.length - halfWindow; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= halfWindow; j++) {
+      if (prices[i] > prices[i - j] || prices[i] > prices[i + j]) { isTrough = false; break; }
+    }
+    if (isTrough && (troughs.length === 0 || (i - troughs[troughs.length - 1]) >= halfWindow)) {
+      troughs.push(i);
+    }
+  }
+  return troughs;
+}
+
+function filterTroughs(troughs, prices, nominal, tol) {
+  if (troughs.length <= 1) return troughs;
+  const minGap = nominal * (1 - tol);
+  const filtered = [troughs[0]];
+  for (let i = 1; i < troughs.length; i++) {
+    const gap = troughs[i] - filtered[filtered.length - 1];
+    if (gap >= minGap) filtered.push(troughs[i]);
+    else if (prices[troughs[i]] < prices[filtered[filtered.length - 1]]) filtered[filtered.length - 1] = troughs[i];
+  }
+  return filtered;
+}
+
+function findCrest(prices, start, end) {
+  let max = -Infinity, idx = start;
+  for (let i = start; i <= Math.min(end, prices.length - 1); i++) {
+    if (prices[i] > max) { max = prices[i]; idx = i; }
+  }
+  return { idx, price: max };
+}
+
+// ─── Read the pulse ───
+function readPulse(data) {
+  if (data.length < 100) return null;
+
+  const prices = data.map(d => d.price);
+  const dates = data.map(d => d.date);
+  const now = prices.length - 1;
+  const currentPrice = prices[now];
+
+  // Find 60-day troughs
+  let t60 = findTroughs(prices, 12);
+  t60 = filterTroughs(t60, prices, 60, 0.5);
+  if (t60.length < 2) { t60 = findTroughs(prices, 8); t60 = filterTroughs(t60, prices, 60, 0.6); }
+
+  // Find 20-day troughs
+  let t20 = findTroughs(prices, 4);
+  t20 = filterTroughs(t20, prices, 20, 0.5);
+  if (t20.length < 2) { t20 = findTroughs(prices, 3); t20 = filterTroughs(t20, prices, 20, 0.6); }
+
+  if (t60.length < 1 || t20.length < 1) return null;
+
+  // Average 60-day cycle length from recent completed cycles
+  let avgLen60 = 60;
+  if (t60.length >= 2) {
+    const recent = [];
+    for (let i = Math.max(0, t60.length - 5); i < t60.length - 1; i++) recent.push(t60[i+1] - t60[i]);
+    if (recent.length) avgLen60 = recent.reduce((a,b) => a+b, 0) / recent.length;
+  }
+
+  // Average recent amplitude
+  let avgSwing = 0.15;
+  if (t60.length >= 2) {
+    const amps = [];
+    for (let i = Math.max(0, t60.length - 4); i < t60.length - 1; i++) {
+      const c = findCrest(prices, t60[i], t60[i+1]);
+      const low = Math.min(prices[t60[i]], prices[t60[i+1]]);
+      amps.push((c.price - low) / low);
+    }
+    if (amps.length) avgSwing = amps.reduce((a,b) => a+b, 0) / amps.length;
+  }
+
+  // Current 60-day cycle
+  const last60 = t60[t60.length - 1];
+  const daysSince60 = now - last60;
+  const progress60 = daysSince60 / avgLen60;
+  const troughPrice60 = prices[last60];
+  const crest60 = findCrest(prices, last60, now);
+  const moveFromTrough = (currentPrice - troughPrice60) / troughPrice60;
+  const moveFromCrest = (currentPrice - crest60.price) / crest60.price;
+  const pastCrest = currentPrice < crest60.price * 0.97;
+  const nearTrough = daysSince60 <= 8;
+
+  // Current 20-day cycle
+  const last20 = t20[t20.length - 1];
+  const daysSince20 = now - last20;
+  const troughPrice20 = prices[last20];
+  const crest20 = findCrest(prices, last20, now);
+  const near20Trough = daysSince20 <= 5;
+  const past20Crest = currentPrice < crest20.price * 0.97;
+
+  // ─── THE VIBE ───
+  // Three states: DEPLOY, RIDE, EXIT
+  //
+  // DEPLOY when:
+  //   - 60-day cycle is young (first 30%) AND/OR
+  //   - 20-day cycle just troughed (within 5 days)
+  //   - Price is near a recent trough
+  //
+  // EXIT when:
+  //   - 60-day cycle is mature (past 65%) AND price is declining from crest
+  //   - OR 60-day cycle is overdue (past 90%)
+  //   - OR price has given back most of the move
+  //
+  // RIDE when:
+  //   - Everything else — you're in the wave, it's moving
+
+  let vibe, vibeColor, vibeDesc;
+
+  // Check for deploy window
+  const deployScore =
+    (nearTrough ? 3 : 0) +
+    (near20Trough ? 2 : 0) +
+    (progress60 < 0.2 ? 3 : progress60 < 0.35 ? 2 : 0) +
+    (moveFromTrough < 0.03 ? 2 : moveFromTrough < 0.06 ? 1 : 0);
+
+  // Check for exit window
+  const exitScore =
+    (progress60 > 0.85 ? 3 : progress60 > 0.7 ? 2 : 0) +
+    (pastCrest ? 2 : 0) +
+    (past20Crest && progress60 > 0.5 ? 2 : 0) +
+    (moveFromCrest < -0.08 ? 2 : moveFromCrest < -0.04 ? 1 : 0);
+
+  if (deployScore >= 4) {
+    vibe = "DEPLOY";
+    vibeColor = GREEN;
+    vibeDesc = "The wave just reset. This is your window.";
+  } else if (exitScore >= 4) {
+    vibe = "EXIT";
+    vibeColor = RED;
+    vibeDesc = "The wave is cresting. Take profit, wait for the next one.";
+  } else if (deployScore >= 2 && exitScore < 2) {
+    vibe = "DEPLOY";
+    vibeColor = GREEN;
+    vibeDesc = "Early in the wave. Looks like a window opening.";
+  } else if (exitScore >= 2 && progress60 > 0.6) {
+    vibe = "EXIT";
+    vibeColor = RED;
+    vibeDesc = "Wave is getting tired. Consider taking profit.";
+  } else {
+    vibe = "RIDE";
+    vibeColor = GOLD;
+    vibeDesc = "You're in the wave. Let it move.";
+  }
+
+  // Expected move remaining (rough)
+  const expectedTotalMove = avgSwing;
+  const moveUsed = moveFromTrough;
+  const moveLeft = Math.max(0, expectedTotalMove - moveUsed);
+  const daysLeft = Math.max(0, Math.round(avgLen60 - daysSince60));
+
+  // Dollar context on $400K
+  const dollarOnMove = Math.round(moveFromTrough * 400000);
+  const dollarOnExpected = Math.round(moveLeft * 400000);
+
+  return {
+    vibe, vibeColor, vibeDesc,
+    currentPrice, troughPrice60, troughPrice20,
+    crest60, crest20,
+    daysSince60, daysSince20, avgLen60, progress60,
+    moveFromTrough, moveFromCrest, moveLeft,
+    avgSwing, daysLeft,
+    dollarOnMove, dollarOnExpected,
+    near20Trough, nearTrough, pastCrest, past20Crest,
+    deployScore, exitScore,
+    t60, t20, prices, dates,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+async function fetchBTCData() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.prices.map(([ts,p]) => ({date:new Date(ts),price:p}));
+    if (d.length > 100) return {data:d, source:"CoinGecko"};
+  } catch(e) { console.warn("CoinGecko:",e); }
+  try {
+    const all = [];
+    let end = Date.now();
+    for (let i=0;i<8;i++) {
+      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
+      if (!r.ok) break;
+      const k = await r.json();
+      if (!k.length) break;
+      all.unshift(...k); end = k[0][0]-1;
+    }
+    if (all.length>100) {
+      const seen=new Set();
+      const d=all.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;})
+        .map(k=>({date:new Date(k[0]),price:+k[4]})).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"Binance"};
+    }
+  } catch(e) { console.warn("Binance:",e); }
+  try {
+    const all=[];
+    let toTs=Math.floor(Date.now()/1000);
+    for(let i=0;i<3;i++){
+      const r=await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
+      if(!r.ok)break;
+      const j=await r.json();
+      if(!j.Data?.Data?.length)break;
+      all.unshift(...j.Data.Data); toTs=j.Data.Data[0].time-1;
+    }
+    if(all.length>100){
+      const seen=new Set();
+      const d=all.filter(x=>{if(seen.has(x.time))return false;seen.add(x.time);return true;})
+        .map(x=>({date:new Date(x.time*1000),price:x.close}))
+        .filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
+      return {data:d, source:"CryptoCompare"};
+    }
+  } catch(e) { console.warn("CryptoCompare:",e); }
+  return {data:[], source:"ERROR"};
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en",{maximumFractionDigits:0}) : p.toFixed(2); }
+function fmtD(d) { return d instanceof Date ? d.toISOString().slice(0,10) : "—"; }
+
+function draw() {
+  const canvas = document.getElementById("canvas");
+  const container = canvas.parentElement;
+  const size = Math.min(container.clientWidth - 20, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  canvas.style.width = size+"px"; canvas.style.height = size+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const cx = size/2, cy = size/2;
+
+  const cutoff = new Date(Date.now() - 730 * 86400000);
+  const recentData = allData.filter(d => d.date >= cutoff);
+  const pulse = readPulse(recentData);
+  if (!pulse) return;
+
+  // ── Background ──
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0,0,size,size);
+  const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,size/2);
+  bg.addColorStop(0,"rgba(15,15,30,0.5)"); bg.addColorStop(1,"rgba(10,10,15,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0,0,size,size);
+
+  const maxR = (size/2) * 0.88;
+  const startAngle = -Math.PI / 2;
+
+  // ═════════════════════════════════════════════
+  // THE 60-DAY BREATH — outer ring
+  // ═════════════════════════════════════════════
+  const r60 = maxR * 0.85;
+  const progress = Math.min(pulse.progress60, 1.3);
+  const progressAngle = startAngle + progress * Math.PI * 2;
+
+  // The full breath path — colored by zone
+  // First third: green (deploy zone)
+  // Middle third: gold (ride zone)
+  // Last third: red (exit zone)
+  const deployEnd = startAngle + 0.30 * Math.PI * 2;
+  const rideEnd = startAngle + 0.65 * Math.PI * 2;
+  const exitEnd = startAngle + Math.PI * 2;
+
+  // Deploy zone arc (dim)
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, deployEnd);
+  ctx.strokeStyle = "rgba(0,230,118,0.08)"; ctx.lineWidth = 18; ctx.stroke();
+
+  // Ride zone arc (dim)
+  ctx.beginPath(); ctx.arc(cx, cy, r60, deployEnd, rideEnd);
+  ctx.strokeStyle = "rgba(255,215,0,0.06)"; ctx.lineWidth = 18; ctx.stroke();
+
+  // Exit zone arc (dim)
+  ctx.beginPath(); ctx.arc(cx, cy, r60, rideEnd, exitEnd);
+  ctx.strokeStyle = "rgba(255,23,68,0.06)"; ctx.lineWidth = 18; ctx.stroke();
+
+  // Zone labels
+  ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
+
+  const deployLabelAngle = startAngle + 0.15 * Math.PI * 2;
+  ctx.fillStyle = GREEN; ctx.globalAlpha = 0.3;
+  ctx.fillText("DEPLOY", cx + (r60 + 22) * Math.cos(deployLabelAngle), cy + (r60 + 22) * Math.sin(deployLabelAngle) + 3);
+
+  const rideLabelAngle = startAngle + 0.475 * Math.PI * 2;
+  ctx.fillStyle = GOLD; ctx.globalAlpha = 0.25;
+  ctx.fillText("RIDE", cx + (r60 + 22) * Math.cos(rideLabelAngle), cy + (r60 + 22) * Math.sin(rideLabelAngle) + 3);
+
+  const exitLabelAngle = startAngle + 0.825 * Math.PI * 2;
+  ctx.fillStyle = RED; ctx.globalAlpha = 0.25;
+  ctx.fillText("EXIT", cx + (r60 + 22) * Math.cos(exitLabelAngle), cy + (r60 + 22) * Math.sin(exitLabelAngle) + 3);
+  ctx.globalAlpha = 1;
+
+  // The elapsed arc — bright, in the vibe color
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, progressAngle);
+  ctx.strokeStyle = pulse.vibeColor; ctx.lineWidth = 8; ctx.globalAlpha = 0.8 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Glow on elapsed
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, progressAngle);
+  ctx.strokeStyle = pulse.vibeColor; ctx.lineWidth = 26; ctx.globalAlpha = 0.10 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // ── Trough marker at 12 o'clock ──
+  ctx.beginPath(); ctx.arc(cx, cy - r60, 5, 0, Math.PI*2);
+  ctx.fillStyle = GREEN; ctx.globalAlpha = 0.6; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.font = "7px monospace"; ctx.fillStyle = GREEN; ctx.globalAlpha = 0.4;
+  ctx.fillText("TROUGH", cx, cy - r60 - 12);
+  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillText(`$${fmtP(pulse.troughPrice60)}`, cx, cy - r60 - 24);
+  ctx.globalAlpha = 1;
+
+  // ── Crest marker (gold) ──
+  if (pulse.crest60) {
+    const crestDayPct = (pulse.crest60.idx - pulse.t60[pulse.t60.length-1]) / Math.max(pulse.daysSince60, 1);
+    const crestAngle = startAngle + crestDayPct * progress * Math.PI * 2;
+    const crestX = cx + (r60 - 18) * Math.cos(crestAngle);
+    const crestY = cy + (r60 - 18) * Math.sin(crestAngle);
+    ctx.beginPath(); ctx.arc(crestX, crestY, 4, 0, Math.PI*2);
+    ctx.fillStyle = GOLD; ctx.globalAlpha = 0.8; ctx.fill();
+    ctx.beginPath(); ctx.arc(crestX, crestY, 9, 0, Math.PI*2);
+    ctx.fillStyle = GOLD; ctx.globalAlpha = 0.1; ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = "7px monospace"; ctx.fillStyle = GOLD; ctx.globalAlpha = 0.5;
+    ctx.fillText(`$${fmtP(pulse.crest60.price)}`, crestX, crestY - 10);
+    ctx.globalAlpha = 1;
+  }
+
+  // ── YOU ARE HERE — the big marker ──
+  const nowX = cx + r60 * Math.cos(progressAngle);
+  const nowY = cy + r60 * Math.sin(progressAngle);
+
+  // Outer glow pulses
+  const pulseScale = 1 + 0.15 * Math.sin(Date.now() / 600);
+  ctx.beginPath(); ctx.arc(nowX, nowY, 22 * pulseScale, 0, Math.PI*2);
+  ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.06; ctx.fill();
+  ctx.beginPath(); ctx.arc(nowX, nowY, 14, 0, Math.PI*2);
+  ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.12; ctx.fill();
+  ctx.beginPath(); ctx.arc(nowX, nowY, 8, 0, Math.PI*2);
+  ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.95 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // THE 20-DAY PULSE — inner ring
+  // ═════════════════════════════════════════════
+  const r20 = maxR * 0.50;
+  const progress20 = Math.min(pulse.daysSince20 / 20, 1.3);
+  const progressAngle20 = startAngle + progress20 * Math.PI * 2;
+  const color20 = pulse.near20Trough ? GREEN : pulse.past20Crest ? RED : CYAN;
+
+  // Deploy/ride/exit zones (subtle)
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, startAngle + 0.25 * Math.PI * 2);
+  ctx.strokeStyle = "rgba(0,230,118,0.05)"; ctx.lineWidth = 10; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle + 0.25 * Math.PI * 2, startAngle + 0.6 * Math.PI * 2);
+  ctx.strokeStyle = "rgba(79,195,247,0.04)"; ctx.lineWidth = 10; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle + 0.6 * Math.PI * 2, startAngle + Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,23,68,0.04)"; ctx.lineWidth = 10; ctx.stroke();
+
+  // Elapsed
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, progressAngle20);
+  ctx.strokeStyle = color20; ctx.lineWidth = 4; ctx.globalAlpha = 0.6 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // 20d glow
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, progressAngle20);
+  ctx.strokeStyle = color20; ctx.lineWidth = 14; ctx.globalAlpha = 0.06 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // 20d marker
+  const mx20 = cx + r20 * Math.cos(progressAngle20);
+  const my20 = cy + r20 * Math.sin(progressAngle20);
+  ctx.beginPath(); ctx.arc(mx20, my20, 5, 0, Math.PI*2);
+  ctx.fillStyle = color20; ctx.globalAlpha = 0.8 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // 20d label
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = color20; ctx.globalAlpha = 0.4;
+  ctx.textAlign = "center";
+  ctx.fillText("20D PULSE", cx, cy - r20 - 10);
+  ctx.font = "7px monospace";
+  ctx.fillText(`DAY ${pulse.daysSince20}`, cx, cy - r20 - 22);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // CENTER — THE VIBE
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+
+  // The word
+  ctx.font = "bold 42px monospace"; ctx.fillStyle = pulse.vibeColor;
+  ctx.globalAlpha = 0.95 * animProgress;
+  ctx.fillText(pulse.vibe, cx, cy - 8);
+  ctx.globalAlpha = 1;
+
+  // The description
+  ctx.font = "11px monospace"; ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillText(pulse.vibeDesc, cx, cy + 14);
+
+  // Price
+  ctx.font = "bold 14px monospace"; ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.7;
+  ctx.fillText(`$${fmtP(pulse.currentPrice)}`, cx, cy + 36);
+  ctx.globalAlpha = 1;
+
+  // The move so far / move left
+  ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.25)";
+  const moveStr = pulse.moveFromTrough >= 0
+    ? `+${(pulse.moveFromTrough*100).toFixed(1)}% from trough`
+    : `${(pulse.moveFromTrough*100).toFixed(1)}% from trough`;
+  ctx.fillText(moveStr, cx, cy + 52);
+
+  // Dollar context
+  if (pulse.vibe === "RIDE" || pulse.vibe === "EXIT") {
+    ctx.font = "9px monospace"; ctx.fillStyle = pulse.vibeColor; ctx.globalAlpha = 0.4;
+    const dollarStr = pulse.dollarOnMove >= 0
+      ? `+$${Number(pulse.dollarOnMove).toLocaleString()} on $400K`
+      : `-$${Number(Math.abs(pulse.dollarOnMove)).toLocaleString()} on $400K`;
+    ctx.fillText(dollarStr, cx, cy + 66);
+    ctx.globalAlpha = 1;
+  }
+
+  if (pulse.vibe === "DEPLOY") {
+    ctx.font = "9px monospace"; ctx.fillStyle = GREEN; ctx.globalAlpha = 0.4;
+    ctx.fillText(`Avg swing: ~${(pulse.avgSwing*100).toFixed(0)}% · ~$${Number(Math.round(pulse.avgSwing*400000)).toLocaleString()} on $400K`, cx, cy + 66);
+    ctx.globalAlpha = 1;
+  }
+
+  // Day count — small
+  ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillText(`60D: day ${pulse.daysSince60} of ~${Math.round(pulse.avgLen60)} · ${pulse.daysLeft}d left`, cx, cy + 82);
+
+  // ═════════════════════════════════════════════
+  // CONTEXT BAR
+  // ═════════════════════════════════════════════
+  const fromCrest = pulse.moveFromCrest < 0
+    ? `${(pulse.moveFromCrest*100).toFixed(1)}% from wave high ($${fmtP(pulse.crest60.price)})`
+    : `at wave high`;
+  const moveLeftStr = pulse.moveLeft > 0.01
+    ? `~${(pulse.moveLeft*100).toFixed(0)}% move expected remaining (~$${Number(Math.round(pulse.moveLeft*400000)).toLocaleString()})`
+    : `move appears exhausted`;
+
+  document.getElementById("context").innerHTML = `
+    <span style="color:${pulse.vibeColor};font-weight:700">${pulse.vibe}</span> ·
+    60D wave: day ${pulse.daysSince60} of ~${Math.round(pulse.avgLen60)} ·
+    20D pulse: day ${pulse.daysSince20} ·
+    ${fromCrest} ·
+    ${moveLeftStr} ·
+    <span style="color:rgba(255,255,255,0.5)">~${pulse.daysLeft}d to next trough</span>
+  `;
+
+  // Keep pulsing the NOW marker
+  if (animProgress >= 1) requestAnimationFrame(() => draw());
+}
+
+// ═══════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════
+function animate() {
+  if (animProgress < 1) {
+    animProgress += 0.025;
+    if (animProgress > 1) animProgress = 1;
+    draw();
+    requestAnimationFrame(animate);
+  } else {
+    draw(); // keep pulsing
+  }
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount+1)%4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  const result = await fetchBTCData();
+  clearInterval(dotTimer);
+
+  if (!result.data.length) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
+    return;
+  }
+
+  allData = result.data;
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("badgeText").textContent = `LIVE · ${result.source}`;
+
+  animate();
+  window.addEventListener("resize", draw);
+}
+
+main();
+</script>
+</body>
+</html>
