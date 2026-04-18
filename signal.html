@@ -187,65 +187,38 @@ function estimateDominantCycle(closes, minLag = 35, maxLag = 90) {
 }
 
 // ═══════════════════════════════════════════════
-// ADAPTIVE TROUGH DETECTION (Codex + Ours merged)
+// TROUGH DETECTION — Vibe's proven algorithm
 // ═══════════════════════════════════════════════
-function dynamicWindow(closes) {
-  const atrPct = calcAtrPercent(closes, 20);
-  return clamp(Math.round(6 + atrPct * 180), 6, 18);
-}
+// The adaptive version (median smoothing + rebound filter) was
+// rejecting valid shallow troughs, causing the engine to use
+// stale older troughs and read EXIT prematurely.
+// We use the Vibe's battle-tested detector for timing accuracy,
+// and keep Codex's improvements for everything else.
 
-function findTroughsAdaptive(closes, nominalCycle) {
-  const smooth = rollingMedian(closes, 5);
-  const halfWindow = dynamicWindow(closes);
-  const minGap = Math.max(10, Math.round(nominalCycle * 0.5));
+function findTroughs(prices, halfWindow) {
   const troughs = [];
-
-  for (let i = halfWindow; i < smooth.length - halfWindow; i++) {
-    let isMin = true;
+  for (let i = halfWindow; i < prices.length - halfWindow; i++) {
+    let isTrough = true;
     for (let j = 1; j <= halfWindow; j++) {
-      if (smooth[i] > smooth[i - j] || smooth[i] > smooth[i + j]) { isMin = false; break; }
+      if (prices[i] > prices[i - j] || prices[i] > prices[i + j]) { isTrough = false; break; }
     }
-    if (!isMin) continue;
-
-    // Rebound confirmation: price must bounce at least 1.5% within 5 bars
-    const reboundWindow = smooth.slice(i + 1, Math.min(smooth.length, i + 6));
-    const rebound = reboundWindow.length ? (Math.max(...reboundWindow) - smooth[i]) / smooth[i] : 0;
-    if (rebound < 0.015) continue;
-
-    if (!troughs.length || i - troughs[troughs.length - 1] >= minGap) {
+    if (isTrough && (troughs.length === 0 || (i - troughs[troughs.length - 1]) >= halfWindow)) {
       troughs.push(i);
-    } else {
-      if (smooth[i] < smooth[troughs[troughs.length - 1]]) {
-        troughs[troughs.length - 1] = i;
-      }
     }
   }
   return troughs;
 }
 
-// 20-day troughs — our original approach, enhanced with median smoothing
-function findTroughs20(closes) {
-  const smooth = rollingMedian(closes, 3);
-  const halfWindow = Math.max(3, Math.min(6, dynamicWindow(closes) - 3));
-  const minGap = 10;
-  const troughs = [];
-
-  for (let i = halfWindow; i < smooth.length - halfWindow; i++) {
-    let isMin = true;
-    for (let j = 1; j <= halfWindow; j++) {
-      if (smooth[i] > smooth[i - j] || smooth[i] > smooth[i + j]) { isMin = false; break; }
-    }
-    if (!isMin) continue;
-
-    if (!troughs.length || i - troughs[troughs.length - 1] >= minGap) {
-      troughs.push(i);
-    } else {
-      if (smooth[i] < smooth[troughs[troughs.length - 1]]) {
-        troughs[troughs.length - 1] = i;
-      }
-    }
+function filterTroughs(troughs, prices, nominal, tol) {
+  if (troughs.length <= 1) return troughs;
+  const minGap = nominal * (1 - tol);
+  const filtered = [troughs[0]];
+  for (let i = 1; i < troughs.length; i++) {
+    const gap = troughs[i] - filtered[filtered.length - 1];
+    if (gap >= minGap) filtered.push(troughs[i]);
+    else if (prices[troughs[i]] < prices[filtered[filtered.length - 1]]) filtered[filtered.length - 1] = troughs[i];
   }
-  return troughs;
+  return filtered;
 }
 
 function findCrest(prices, start, end) {
@@ -352,15 +325,20 @@ function computeSignal(prices, volumes, fng) {
   const now = closes.length - 1;
   const currentPrice = closes[now];
 
-  // ── Adaptive cycle detection ──
+  // ── Cycle detection ──
+  // Adaptive estimation for display, but timing uses proven trough detection
   const cycleLen = estimateDominantCycle(closes);
 
-  // ── 60-day adaptive troughs ──
-  const t60 = findTroughsAdaptive(closes, cycleLen);
+  // ── 60-day troughs — Vibe's proven algorithm ──
+  let t60 = findTroughs(closes, 12);
+  t60 = filterTroughs(t60, closes, 60, 0.5);
+  if (t60.length < 2) { t60 = findTroughs(closes, 8); t60 = filterTroughs(t60, closes, 60, 0.6); }
   if (t60.length < 1) return null;
 
-  // ── 20-day troughs ──
-  const t20 = findTroughs20(closes);
+  // ── 20-day troughs — same proven approach ──
+  let t20 = findTroughs(closes, 4);
+  t20 = filterTroughs(t20, closes, 20, 0.5);
+  if (t20.length < 2) { t20 = findTroughs(closes, 3); t20 = filterTroughs(t20, closes, 20, 0.6); }
 
   // ── Average cycle length from recent completed cycles ──
   let avgLen60 = cycleLen;
@@ -435,11 +413,29 @@ function computeSignal(prices, volumes, fng) {
     (moveFromTrough < 0.03 ? 2 : moveFromTrough < 0.06 ? 1 : 0);
 
   // Exit score (0-9)
+  // pastCrest and past20Crest alone shouldn't force EXIT —
+  // they need progress context. Without progress > 0.5, a pullback
+  // from crest could just be normal mid-cycle volatility.
   const exitScore =
     (progress60 > 0.85 ? 3 : progress60 > 0.70 ? 2 : 0) +
-    (pastCrest ? 2 : 0) +
-    (past20Crest && progress60 > 0.5 ? 2 : 0) +
-    (moveFromCrest < -0.08 ? 2 : moveFromCrest < -0.04 ? 1 : 0);
+    (pastCrest && progress60 > 0.5 ? 2 : pastCrest ? 1 : 0) +
+    (past20Crest && progress60 > 0.6 ? 2 : 0) +
+    (moveFromCrest < -0.08 && progress60 > 0.5 ? 2 : moveFromCrest < -0.04 && progress60 > 0.5 ? 1 : 0);
+
+  // ── DIAGNOSTICS (open browser console to see) ──
+  console.log("═══ THE SIGNAL — SCORING DIAGNOSTIC ═══");
+  console.log("Cycle length (adaptive):", cycleLen, "| Avg from troughs:", avgLen60);
+  console.log("Last 60d trough index:", last60, "| Days since:", daysSince60, "| Progress:", (progress60 * 100).toFixed(1) + "%");
+  console.log("Last 20d trough index:", last20, "| Days since:", daysSince20);
+  console.log("Trough price:", fmtP(troughPrice60), "| Crest price:", fmtP(crest60.price), "| Current:", fmtP(currentPrice));
+  console.log("Move from trough:", (moveFromTrough * 100).toFixed(2) + "%", "| Move from crest:", (moveFromCrest * 100).toFixed(2) + "%");
+  console.log("Past crest (3% rule):", pastCrest, "| Past 20d crest:", past20Crest);
+  console.log("Near trough (≤8d):", nearTrough, "| Near 20d trough (≤5d):", near20Trough);
+  console.log("Deploy score:", deployScore, "| Exit score:", exitScore);
+  console.log("Flow:", flowState, "| F&G:", fgValue, "| Volume:", volClass.band, "| Regime:", regime);
+  console.log("All 60d troughs:", t60.slice(-5).map(i => `idx=${i} price=$${fmtP(closes[i])}`));
+  console.log("All 20d troughs:", t20.slice(-5).map(i => `idx=${i} price=$${fmtP(closes[i])}`));
+  console.log("═══════════════════════════════════════");
 
   // Flow boost — conviction modifies the timing signal
   let flowBoost = 0;
