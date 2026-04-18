@@ -8,6 +8,9 @@ This document defines **robustness checks** for the DEPLOY / RIDE / EXIT engine 
 - Penalize high-frequency state flips.
 
 ## Checks
+0. **Cycle significance guard**
+   - Validate the best autocorrelation in the 35-90d search band.
+   - If correlation is weak, force 60-day fallback instead of adaptive shortening.
 1. **State persistence**
    - Median run length for each action state over history.
    - Flag if median run length < 3 days.

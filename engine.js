@@ -69,7 +69,15 @@
 
   function estimateDominantCycle(closes, minLag = 35, maxLag = 90) {
     if (closes.length < maxLag + 20) return 60;
-    const smooth = rollingMedian(closes, 5);
+
+    // Detrend with log returns so trend persistence does not masquerade as a cycle.
+    const returns = [];
+    for (let i = 1; i < closes.length; i++) {
+      const prev = closes[i - 1];
+      const next = closes[i];
+      returns.push(prev > 0 && next > 0 ? Math.log(next / prev) : 0);
+    }
+    const smooth = rollingMedian(returns, 5);
     let bestLag = 60;
     let bestCorr = -Infinity;
     for (let lag = minLag; lag <= maxLag; lag++) {
@@ -79,6 +87,8 @@
         bestLag = lag;
       }
     }
+    // If no meaningful periodicity appears, preserve the operator's 60d anchor.
+    if (bestCorr < 0.35) return 60;
     return clamp(bestLag, 45, 75);
   }
 
@@ -91,7 +101,7 @@
   function findTroughsAdaptive(closes, nominalCycle) {
     const smooth = rollingMedian(closes, 5);
     const halfWindow = dynamicWindow(closes);
-    const minGap = Math.max(10, Math.round(nominalCycle * 0.5));
+    const minGap = Math.max(14, Math.round(nominalCycle * 0.6));
     const troughs = [];
 
     for (let i = halfWindow; i < smooth.length - halfWindow; i++) {
