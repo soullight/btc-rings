@@ -163,12 +163,26 @@ function autocorr(values, lag) {
 
 function estimateDominantCycle(closes, minLag = 35, maxLag = 90) {
   if (closes.length < maxLag + 20) return 60;
-  const smooth = rollingMedian(closes, 5);
+
+  // CRITICAL FIX: Detrend by using daily returns, not raw prices.
+  // Raw prices carry trend momentum that fools autocorrelation into
+  // finding fake short cycles during strong trends.
+  const returns = [];
+  for (let i = 1; i < closes.length; i++) {
+    returns.push((closes[i] - closes[i - 1]) / closes[i - 1]);
+  }
+  const smooth = rollingMedian(returns, 5);
+
   let bestLag = 60, bestCorr = -Infinity;
   for (let lag = minLag; lag <= maxLag; lag++) {
     const c = autocorr(smooth, lag);
     if (c > bestCorr) { bestCorr = c; bestLag = lag; }
   }
+
+  // Correlation threshold: if the best correlation is weak,
+  // the cycle signal isn't statistically meaningful. Fall back to 60.
+  if (bestCorr < 0.35) return 60;
+
   return clamp(bestLag, 45, 75);
 }
 
