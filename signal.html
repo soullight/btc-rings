@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — The Signal</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: 8px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.2); letter-spacing: 3px; margin-top: 4px; }
+  canvas { border-radius: 12px; margin-top: 14px; }
+  .loading { text-align: center; padding: 100px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(224,64,251,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(224,64,251,0.08); border: 1px solid rgba(224,64,251,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:#E040FB; box-shadow:0 0 6px #E040FB; }
+  .context-bar {
+    margin-top: 14px; max-width: 650px; width: 100%;
+    padding: 12px 18px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    font-size: 10px; color: rgba(255,255,255,0.35); text-align: center; line-height: 1.8;
+  }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>THE SIGNAL</h1>
+  <div class="subtitle">TIMING · CONVICTION · REGIME — ONE READ</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">READING EVERYTHING<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="context" class="context-bar"></div>
+  <div class="footer">ADAPTIVE ENGINE · QUANTILE VOLUME · REGIME AWARENESS · ALL CLIENT-SIDE</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// THE SIGNAL
+// ═══════════════════════════════════════════════════════════════
+//
+// The Vibe reads timing. The Flow reads conviction.
+// The Signal reads everything.
+//
+// Three rings:
+//   OUTER  — Regime. The macro weather. Trend up, trend down,
+//            range, shock. A thin ambient glow that colors
+//            the entire context.
+//
+//   MAIN   — Adaptive 60-day cycle clock. Uses autocorrelation
+//            to find the actual dominant cycle (not hardcoded 60).
+//            ATR-based dynamic window. Median smoothing.
+//            Rebound confirmation on troughs.
+//            Deploy / Ride / Exit zones.
+//
+//   INNER  — 20-day sub-pulse. The fast rhythm inside the breath.
+//
+// Center: One word. Flow state. Regime badge. Price. Dollars.
+//
+// Engine: Best of our original system + Codex improvements.
+//   - Adaptive cycle via autocorrelation (Codex)
+//   - Dynamic halfWindow via ATR (Codex)
+//   - Median smoothing before trough scan (Codex)
+//   - Rebound confirmation on troughs (Codex)
+//   - Quantile-based volume thresholds (Codex)
+//   - Regime detection with guardrails (Codex)
+//   - 20-day sub-cycle (ours — Codex dropped this)
+//   - Nuanced deploy/exit scoring (ours — Codex simplified)
+//   - Ring visualization (ours)
+//   - Dollar context on $400K (ours)
+//   - Fear & Greed integration (ours)
+//
+// ═══════════════════════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700";
+const CYAN = "#4FC3F7", PURPLE = "#E040FB", ORANGE = "#FF9800";
+
+let animProgress = 0;
+let signalState = null;
+
+// ═══════════════════════════════════════════════
+// UTILITIES (from Codex)
+// ═══════════════════════════════════════════════
+function mean(arr) {
+  if (!arr || !arr.length) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function pctChange(a, b) {
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === 0) return 0;
+  return (b - a) / a;
+}
+
+function rollingMedian(values, window) {
+  const out = [];
+  for (let i = 0; i < values.length; i++) {
+    const start = Math.max(0, i - Math.floor(window / 2));
+    const end = Math.min(values.length, i + Math.ceil(window / 2));
+    const slice = values.slice(start, end).sort((a, b) => a - b);
+    out.push(slice[Math.floor(slice.length / 2)]);
+  }
+  return out;
+}
+
+function quantile(sorted, q) {
+  if (!sorted.length) return 0;
+  const idx = (sorted.length - 1) * q;
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+function calcAtrPercent(closes, period) {
+  if (closes.length < period + 1) return 0.02;
+  const trs = [];
+  for (let i = 1; i < closes.length; i++) {
+    trs.push(Math.abs(closes[i] - closes[i - 1]) / closes[i - 1]);
+  }
+  return mean(trs.slice(-period));
+}
+
+// ═══════════════════════════════════════════════
+// ADAPTIVE CYCLE DETECTION (from Codex)
+// ═══════════════════════════════════════════════
+function autocorr(values, lag) {
+  const n = values.length;
+  if (n <= lag + 2) return -1;
+  const x = values.slice(0, n - lag);
+  const y = values.slice(lag);
+  const mx = mean(x), my = mean(y);
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < x.length; i++) {
+    const vx = x[i] - mx, vy = y[i] - my;
+    num += vx * vy; dx += vx * vx; dy += vy * vy;
+  }
+  if (dx === 0 || dy === 0) return -1;
+  return num / Math.sqrt(dx * dy);
+}
+
+function estimateDominantCycle(closes, minLag = 35, maxLag = 90) {
+  if (closes.length < maxLag + 20) return 60;
+  const smooth = rollingMedian(closes, 5);
+  let bestLag = 60, bestCorr = -Infinity;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    const c = autocorr(smooth, lag);
+    if (c > bestCorr) { bestCorr = c; bestLag = lag; }
+  }
+  return clamp(bestLag, 45, 75);
+}
+
+// ═══════════════════════════════════════════════
+// ADAPTIVE TROUGH DETECTION (Codex + Ours merged)
+// ═══════════════════════════════════════════════
+function dynamicWindow(closes) {
+  const atrPct = calcAtrPercent(closes, 20);
+  return clamp(Math.round(6 + atrPct * 180), 6, 18);
+}
+
+function findTroughsAdaptive(closes, nominalCycle) {
+  const smooth = rollingMedian(closes, 5);
+  const halfWindow = dynamicWindow(closes);
+  const minGap = Math.max(10, Math.round(nominalCycle * 0.5));
+  const troughs = [];
+
+  for (let i = halfWindow; i < smooth.length - halfWindow; i++) {
+    let isMin = true;
+    for (let j = 1; j <= halfWindow; j++) {
+      if (smooth[i] > smooth[i - j] || smooth[i] > smooth[i + j]) { isMin = false; break; }
+    }
+    if (!isMin) continue;
+
+    // Rebound confirmation: price must bounce at least 1.5% within 5 bars
+    const reboundWindow = smooth.slice(i + 1, Math.min(smooth.length, i + 6));
+    const rebound = reboundWindow.length ? (Math.max(...reboundWindow) - smooth[i]) / smooth[i] : 0;
+    if (rebound < 0.015) continue;
+
+    if (!troughs.length || i - troughs[troughs.length - 1] >= minGap) {
+      troughs.push(i);
+    } else {
+      if (smooth[i] < smooth[troughs[troughs.length - 1]]) {
+        troughs[troughs.length - 1] = i;
+      }
+    }
+  }
+  return troughs;
+}
+
+// 20-day troughs — our original approach, enhanced with median smoothing
+function findTroughs20(closes) {
+  const smooth = rollingMedian(closes, 3);
+  const halfWindow = Math.max(3, Math.min(6, dynamicWindow(closes) - 3));
+  const minGap = 10;
+  const troughs = [];
+
+  for (let i = halfWindow; i < smooth.length - halfWindow; i++) {
+    let isMin = true;
+    for (let j = 1; j <= halfWindow; j++) {
+      if (smooth[i] > smooth[i - j] || smooth[i] > smooth[i + j]) { isMin = false; break; }
+    }
+    if (!isMin) continue;
+
+    if (!troughs.length || i - troughs[troughs.length - 1] >= minGap) {
+      troughs.push(i);
+    } else {
+      if (smooth[i] < smooth[troughs[troughs.length - 1]]) {
+        troughs[troughs.length - 1] = i;
+      }
+    }
+  }
+  return troughs;
+}
+
+function findCrest(prices, start, end) {
+  let max = -Infinity, idx = start;
+  for (let i = start; i <= Math.min(end, prices.length - 1); i++) {
+    if (prices[i] > max) { max = prices[i]; idx = i; }
+  }
+  return { idx, price: max };
+}
+
+// ═══════════════════════════════════════════════
+// QUANTILE-BASED VOLUME (from Codex)
+// ═══════════════════════════════════════════════
+function classifyVolume(volumes) {
+  if (volumes.length < 70) return { band: "normal", ratio20: 1, ratio60: 1, trend: 1 };
+  const recent5 = mean(volumes.slice(-5));
+  const prev5 = mean(volumes.slice(-10, -5));
+  const avg20 = mean(volumes.slice(-20));
+  const avg60 = mean(volumes.slice(-60));
+  const ratio20 = avg20 ? recent5 / avg20 : 1;
+  const ratio60 = avg60 ? recent5 / avg60 : 1;
+  const trend = prev5 ? recent5 / prev5 : 1;
+
+  // Build historical distribution of 5d/60d ratios
+  const ratios = [];
+  for (let i = 60; i < volumes.length; i++) {
+    const local5 = mean(volumes.slice(i - 4, i + 1));
+    const local60 = mean(volumes.slice(i - 59, i + 1));
+    ratios.push(local60 ? local5 / local60 : 1);
+  }
+  const sorted = ratios.slice().sort((a, b) => a - b);
+  const q30 = quantile(sorted, 0.30);
+  const q70 = quantile(sorted, 0.70);
+  const q90 = quantile(sorted, 0.90);
+
+  let band = "normal";
+  if (ratio60 >= q90) band = "massive";
+  else if (ratio60 >= q70) band = "high";
+  else if (ratio60 < q30) band = "thin";
+
+  return { band, ratio20, ratio60, trend };
+}
+
+// ═══════════════════════════════════════════════
+// REGIME DETECTION (from Codex)
+// ═══════════════════════════════════════════════
+function detectRegime(closes) {
+  if (closes.length < 70) return "range";
+  const c = closes[closes.length - 1];
+  const c20 = closes[closes.length - 20];
+  const c60 = closes[closes.length - 60];
+  const m20 = pctChange(c20, c);
+  const m60 = pctChange(c60, c);
+
+  const daily = [];
+  for (let i = closes.length - 20; i < closes.length; i++) {
+    if (i <= 0) continue;
+    daily.push(Math.abs(pctChange(closes[i - 1], closes[i])));
+  }
+  const rv = mean(daily);
+
+  if (daily.length && Math.max(...daily) > 0.08) return "shock";
+  if (m20 > 0.03 && m60 > 0.05) return "trend_up";
+  if (m20 < -0.03 && m60 < -0.05) return "trend_down";
+  if (rv < 0.015) return "range";
+  return "mixed";
+}
+
+// ═══════════════════════════════════════════════
+// FLOW STATE (ours, with Codex's volume classification)
+// ═══════════════════════════════════════════════
+function inferFlowState(fgValue, volumeBand) {
+  if (fgValue <= 15) return volumeBand === "massive" || volumeBand === "high" ? "CAPITULATION" : "ACCUMULATION";
+  if (fgValue <= 30) return volumeBand === "massive" || volumeBand === "high" ? "ABSORPTION" : "ACCUMULATION";
+  if (fgValue <= 45) return volumeBand === "massive" || volumeBand === "high" ? "ABSORPTION" : "ACCUMULATION";
+  if (fgValue <= 55) return "MOMENTUM";
+  if (fgValue <= 70) return volumeBand === "thin" ? "EXHAUSTION" : "MOMENTUM";
+  if (fgValue <= 85) return volumeBand === "thin" ? "EXHAUSTION" : "DISTRIBUTION";
+  return volumeBand === "massive" ? "DISTRIBUTION" : "EXHAUSTION";
+}
+
+function flowColor(state) {
+  const map = { CAPITULATION: PURPLE, ABSORPTION: GREEN, ACCUMULATION: CYAN, MOMENTUM: GOLD, DISTRIBUTION: ORANGE, EXHAUSTION: RED };
+  return map[state] || GOLD;
+}
+
+function regimeColor(regime) {
+  const map = { trend_up: GREEN, trend_down: RED, range: GOLD, shock: PURPLE, mixed: CYAN };
+  return map[regime] || CYAN;
+}
+
+function regimeLabel(regime) {
+  const map = { trend_up: "UPTREND", trend_down: "DOWNTREND", range: "RANGE", shock: "SHOCK", mixed: "MIXED" };
+  return map[regime] || "MIXED";
+}
+
+// ═══════════════════════════════════════════════
+// THE SIGNAL ENGINE — everything combined
+// ═══════════════════════════════════════════════
+function computeSignal(prices, volumes, fng) {
+  if (prices.length < 100) return null;
+
+  const closes = prices.map(d => d.price);
+  const now = closes.length - 1;
+  const currentPrice = closes[now];
+
+  // ── Adaptive cycle detection ──
+  const cycleLen = estimateDominantCycle(closes);
+
+  // ── 60-day adaptive troughs ──
+  const t60 = findTroughsAdaptive(closes, cycleLen);
+  if (t60.length < 1) return null;
+
+  // ── 20-day troughs ──
+  const t20 = findTroughs20(closes);
+
+  // ── Average cycle length from recent completed cycles ──
+  let avgLen60 = cycleLen;
+  if (t60.length >= 2) {
+    const recent = [];
+    for (let i = Math.max(0, t60.length - 5); i < t60.length - 1; i++) {
+      recent.push(t60[i + 1] - t60[i]);
+    }
+    if (recent.length) avgLen60 = Math.round(mean(recent));
+  }
+
+  // ── Average swing amplitude ──
+  let avgSwing = 0.15;
+  if (t60.length >= 2) {
+    const amps = [];
+    for (let i = Math.max(0, t60.length - 4); i < t60.length - 1; i++) {
+      const c = findCrest(closes, t60[i], t60[i + 1]);
+      const low = Math.min(closes[t60[i]], closes[t60[i + 1]]);
+      amps.push((c.price - low) / low);
+    }
+    if (amps.length) avgSwing = mean(amps);
+  }
+
+  // ── Current 60-day cycle position ──
+  const last60 = t60[t60.length - 1];
+  const daysSince60 = now - last60;
+  const progress60 = daysSince60 / avgLen60;
+  const troughPrice60 = closes[last60];
+  const crest60 = findCrest(closes, last60, now);
+  const moveFromTrough = (currentPrice - troughPrice60) / troughPrice60;
+  const moveFromCrest = (currentPrice - crest60.price) / crest60.price;
+  const pastCrest = currentPrice < crest60.price * 0.97;
+  const nearTrough = daysSince60 <= 8;
+
+  // ── Current 20-day cycle ──
+  const last20 = t20.length > 0 ? t20[t20.length - 1] : last60;
+  const daysSince20 = now - last20;
+  const troughPrice20 = closes[last20];
+  const crest20 = findCrest(closes, last20, now);
+  const near20Trough = daysSince20 <= 5;
+  const past20Crest = currentPrice < crest20.price * 0.97;
+
+  // ── Volume classification (quantile-based) ──
+  const vols = volumes.map(v => v.volume);
+  const volClass = classifyVolume(vols);
+
+  // ── Fear & Greed ──
+  const fgValue = fng.length > 0 ? fng[fng.length - 1].value : 50;
+  const fgLabel = fng.length > 0 ? fng[fng.length - 1].label : "Neutral";
+  let fgTrend = 0;
+  if (fng.length >= 10) {
+    const r5 = mean(fng.slice(-5).map(f => f.value));
+    const p5 = mean(fng.slice(-10, -5).map(f => f.value));
+    fgTrend = r5 - p5;
+  }
+
+  // ── Flow state ──
+  const flowState = inferFlowState(fgValue, volClass.band);
+
+  // ── Regime ──
+  const regime = detectRegime(closes);
+
+  // ═══════════════════════════════════════════════
+  // SCORING — our nuanced system, not Codex's simple mapping
+  // ═══════════════════════════════════════════════
+
+  // Deploy score (0-10)
+  const deployScore =
+    (nearTrough ? 3 : 0) +
+    (near20Trough ? 2 : 0) +
+    (progress60 < 0.20 ? 3 : progress60 < 0.35 ? 2 : 0) +
+    (moveFromTrough < 0.03 ? 2 : moveFromTrough < 0.06 ? 1 : 0);
+
+  // Exit score (0-9)
+  const exitScore =
+    (progress60 > 0.85 ? 3 : progress60 > 0.70 ? 2 : 0) +
+    (pastCrest ? 2 : 0) +
+    (past20Crest && progress60 > 0.5 ? 2 : 0) +
+    (moveFromCrest < -0.08 ? 2 : moveFromCrest < -0.04 ? 1 : 0);
+
+  // Flow boost — conviction modifies the timing signal
+  let flowBoost = 0;
+  if (flowState === "CAPITULATION") flowBoost = 3;
+  else if (flowState === "ABSORPTION") flowBoost = 2;
+  else if (flowState === "ACCUMULATION") flowBoost = 0;
+  else if (flowState === "MOMENTUM") flowBoost = 0;
+  else if (flowState === "DISTRIBUTION") flowBoost = -2;
+  else if (flowState === "EXHAUSTION") flowBoost = -3;
+
+  // Adjusted scores
+  const adjDeploy = deployScore + Math.max(0, flowBoost);
+  const adjExit = exitScore + Math.max(0, -flowBoost);
+
+  // ── Decision ──
+  let action, actionColor, actionDesc;
+
+  if (adjDeploy >= 4) {
+    action = "DEPLOY";
+    actionColor = GREEN;
+    actionDesc = "The wave reset. Timing + conviction say go.";
+  } else if (adjExit >= 4) {
+    action = "EXIT";
+    actionColor = RED;
+    actionDesc = "Wave is cresting. Take profit, wait for the next one.";
+  } else if (adjDeploy >= 2 && adjExit < 2) {
+    action = "DEPLOY";
+    actionColor = GREEN;
+    actionDesc = "Early signs of a window opening.";
+  } else if (adjExit >= 2 && progress60 > 0.6) {
+    action = "EXIT";
+    actionColor = RED;
+    actionDesc = "Wave getting tired. Consider taking money.";
+  } else {
+    action = "RIDE";
+    actionColor = GOLD;
+    actionDesc = "In the wave. Let it move.";
+  }
+
+  // ── Regime guardrails (from Codex) ──
+  const notes = [];
+  if (regime === "shock" && action === "DEPLOY") {
+    action = "RIDE"; actionColor = GOLD;
+    actionDesc = "Timing says deploy but market is in shock. Wait for clarity.";
+    notes.push("SHOCK LOCKOUT");
+  }
+  if (regime === "trend_down" && action === "DEPLOY" && flowState === "ACCUMULATION") {
+    action = "RIDE"; actionColor = GOLD;
+    actionDesc = "Early cycle but downtrend with quiet accumulation. Patience.";
+    notes.push("DOWNTREND CAUTION");
+  }
+
+  // Conviction alignment note
+  if (action === "DEPLOY" && (flowState === "CAPITULATION" || flowState === "ABSORPTION")) {
+    notes.push("CONVICTION ALIGNED");
+  }
+  if (action === "EXIT" && (flowState === "DISTRIBUTION" || flowState === "EXHAUSTION")) {
+    notes.push("CONVICTION ALIGNED");
+  }
+  if (action === "DEPLOY" && (flowState === "DISTRIBUTION" || flowState === "EXHAUSTION")) {
+    notes.push("CONVICTION CONFLICT");
+  }
+  if (action === "EXIT" && (flowState === "CAPITULATION" || flowState === "ABSORPTION")) {
+    notes.push("CONVICTION CONFLICT");
+  }
+
+  // ── Dollar context ──
+  const dollarOnMove = Math.round(moveFromTrough * 400000);
+  const moveLeft = Math.max(0, avgSwing - moveFromTrough);
+  const dollarOnExpected = Math.round(moveLeft * 400000);
+  const daysLeft = Math.max(0, Math.round(avgLen60 - daysSince60));
+
+  return {
+    action, actionColor, actionDesc, notes,
+    currentPrice, cycleLen, avgLen60,
+    daysSince60, progress60, daysLeft,
+    troughPrice60, crest60, moveFromTrough, moveFromCrest,
+    daysSince20, troughPrice20, crest20,
+    near20Trough, nearTrough, pastCrest, past20Crest,
+    avgSwing, moveLeft,
+    dollarOnMove, dollarOnExpected,
+    flowState, fgValue, fgLabel, fgTrend,
+    volClass, regime,
+    deployScore, exitScore, adjDeploy, adjExit, flowBoost,
+    t60, t20, prices: closes,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+async function fetchPriceAndVolume() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=730&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const prices = j.prices.map(([ts, p]) => ({ date: new Date(ts), price: p }));
+    const volumes = j.total_volumes.map(([ts, v]) => ({ date: new Date(ts), volume: v }));
+    if (prices.length > 100) return { prices, volumes, source: "CoinGecko" };
+  } catch (e) { console.warn("CoinGecko:", e); }
+
+  try {
+    const all = [];
+    let toTs = Math.floor(Date.now() / 1000);
+    for (let i = 0; i < 2; i++) {
+      const r = await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=730&toTs=${toTs}`);
+      if (!r.ok) break;
+      const j = await r.json();
+      if (!j.Data?.Data?.length) break;
+      all.unshift(...j.Data.Data);
+      toTs = j.Data.Data[0].time - 1;
+    }
+    if (all.length > 100) {
+      const seen = new Set();
+      const prices = all.filter(x => { if (seen.has(x.time)) return false; seen.add(x.time); return true; })
+        .map(x => ({ date: new Date(x.time * 1000), price: x.close }))
+        .filter(x => x.price > 0).sort((a, b) => a.date - b.date);
+      const volumes = all.filter(x => x.volumeto > 0)
+        .map(x => ({ date: new Date(x.time * 1000), volume: x.volumeto }))
+        .sort((a, b) => a.date - b.date);
+      return { prices, volumes, source: "CryptoCompare" };
+    }
+  } catch (e) { console.warn("CryptoCompare:", e); }
+
+  return { prices: [], volumes: [], source: "ERROR" };
+}
+
+async function fetchFearGreed() {
+  try {
+    const r = await fetch("https://api.alternative.me/fng/?limit=365&format=json");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    return j.data.map(d => ({
+      date: new Date(parseInt(d.timestamp) * 1000),
+      value: parseInt(d.value),
+      label: d.value_classification
+    })).reverse();
+  } catch (e) {
+    console.warn("Fear & Greed:", e);
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en", { maximumFractionDigits: 0 }) : p.toFixed(2); }
+
+function draw() {
+  const canvas = document.getElementById("canvas");
+  const container = canvas.parentElement;
+  const size = Math.min(container.clientWidth - 20, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size * dpr; canvas.height = size * dpr;
+  canvas.style.width = size + "px"; canvas.style.height = size + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const cx = size / 2, cy = size / 2;
+
+  if (!signalState) return;
+  const s = signalState;
+  const startAngle = -Math.PI / 2;
+
+  // ── Background ──
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0, 0, size, size);
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size / 2);
+  bg.addColorStop(0, "rgba(15,15,30,0.5)"); bg.addColorStop(1, "rgba(10,10,15,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+
+  const maxR = (size / 2) * 0.90;
+
+  // ═════════════════════════════════════════════
+  // OUTERMOST RING — REGIME
+  // ═════════════════════════════════════════════
+  const rRegime = maxR * 0.97;
+  const rc = regimeColor(s.regime);
+
+  // Full circle — thin ambient glow
+  ctx.beginPath(); ctx.arc(cx, cy, rRegime, 0, Math.PI * 2);
+  ctx.strokeStyle = rc; ctx.lineWidth = 3; ctx.globalAlpha = 0.25 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Outer glow
+  ctx.beginPath(); ctx.arc(cx, cy, rRegime, 0, Math.PI * 2);
+  ctx.strokeStyle = rc; ctx.lineWidth = 20; ctx.globalAlpha = 0.04 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Regime label
+  ctx.font = "bold 8px monospace"; ctx.textAlign = "center";
+  ctx.fillStyle = rc; ctx.globalAlpha = 0.4;
+  ctx.fillText(regimeLabel(s.regime), cx, cy - rRegime - 8);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // MAIN RING — 60-DAY ADAPTIVE CYCLE
+  // ═════════════════════════════════════════════
+  const r60 = maxR * 0.80;
+  const progress = Math.min(s.progress60, 1.3);
+  const progressAngle = startAngle + progress * Math.PI * 2;
+
+  // Deploy/Ride/Exit zone arcs (dim background)
+  const deployEnd = startAngle + 0.30 * Math.PI * 2;
+  const rideEnd = startAngle + 0.70 * Math.PI * 2;
+  const exitEnd = startAngle + Math.PI * 2;
+
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, deployEnd);
+  ctx.strokeStyle = "rgba(0,230,118,0.07)"; ctx.lineWidth = 20; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r60, deployEnd, rideEnd);
+  ctx.strokeStyle = "rgba(255,215,0,0.05)"; ctx.lineWidth = 20; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r60, rideEnd, exitEnd);
+  ctx.strokeStyle = "rgba(255,23,68,0.05)"; ctx.lineWidth = 20; ctx.stroke();
+
+  // Zone labels
+  ctx.font = "bold 9px monospace";
+  const deployLabelAngle = startAngle + 0.15 * Math.PI * 2;
+  ctx.fillStyle = GREEN; ctx.globalAlpha = 0.25;
+  ctx.fillText("DEPLOY", cx + (r60 + 22) * Math.cos(deployLabelAngle), cy + (r60 + 22) * Math.sin(deployLabelAngle) + 3);
+
+  const rideLabelAngle = startAngle + 0.50 * Math.PI * 2;
+  ctx.fillStyle = GOLD; ctx.globalAlpha = 0.2;
+  ctx.fillText("RIDE", cx + (r60 + 22) * Math.cos(rideLabelAngle), cy + (r60 + 22) * Math.sin(rideLabelAngle) + 3);
+
+  const exitLabelAngle = startAngle + 0.85 * Math.PI * 2;
+  ctx.fillStyle = RED; ctx.globalAlpha = 0.2;
+  ctx.fillText("EXIT", cx + (r60 + 22) * Math.cos(exitLabelAngle), cy + (r60 + 22) * Math.sin(exitLabelAngle) + 3);
+  ctx.globalAlpha = 1;
+
+  // Elapsed arc — bright, action color
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, progressAngle);
+  ctx.strokeStyle = s.actionColor; ctx.lineWidth = 8; ctx.globalAlpha = 0.8 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Glow on elapsed
+  ctx.beginPath(); ctx.arc(cx, cy, r60, startAngle, progressAngle);
+  ctx.strokeStyle = s.actionColor; ctx.lineWidth = 28; ctx.globalAlpha = 0.08 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // ── Trough marker at 12 o'clock ──
+  ctx.beginPath(); ctx.arc(cx, cy - r60, 5, 0, Math.PI * 2);
+  ctx.fillStyle = GREEN; ctx.globalAlpha = 0.6; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.font = "7px monospace"; ctx.fillStyle = GREEN; ctx.globalAlpha = 0.35;
+  ctx.fillText("TROUGH", cx, cy - r60 - 10);
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillText(`$${fmtP(s.troughPrice60)}`, cx, cy - r60 - 22);
+  ctx.globalAlpha = 1;
+
+  // ── Crest marker (gold) ──
+  if (s.crest60) {
+    const crestDayPct = (s.crest60.idx - s.t60[s.t60.length - 1]) / Math.max(s.daysSince60, 1);
+    const crestAngle = startAngle + crestDayPct * progress * Math.PI * 2;
+    const crestX = cx + (r60 - 20) * Math.cos(crestAngle);
+    const crestY = cy + (r60 - 20) * Math.sin(crestAngle);
+    ctx.beginPath(); ctx.arc(crestX, crestY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = GOLD; ctx.globalAlpha = 0.8; ctx.fill();
+    ctx.beginPath(); ctx.arc(crestX, crestY, 9, 0, Math.PI * 2);
+    ctx.fillStyle = GOLD; ctx.globalAlpha = 0.1; ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = "7px monospace"; ctx.fillStyle = GOLD; ctx.globalAlpha = 0.45;
+    ctx.fillText(`$${fmtP(s.crest60.price)}`, crestX, crestY - 10);
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Adaptive cycle length indicator ──
+  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillText(`~${s.avgLen60}d cycle (adaptive)`, cx, cy + r60 + 16);
+
+  // ── NOW marker — pulsing ──
+  const nowX = cx + r60 * Math.cos(progressAngle);
+  const nowY = cy + r60 * Math.sin(progressAngle);
+  const pulseScale = 1 + 0.15 * Math.sin(Date.now() / 600);
+
+  ctx.beginPath(); ctx.arc(nowX, nowY, 22 * pulseScale, 0, Math.PI * 2);
+  ctx.fillStyle = s.actionColor; ctx.globalAlpha = 0.06; ctx.fill();
+  ctx.beginPath(); ctx.arc(nowX, nowY, 14, 0, Math.PI * 2);
+  ctx.fillStyle = s.actionColor; ctx.globalAlpha = 0.12; ctx.fill();
+  ctx.beginPath(); ctx.arc(nowX, nowY, 8, 0, Math.PI * 2);
+  ctx.fillStyle = s.actionColor; ctx.globalAlpha = 0.95 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // INNER RING — 20-DAY SUB-PULSE
+  // ═════════════════════════════════════════════
+  const r20 = maxR * 0.48;
+  const progress20 = Math.min(s.daysSince20 / 20, 1.3);
+  const progressAngle20 = startAngle + progress20 * Math.PI * 2;
+  const color20 = s.near20Trough ? GREEN : s.past20Crest ? RED : CYAN;
+
+  // Zone arcs (subtle)
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, startAngle + 0.25 * Math.PI * 2);
+  ctx.strokeStyle = "rgba(0,230,118,0.04)"; ctx.lineWidth = 10; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle + 0.25 * Math.PI * 2, startAngle + 0.6 * Math.PI * 2);
+  ctx.strokeStyle = "rgba(79,195,247,0.03)"; ctx.lineWidth = 10; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle + 0.6 * Math.PI * 2, startAngle + Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,23,68,0.03)"; ctx.lineWidth = 10; ctx.stroke();
+
+  // Elapsed
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, progressAngle20);
+  ctx.strokeStyle = color20; ctx.lineWidth = 4; ctx.globalAlpha = 0.6 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Glow
+  ctx.beginPath(); ctx.arc(cx, cy, r20, startAngle, progressAngle20);
+  ctx.strokeStyle = color20; ctx.lineWidth = 14; ctx.globalAlpha = 0.05 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // 20d marker
+  const mx20 = cx + r20 * Math.cos(progressAngle20);
+  const my20 = cy + r20 * Math.sin(progressAngle20);
+  ctx.beginPath(); ctx.arc(mx20, my20, 5, 0, Math.PI * 2);
+  ctx.fillStyle = color20; ctx.globalAlpha = 0.8 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // 20d label
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = color20; ctx.globalAlpha = 0.35;
+  ctx.fillText("20D PULSE", cx, cy - r20 - 10);
+  ctx.font = "7px monospace";
+  ctx.fillText(`DAY ${s.daysSince20}`, cx, cy - r20 - 22);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // CENTER — THE SIGNAL
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+
+  // Action word
+  ctx.font = "bold 40px monospace"; ctx.fillStyle = s.actionColor;
+  ctx.globalAlpha = 0.95 * animProgress;
+  ctx.fillText(s.action, cx, cy - 24);
+  ctx.globalAlpha = 1;
+
+  // Flow state + regime
+  ctx.font = "bold 11px monospace";
+  ctx.fillStyle = flowColor(s.flowState); ctx.globalAlpha = 0.5;
+  ctx.fillText(s.flowState, cx, cy - 2);
+  ctx.globalAlpha = 1;
+
+  // Description
+  ctx.font = "10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  const words = s.actionDesc.split(' ');
+  let line = '', y = cy + 16;
+  for (const word of words) {
+    const test = line + (line ? ' ' : '') + word;
+    if (ctx.measureText(test).width > size * 0.50) {
+      ctx.fillText(line, cx, y); line = word; y += 13;
+    } else { line = test; }
+  }
+  if (line) ctx.fillText(line, cx, y);
+
+  // Price
+  y += 18;
+  ctx.font = "bold 14px monospace"; ctx.fillStyle = s.actionColor; ctx.globalAlpha = 0.7;
+  ctx.fillText(`$${fmtP(s.currentPrice)}`, cx, y);
+  ctx.globalAlpha = 1;
+
+  // Move from trough
+  y += 15;
+  ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.25)";
+  const moveStr = s.moveFromTrough >= 0
+    ? `+${(s.moveFromTrough * 100).toFixed(1)}% from trough`
+    : `${(s.moveFromTrough * 100).toFixed(1)}% from trough`;
+  ctx.fillText(moveStr, cx, y);
+
+  // Dollar context
+  y += 14;
+  if (s.action === "RIDE" || s.action === "EXIT") {
+    ctx.font = "9px monospace"; ctx.fillStyle = s.actionColor; ctx.globalAlpha = 0.4;
+    const dStr = s.dollarOnMove >= 0
+      ? `+$${Number(s.dollarOnMove).toLocaleString()} on $400K`
+      : `-$${Number(Math.abs(s.dollarOnMove)).toLocaleString()} on $400K`;
+    ctx.fillText(dStr, cx, y);
+    ctx.globalAlpha = 1;
+  }
+  if (s.action === "DEPLOY") {
+    ctx.font = "9px monospace"; ctx.fillStyle = GREEN; ctx.globalAlpha = 0.4;
+    ctx.fillText(`Avg swing: ~${(s.avgSwing * 100).toFixed(0)}% · ~$${Number(Math.round(s.avgSwing * 400000)).toLocaleString()} on $400K`, cx, y);
+    ctx.globalAlpha = 1;
+  }
+
+  // Notes (regime guardrails, conviction alignment)
+  if (s.notes.length > 0) {
+    y += 16;
+    ctx.font = "bold 8px monospace"; ctx.globalAlpha = 0.5;
+    for (const note of s.notes) {
+      if (note === "CONVICTION ALIGNED") ctx.fillStyle = GREEN;
+      else if (note === "CONVICTION CONFLICT") ctx.fillStyle = ORANGE;
+      else if (note === "SHOCK LOCKOUT") ctx.fillStyle = PURPLE;
+      else if (note === "DOWNTREND CAUTION") ctx.fillStyle = RED;
+      else ctx.fillStyle = "rgba(255,255,255,0.3)";
+      ctx.fillText(note, cx, y);
+      y += 12;
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Day count
+  y += 4;
+  ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillText(`60D: day ${s.daysSince60} of ~${s.avgLen60} · ${s.daysLeft}d left`, cx, y);
+
+  // ── Context bar ──
+  const fromCrest = s.moveFromCrest < 0
+    ? `${(s.moveFromCrest * 100).toFixed(1)}% from wave high ($${fmtP(s.crest60.price)})`
+    : `at wave high`;
+  const moveLeftStr = s.moveLeft > 0.01
+    ? `~${(s.moveLeft * 100).toFixed(0)}% move remaining (~$${Number(Math.round(s.moveLeft * 400000)).toLocaleString()})`
+    : `move appears exhausted`;
+  const fgTrendStr = s.fgTrend > 5 ? "trending greedier" : s.fgTrend < -5 ? "trending fearful" : "stable";
+
+  document.getElementById("context").innerHTML = `
+    <span style="color:${s.actionColor};font-weight:700">${s.action}</span> ·
+    Regime: <span style="color:${regimeColor(s.regime)}">${regimeLabel(s.regime)}</span> ·
+    Flow: <span style="color:${flowColor(s.flowState)}">${s.flowState}</span> ·
+    F&G: <span style="color:${flowColor(s.flowState)}">${s.fgValue}</span> (${fgTrendStr}) ·
+    Vol: <span style="color:${s.volClass.band === 'thin' ? RED : s.volClass.band === 'massive' ? PURPLE : s.volClass.band === 'high' ? GREEN : CYAN}">${s.volClass.band.toUpperCase()}</span> (${s.volClass.ratio20.toFixed(1)}×) ·
+    ${fromCrest} ·
+    ${moveLeftStr} ·
+    Cycle: <span style="color:rgba(255,255,255,0.5)">${s.cycleLen}d (autocorrelation)</span>${s.notes.length ? ' · ' + s.notes.map(n => `<span style="color:${n === 'CONVICTION ALIGNED' ? GREEN : n === 'CONVICTION CONFLICT' ? ORANGE : PURPLE}">${n}</span>`).join(' · ') : ''}
+  `;
+
+  if (animProgress >= 1) requestAnimationFrame(() => draw());
+}
+
+// ═══════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════
+function animate() {
+  if (animProgress < 1) {
+    animProgress += 0.025;
+    if (animProgress > 1) animProgress = 1;
+    draw();
+    requestAnimationFrame(animate);
+  } else {
+    draw();
+  }
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount + 1) % 4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  const [priceResult, fngResult] = await Promise.all([
+    fetchPriceAndVolume(),
+    fetchFearGreed()
+  ]);
+
+  clearInterval(dotTimer);
+
+  if (!priceResult.prices.length) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
+    return;
+  }
+
+  let sourceStr = priceResult.source;
+  if (fngResult.length > 0) sourceStr += " + Alternative.me";
+
+  signalState = computeSignal(priceResult.prices, priceResult.volumes, fngResult);
+
+  if (!signalState) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">INSUFFICIENT DATA</div>';
+    return;
+  }
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("badgeText").textContent = `LIVE · ${sourceStr}`;
+
+  animate();
+  window.addEventListener("resize", draw);
+}
+
+main();
+</script>
+</body>
+</html>
