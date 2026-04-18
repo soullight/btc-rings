@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — The Flow</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: 8px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.2); letter-spacing: 3px; margin-top: 4px; }
+  canvas { border-radius: 12px; margin-top: 14px; }
+  .loading { text-align: center; padding: 100px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(79,195,247,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(79,195,247,0.08); border: 1px solid rgba(79,195,247,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:#4FC3F7; box-shadow:0 0 6px #4FC3F7; }
+  .context-bar {
+    margin-top: 14px; max-width: 600px; width: 100%;
+    padding: 12px 18px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    font-size: 10px; color: rgba(255,255,255,0.35); text-align: center; line-height: 1.7;
+  }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>THE FLOW</h1>
+  <div class="subtitle">READ THE ROOM · FOLLOW THE MONEY · IGNORE THE NOISE</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">READING THE FLOW<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="context" class="context-bar"></div>
+  <div class="footer">SMART MONEY LEAVES FOOTPRINTS · FEAR IS OPPORTUNITY · GREED IS THE EXIT</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// THE FLOW
+// ═══════════════════════════════════════════════
+//
+// The Vibe reads the rhythm — when to deploy, ride, exit.
+// The Flow reads the room — who's behind the move.
+//
+// Two layers:
+//
+//   FEAR & GREED — crypto's collective sentiment.
+//     When fear is extreme, institutions are loading.
+//     When greed is extreme, they're distributing into retail.
+//     This is the VIX of crypto.
+//
+//   VOLUME — the weight behind every candle.
+//     High volume at a low = absorption (smart money buying the dip)
+//     Thin volume on a breakout = exhaustion (no conviction)
+//     Volume confirms or denies what price is doing.
+//
+// Combined, they give you six states:
+//
+//   CAPITULATION — Extreme fear + massive volume.
+//                  Retail is panic-selling into institutional hands.
+//                  This is maximum deploy signal.
+//
+//   ABSORPTION  — High fear + above-average volume.
+//                  Smart money quietly buying the dip.
+//                  Deploy boost.
+//
+//   ACCUMULATION — Moderate fear + normal volume.
+//                   Quiet building. Watch for entry.
+//
+//   MOMENTUM    — Neutral sentiment + strong volume.
+//                  Active trend, real participation. Ride.
+//
+//   DISTRIBUTION — Greed + heavy volume.
+//                   Smart money selling into retail strength.
+//                   Exit warning.
+//
+//   EXHAUSTION  — Greed + thin volume.
+//                  Move is running on fumes. No buyers left.
+//                  Exit.
+//
+// ═══════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700", CYAN = "#4FC3F7";
+const PURPLE = "#E040FB", ORANGE = "#FF9800";
+
+let priceData = [];
+let volumeData = [];
+let fngData = [];
+let animProgress = 0;
+let flowState = null;
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+
+async function fetchPriceAndVolume() {
+  // CoinGecko gives us both price and volume
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const prices = j.prices.map(([ts,p]) => ({date:new Date(ts), price:p}));
+    const volumes = j.total_volumes.map(([ts,v]) => ({date:new Date(ts), volume:v}));
+    if (prices.length > 30) return {prices, volumes, source:"CoinGecko"};
+  } catch(e) { console.warn("CoinGecko:", e); }
+
+  // Fallback: CryptoCompare
+  try {
+    const r = await fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=365");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.Data.Data;
+    const prices = d.map(x => ({date:new Date(x.time*1000), price:x.close})).filter(x => x.price > 0);
+    const volumes = d.map(x => ({date:new Date(x.time*1000), volume:x.volumeto})).filter(x => x.volume > 0);
+    if (prices.length > 30) return {prices, volumes, source:"CryptoCompare"};
+  } catch(e) { console.warn("CryptoCompare:", e); }
+
+  return {prices:[], volumes:[], source:"ERROR"};
+}
+
+async function fetchFearGreed() {
+  try {
+    const r = await fetch("https://api.alternative.me/fng/?limit=365&format=json");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    // Returns newest first, reverse it
+    const data = j.data.map(d => ({
+      date: new Date(parseInt(d.timestamp) * 1000),
+      value: parseInt(d.value),
+      label: d.value_classification
+    })).reverse();
+    return data;
+  } catch(e) {
+    console.warn("Fear & Greed:", e);
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════
+// THE FLOW ENGINE
+// ═══════════════════════════════════════════════
+
+function analyzeFlow(prices, volumes, fng) {
+  if (prices.length < 30 || volumes.length < 30) return null;
+
+  const currentPrice = prices[prices.length - 1].price;
+  const currentFng = fng.length > 0 ? fng[fng.length - 1] : null;
+  const fngValue = currentFng ? currentFng.value : 50;
+  const fngLabel = currentFng ? currentFng.label : "Neutral";
+
+  // ── Volume analysis ──
+  // Compare recent volume to 20-day and 60-day averages
+  const recentVols = volumes.slice(-5).map(v => v.volume);
+  const vol20 = volumes.slice(-20).map(v => v.volume);
+  const vol60 = volumes.slice(-60).map(v => v.volume);
+
+  const avgRecent = recentVols.reduce((a,b) => a+b, 0) / recentVols.length;
+  const avg20 = vol20.reduce((a,b) => a+b, 0) / vol20.length;
+  const avg60 = vol60.length > 0 ? vol60.reduce((a,b) => a+b, 0) / vol60.length : avg20;
+
+  const volRatio20 = avgRecent / avg20;  // >1 = above average, <1 = below
+  const volRatio60 = avgRecent / avg60;
+
+  // Volume trend: are we ramping up or drying out?
+  const vol5ago = volumes.slice(-10, -5).map(v => v.volume);
+  const avg5ago = vol5ago.length > 0 ? vol5ago.reduce((a,b) => a+b, 0) / vol5ago.length : avgRecent;
+  const volTrend = avgRecent / avg5ago; // >1 = increasing, <1 = decreasing
+
+  // ── Fear & Greed zones ──
+  // 0-15: Extreme Fear
+  // 15-30: Fear
+  // 30-45: Moderate Fear
+  // 45-55: Neutral
+  // 55-70: Moderate Greed
+  // 70-85: Greed
+  // 85-100: Extreme Greed
+
+  // Fear & Greed trend (last 5 days vs 5 before that)
+  let fngTrend = 0;
+  if (fng.length >= 10) {
+    const recent5 = fng.slice(-5).map(f => f.value);
+    const prev5 = fng.slice(-10, -5).map(f => f.value);
+    const avgRecFng = recent5.reduce((a,b) => a+b, 0) / 5;
+    const avgPrevFng = prev5.reduce((a,b) => a+b, 0) / 5;
+    fngTrend = avgRecFng - avgPrevFng; // positive = getting greedier
+  }
+
+  // ── Price context ──
+  const prices20 = prices.slice(-20).map(p => p.price);
+  const prices60 = prices.slice(-60).map(p => p.price);
+  const high20 = Math.max(...prices20);
+  const low20 = Math.min(...prices20);
+  const high60 = Math.max(...prices60);
+  const low60 = Math.min(...prices60);
+  const posIn20 = (currentPrice - low20) / (high20 - low20 || 1); // 0=at low, 1=at high
+  const posIn60 = (currentPrice - low60) / (high60 - low60 || 1);
+  const priceChange5d = (currentPrice - prices[Math.max(0, prices.length - 6)].price) / prices[Math.max(0, prices.length - 6)].price;
+
+  // ── THE FLOW STATE ──
+  let state, stateColor, stateDesc, vibeBoost;
+
+  // Volume categories
+  const volHigh = volRatio20 > 1.4;
+  const volMassive = volRatio20 > 1.8;
+  const volNormal = volRatio20 >= 0.7 && volRatio20 <= 1.4;
+  const volThin = volRatio20 < 0.7;
+
+  if (fngValue <= 15 && volMassive) {
+    state = "CAPITULATION";
+    stateColor = PURPLE;
+    stateDesc = "Panic selling into institutional hands. Maximum opportunity.";
+    vibeBoost = "STRONG DEPLOY";
+  } else if (fngValue <= 30 && volHigh) {
+    state = "ABSORPTION";
+    stateColor = GREEN;
+    stateDesc = "Smart money buying the fear. Accumulation in progress.";
+    vibeBoost = "DEPLOY BOOST";
+  } else if (fngValue <= 30 && !volHigh) {
+    state = "ACCUMULATION";
+    stateColor = CYAN;
+    stateDesc = "Fear is elevated but quiet. Watching for volume to confirm.";
+    vibeBoost = "WATCH";
+  } else if (fngValue <= 45 && volHigh) {
+    state = "ABSORPTION";
+    stateColor = GREEN;
+    stateDesc = "Moderate fear with strong volume. Someone is loading.";
+    vibeBoost = "DEPLOY BOOST";
+  } else if (fngValue >= 75 && volThin) {
+    state = "EXHAUSTION";
+    stateColor = RED;
+    stateDesc = "Greed on fumes. No volume behind the move. Thin air.";
+    vibeBoost = "EXIT";
+  } else if (fngValue >= 70 && volHigh) {
+    state = "DISTRIBUTION";
+    stateColor = ORANGE;
+    stateDesc = "Greed with heavy volume. Smart money selling into strength.";
+    vibeBoost = "EXIT WARNING";
+  } else if (fngValue >= 55 && volThin) {
+    state = "EXHAUSTION";
+    stateColor = RED;
+    stateDesc = "Optimism but volume is drying up. Move losing steam.";
+    vibeBoost = "CAUTION";
+  } else if (fngValue > 45 && fngValue < 70 && volHigh) {
+    state = "MOMENTUM";
+    stateColor = GOLD;
+    stateDesc = "Neutral sentiment, strong volume. Real participation. Ride it.";
+    vibeBoost = "RIDE";
+  } else if (fngValue <= 45 && volNormal) {
+    state = "ACCUMULATION";
+    stateColor = CYAN;
+    stateDesc = "Quiet building. Sentiment is cautious, volume is steady.";
+    vibeBoost = "WATCH";
+  } else {
+    state = "MOMENTUM";
+    stateColor = GOLD;
+    stateDesc = "Market is moving with conviction. Stay in the wave.";
+    vibeBoost = "RIDE";
+  }
+
+  return {
+    state, stateColor, stateDesc, vibeBoost,
+    currentPrice,
+    fngValue, fngLabel, fngTrend,
+    volRatio20, volRatio60, volTrend,
+    avgRecent, avg20, avg60,
+    posIn20, posIn60, priceChange5d,
+    high20, low20, high60, low60,
+    prices, volumes, fng
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en",{maximumFractionDigits:0}) : p.toFixed(2); }
+function fmtVol(v) {
+  if (v >= 1e9) return (v/1e9).toFixed(1) + "B";
+  if (v >= 1e6) return (v/1e6).toFixed(0) + "M";
+  if (v >= 1e3) return (v/1e3).toFixed(0) + "K";
+  return v.toFixed(0);
+}
+
+function draw() {
+  const canvas = document.getElementById("canvas");
+  const container = canvas.parentElement;
+  const size = Math.min(container.clientWidth - 20, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  canvas.style.width = size+"px"; canvas.style.height = size+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const cx = size/2, cy = size/2;
+
+  if (!flowState) return;
+  const f = flowState;
+
+  // ── Background ──
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0,0,size,size);
+  const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,size/2);
+  bg.addColorStop(0,"rgba(15,15,30,0.5)"); bg.addColorStop(1,"rgba(10,10,15,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0,0,size,size);
+
+  const maxR = (size/2) * 0.88;
+  const startAngle = -Math.PI / 2;
+
+  // ═════════════════════════════════════════════
+  // OUTER RING — FEAR & GREED
+  // ═════════════════════════════════════════════
+  const rFng = maxR * 0.88;
+
+  // Full ring background — gradient from green (fear/0) through gold (neutral/50) to red (greed/100)
+  // Draw as segments
+  const segments = 100;
+  for (let i = 0; i < segments; i++) {
+    const pct = i / segments;
+    const a1 = startAngle + pct * Math.PI * 2;
+    const a2 = startAngle + (pct + 1/segments) * Math.PI * 2;
+
+    // Color: 0=green (extreme fear), 50=gold (neutral), 100=red (extreme greed)
+    const segVal = pct * 100;
+    let r, g, b;
+    if (segVal < 25) {
+      // Green to cyan
+      const t = segVal / 25;
+      r = Math.round(0 + t * 79); g = Math.round(230 - t * 35); b = Math.round(118 + t * 129);
+    } else if (segVal < 50) {
+      // Cyan to gold
+      const t = (segVal - 25) / 25;
+      r = Math.round(79 + t * 176); g = Math.round(195 + t * 20); b = Math.round(247 - t * 247);
+    } else if (segVal < 75) {
+      // Gold to orange
+      const t = (segVal - 50) / 25;
+      r = Math.round(255); g = Math.round(215 - t * 63); b = Math.round(0);
+    } else {
+      // Orange to red
+      const t = (segVal - 75) / 25;
+      r = Math.round(255); g = Math.round(152 - t * 129); b = Math.round(0 + t * 68);
+    }
+
+    ctx.beginPath(); ctx.arc(cx, cy, rFng, a1, a2 + 0.01);
+    ctx.strokeStyle = `rgba(${r},${g},${b},0.06)`; ctx.lineWidth = 20; ctx.stroke();
+  }
+
+  // The needle — where fear & greed currently sits
+  const fngPct = f.fngValue / 100;
+  const fngAngle = startAngle + fngPct * Math.PI * 2;
+
+  // Bright arc from 0 (12 o'clock) to current value
+  // Color it based on the current zone
+  let fngArcColor;
+  if (f.fngValue <= 25) fngArcColor = GREEN;
+  else if (f.fngValue <= 45) fngArcColor = CYAN;
+  else if (f.fngValue <= 55) fngArcColor = GOLD;
+  else if (f.fngValue <= 75) fngArcColor = ORANGE;
+  else fngArcColor = RED;
+
+  ctx.beginPath(); ctx.arc(cx, cy, rFng, startAngle, fngAngle);
+  ctx.strokeStyle = fngArcColor; ctx.lineWidth = 6; ctx.globalAlpha = 0.7 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Glow
+  ctx.beginPath(); ctx.arc(cx, cy, rFng, startAngle, fngAngle);
+  ctx.strokeStyle = fngArcColor; ctx.lineWidth = 24; ctx.globalAlpha = 0.08 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Needle marker
+  const fngX = cx + rFng * Math.cos(fngAngle);
+  const fngY = cy + rFng * Math.sin(fngAngle);
+  const pulseScale = 1 + 0.12 * Math.sin(Date.now() / 700);
+
+  ctx.beginPath(); ctx.arc(fngX, fngY, 18 * pulseScale, 0, Math.PI*2);
+  ctx.fillStyle = fngArcColor; ctx.globalAlpha = 0.05; ctx.fill();
+  ctx.beginPath(); ctx.arc(fngX, fngY, 10, 0, Math.PI*2);
+  ctx.fillStyle = fngArcColor; ctx.globalAlpha = 0.12; ctx.fill();
+  ctx.beginPath(); ctx.arc(fngX, fngY, 6, 0, Math.PI*2);
+  ctx.fillStyle = fngArcColor; ctx.globalAlpha = 0.9 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // F&G zone labels
+  ctx.font = "7px monospace"; ctx.textAlign = "center";
+
+  const fearAngle = startAngle + 0.10 * Math.PI * 2;
+  ctx.fillStyle = GREEN; ctx.globalAlpha = 0.25;
+  ctx.fillText("FEAR", cx + (rFng + 20) * Math.cos(fearAngle), cy + (rFng + 20) * Math.sin(fearAngle) + 3);
+
+  const neutralAngle = startAngle + 0.50 * Math.PI * 2;
+  ctx.fillStyle = GOLD; ctx.globalAlpha = 0.2;
+  ctx.fillText("NEUTRAL", cx + (rFng + 20) * Math.cos(neutralAngle), cy + (rFng + 20) * Math.sin(neutralAngle) + 3);
+
+  const greedAngle = startAngle + 0.85 * Math.PI * 2;
+  ctx.fillStyle = RED; ctx.globalAlpha = 0.2;
+  ctx.fillText("GREED", cx + (rFng + 20) * Math.cos(greedAngle), cy + (rFng + 20) * Math.sin(greedAngle) + 3);
+  ctx.globalAlpha = 1;
+
+  // F&G value label next to marker
+  ctx.font = "bold 10px monospace"; ctx.fillStyle = fngArcColor; ctx.globalAlpha = 0.7;
+  const labelDist = rFng - 22;
+  ctx.fillText(f.fngValue, cx + labelDist * Math.cos(fngAngle), cy + labelDist * Math.sin(fngAngle) + 3);
+  ctx.font = "7px monospace"; ctx.globalAlpha = 0.35;
+  ctx.fillText(f.fngLabel, cx + labelDist * Math.cos(fngAngle), cy + labelDist * Math.sin(fngAngle) + 14);
+  ctx.globalAlpha = 1;
+
+  // Ring label
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = fngArcColor; ctx.globalAlpha = 0.35;
+  ctx.fillText("FEAR & GREED", cx, cy - rFng - 12);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // INNER RING — VOLUME
+  // ═════════════════════════════════════════════
+  const rVol = maxR * 0.55;
+
+  // Volume history ring — show last 60 days of relative volume as bars around the circle
+  const volHistory = f.volumes.slice(-60);
+  const maxVol = Math.max(...volHistory.map(v => v.volume));
+  const volSegments = volHistory.length;
+
+  for (let i = 0; i < volSegments; i++) {
+    const pct = i / volSegments;
+    const a1 = startAngle + pct * Math.PI * 2;
+    const a2 = startAngle + (pct + 1/volSegments) * Math.PI * 2;
+    const relVol = volHistory[i].volume / maxVol;
+    const barHeight = relVol * 30;
+
+    // Color by relative to average
+    const relToAvg = volHistory[i].volume / f.avg60;
+    let volColor;
+    if (relToAvg > 1.8) volColor = `rgba(224,64,251,${0.4 * animProgress})`; // purple = massive
+    else if (relToAvg > 1.3) volColor = `rgba(0,230,118,${0.3 * animProgress})`; // green = high
+    else if (relToAvg > 0.7) volColor = `rgba(79,195,247,${0.2 * animProgress})`; // cyan = normal
+    else volColor = `rgba(255,23,68,${0.15 * animProgress})`; // red = thin
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, rVol - barHeight/2, a1, a2 + 0.01);
+    ctx.strokeStyle = volColor; ctx.lineWidth = barHeight; ctx.stroke();
+  }
+
+  // Current volume indicator — bright ring at the position of today
+  const todayAngle = startAngle + ((volSegments - 1) / volSegments) * Math.PI * 2;
+  const todayX = cx + rVol * Math.cos(todayAngle);
+  const todayY = cy + rVol * Math.sin(todayAngle);
+
+  let volStateColor;
+  if (f.volRatio20 > 1.8) volStateColor = PURPLE;
+  else if (f.volRatio20 > 1.3) volStateColor = GREEN;
+  else if (f.volRatio20 > 0.7) volStateColor = CYAN;
+  else volStateColor = RED;
+
+  ctx.beginPath(); ctx.arc(todayX, todayY, 5, 0, Math.PI*2);
+  ctx.fillStyle = volStateColor; ctx.globalAlpha = 0.8 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Volume ring label
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = volStateColor; ctx.globalAlpha = 0.35;
+  ctx.textAlign = "center";
+  ctx.fillText("VOLUME · 60D", cx, cy - rVol - 12);
+  ctx.globalAlpha = 1;
+
+  // Volume ratio text
+  ctx.font = "7px monospace"; ctx.fillStyle = volStateColor; ctx.globalAlpha = 0.5;
+  ctx.fillText(`${f.volRatio20.toFixed(1)}× avg`, cx, cy - rVol - 24);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // CENTER — THE FLOW STATE
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+
+  // State word
+  ctx.font = "bold 36px monospace"; ctx.fillStyle = f.stateColor;
+  ctx.globalAlpha = 0.95 * animProgress;
+  ctx.fillText(f.state, cx, cy - 20);
+  ctx.globalAlpha = 1;
+
+  // Description
+  ctx.font = "10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.35)";
+  // Word wrap for description
+  const words = f.stateDesc.split(' ');
+  let line = '';
+  let y = cy + 2;
+  for (const word of words) {
+    const test = line + (line ? ' ' : '') + word;
+    if (ctx.measureText(test).width > size * 0.55) {
+      ctx.fillText(line, cx, y);
+      line = word;
+      y += 14;
+    } else {
+      line = test;
+    }
+  }
+  if (line) ctx.fillText(line, cx, y);
+
+  // Vibe boost label
+  y += 20;
+  ctx.font = "bold 12px monospace"; ctx.fillStyle = f.stateColor; ctx.globalAlpha = 0.6;
+  ctx.fillText(f.vibeBoost, cx, y);
+  ctx.globalAlpha = 1;
+
+  // Price
+  y += 20;
+  ctx.font = "bold 14px monospace"; ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillText(`$${fmtP(f.currentPrice)}`, cx, y);
+
+  // 5-day change
+  y += 16;
+  ctx.font = "9px monospace";
+  const changeStr = f.priceChange5d >= 0
+    ? `+${(f.priceChange5d*100).toFixed(1)}% (5d)`
+    : `${(f.priceChange5d*100).toFixed(1)}% (5d)`;
+  ctx.fillStyle = f.priceChange5d >= 0 ? GREEN : RED;
+  ctx.globalAlpha = 0.4;
+  ctx.fillText(changeStr, cx, y);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // CONTEXT BAR
+  // ═════════════════════════════════════════════
+  const fngTrendStr = f.fngTrend > 5 ? "trending greedier" :
+                      f.fngTrend < -5 ? "trending more fearful" : "stable";
+  const volStr = f.volRatio20 > 1.8 ? "massive" :
+                 f.volRatio20 > 1.3 ? "above average" :
+                 f.volRatio20 > 0.7 ? "normal" : "thin";
+  const volTrendStr = f.volTrend > 1.2 ? "increasing" :
+                      f.volTrend < 0.8 ? "decreasing" : "steady";
+
+  document.getElementById("context").innerHTML = `
+    <span style="color:${f.stateColor};font-weight:700">${f.state}</span> ·
+    Fear & Greed: <span style="color:${fngArcColor}">${f.fngValue}</span> (${f.fngLabel}, ${fngTrendStr}) ·
+    Volume: <span style="color:${volStateColor}">${volStr}</span> (${f.volRatio20.toFixed(1)}× 20d avg, ${volTrendStr}) ·
+    5d: $${fmtVol(f.avgRecent)}/day vs 60d avg $${fmtVol(f.avg60)}/day ·
+    <span style="color:${f.stateColor}">${f.vibeBoost}</span>
+  `;
+
+  if (animProgress >= 1) requestAnimationFrame(() => draw());
+}
+
+// ═══════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════
+function animate() {
+  if (animProgress < 1) {
+    animProgress += 0.025;
+    if (animProgress > 1) animProgress = 1;
+    draw();
+    requestAnimationFrame(animate);
+  } else {
+    draw();
+  }
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount+1)%4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  // Fetch both data sources in parallel
+  const [priceResult, fngResult] = await Promise.all([
+    fetchPriceAndVolume(),
+    fetchFearGreed()
+  ]);
+
+  clearInterval(dotTimer);
+
+  if (!priceResult.prices.length) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
+    return;
+  }
+
+  priceData = priceResult.prices;
+  volumeData = priceResult.volumes;
+  fngData = fngResult;
+
+  let sourceStr = priceResult.source;
+  if (fngResult.length > 0) sourceStr += " + Alternative.me";
+
+  flowState = analyzeFlow(priceData, volumeData, fngData);
+
+  if (!flowState) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">INSUFFICIENT DATA</div>';
+    return;
+  }
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("badgeText").textContent = `LIVE · ${sourceStr}`;
+
+  animate();
+  window.addEventListener("resize", draw);
+}
+
+main();
+</script>
+</body>
+</html>
