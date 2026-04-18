@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bitcoin Rings Suite v2</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --fg: #e6e6e6;
+      --muted: #8f95a3;
+      --green: #00E676;
+      --red: #FF1744;
+      --gold: #FFD700;
+      --cyan: #4FC3F7;
+      --purple: #E040FB;
+      --orange: #FF9800;
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at center, #111422 0%, #0a0a0f 55%, #07070c 100%);
+      color: var(--fg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(900px, 100%);
+      border: 1px solid #232736;
+      border-radius: 16px;
+      background: rgba(14, 16, 26, 0.75);
+      box-shadow: 0 0 40px rgba(79, 195, 247, 0.12);
+      padding: 24px;
+    }
+    .top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+    .word {
+      font-size: clamp(36px, 8vw, 72px);
+      letter-spacing: 2px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .meta { color: var(--muted); font-size: 13px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .box {
+      border: 1px solid #232736;
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(9, 10, 16, 0.7);
+    }
+    .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    .value { margin-top: 6px; font-size: 20px; }
+    .notes { margin-top: 14px; color: var(--muted); font-size: 13px; }
+    .ok { color: var(--green); }
+    .warn { color: var(--gold); }
+    .risk { color: var(--red); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="top">
+      <div>
+        <div class="label">Action</div>
+        <div id="action" class="word">LOADING</div>
+      </div>
+      <div class="meta" id="stamp"></div>
+    </div>
+    <div class="grid">
+      <div class="box"><div class="label">BTC Price</div><div class="value" id="price">-</div></div>
+      <div class="box"><div class="label">Timing Phase</div><div class="value" id="phase">-</div></div>
+      <div class="box"><div class="label">Cycle Length (adaptive)</div><div class="value" id="cycle">-</div></div>
+      <div class="box"><div class="label">Flow State</div><div class="value" id="flow">-</div></div>
+      <div class="box"><div class="label">Fear &amp; Greed</div><div class="value" id="fg">-</div></div>
+      <div class="box"><div class="label">Volume Band</div><div class="value" id="vol">-</div></div>
+      <div class="box"><div class="label">Regime</div><div class="value" id="regime">-</div></div>
+      <div class="box"><div class="label">Data Source</div><div class="value" id="source">-</div></div>
+    </div>
+    <div class="notes" id="notes"></div>
+  </div>
+
+  <script src="./engine.js"></script>
+  <script>
+    function colorForAction(action) {
+      if (action === 'DEPLOY') return 'ok';
+      if (action === 'EXIT') return 'risk';
+      return 'warn';
+    }
+
+    (async () => {
+      try {
+        const result = await window.BrainTransferEngine.runSuite();
+        const actionEl = document.getElementById('action');
+        actionEl.textContent = result.decision.action;
+        actionEl.className = `word ${colorForAction(result.decision.action)}`;
+
+        document.getElementById('price').textContent = `$${result.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+        document.getElementById('phase').textContent = `${result.timing.phase.toUpperCase()} (${(result.timing.progress * 100).toFixed(0)}%)`;
+        document.getElementById('cycle').textContent = `${result.timing.cycleLen} days`;
+        document.getElementById('flow').textContent = result.flow.state;
+        document.getElementById('fg').textContent = `${result.flow.fgValue}`;
+        document.getElementById('vol').textContent = result.flow.volumeBand.toUpperCase();
+        document.getElementById('regime').textContent = result.regime.toUpperCase();
+        document.getElementById('source').textContent = result.source;
+        document.getElementById('stamp').textContent = `Generated ${new Date(result.generatedAt).toUTCString()}`;
+        document.getElementById('notes').textContent = `Notes: ${result.decision.notes.join(' | ') || 'none'}`;
+      } catch (e) {
+        document.getElementById('action').textContent = 'DATA ERROR';
+        document.getElementById('notes').textContent = e.message;
+      }
+    })();
+  </script>
+</body>
+</html>
