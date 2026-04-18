@@ -203,19 +203,28 @@
   function decide({ timing, flow, regime }) {
     let action = "RIDE";
     const notes = [];
+    const bearishFlow = ["DISTRIBUTION", "EXHAUSTION"].includes(flow.state);
+    const bullishFlow = ["CAPITULATION", "ABSORPTION"].includes(flow.state);
 
-    if (timing.phase === "early" && ["CAPITULATION", "ABSORPTION"].includes(flow.state)) {
+    if (timing.phase === "early" && bullishFlow) {
       action = "DEPLOY";
       notes.push("timing+conviction alignment");
-    } else if (timing.phase === "late" && ["DISTRIBUTION", "EXHAUSTION"].includes(flow.state)) {
+    } else if (timing.phase === "late" && bearishFlow) {
       action = "EXIT";
       notes.push("late cycle with distribution");
     } else if (timing.phase === "early") {
       action = "DEPLOY";
       notes.push("early cycle bias");
     } else if (timing.phase === "late") {
-      action = "EXIT";
-      notes.push("late cycle bias");
+      // Late-phase timing alone is not enough to force an EXIT; require conviction
+      // or an overextended cycle.
+      if (timing.progress > 1.15) {
+        action = "EXIT";
+        notes.push("overextended cycle");
+      } else {
+        action = "RIDE";
+        notes.push("late but not bearish");
+      }
     }
 
     if (regime === "shock" && action === "DEPLOY") {
