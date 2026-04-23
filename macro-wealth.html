@@ -150,23 +150,80 @@ function prepareData(data) {
 }
 
 async function fetchData() {
+  let data = null;
+  let source = "";
+
+  // Source 1: CoinGecko
   try {
     const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
-    const j = await r.json();
-    const d = j.prices.map(([ts, p]) => ({ date: new Date(ts), price: p }));
-    const clean = d.filter(x => x.price > 0.05);
+    if (r.ok) {
+      const j = await r.json();
+      const d = j.prices.map(([ts, p]) => ({ date: new Date(ts), price: p }));
+      if (d.length > 100) { data = d; source = "CoinGecko"; }
+    }
+  } catch(e) { console.warn("CoinGecko failed:", e); }
 
-    analyzedData = prepareData(clean);
-    document.getElementById("loading").style.display = "none";
-    document.getElementById("hud").style.display = "block";
-
-    currentIndex = Math.floor(analyzedData.length * 0.2);
-    isPlaying = true;
-    requestAnimationFrame(renderLoop);
-  } catch (e) {
-    document.getElementById("loading").innerText = "DATA FETCH FAILED";
-    console.error(e);
+  // Source 2: Binance (paginated)
+  if (!data) {
+    try {
+      const all = [];
+      let end = Date.now();
+      for (let i = 0; i < 8; i++) {
+        const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
+        if (!r.ok) break;
+        const k = await r.json();
+        if (!k.length) break;
+        all.unshift(...k);
+        end = k[0][0] - 1;
+      }
+      if (all.length > 100) {
+        const seen = new Set();
+        const d = all.filter(k => { if (seen.has(k[0])) return false; seen.add(k[0]); return true; })
+          .map(k => ({ date: new Date(k[0]), price: +k[4] }))
+          .sort((a, b) => a.date - b.date);
+        data = d; source = "Binance";
+      }
+    } catch(e) { console.warn("Binance failed:", e); }
   }
+
+  // Source 3: CryptoCompare (paginated)
+  if (!data) {
+    try {
+      const all = [];
+      let toTs = Math.floor(Date.now() / 1000);
+      for (let i = 0; i < 3; i++) {
+        const r = await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
+        if (!r.ok) break;
+        const j = await r.json();
+        if (!j.Data || !j.Data.Data || !j.Data.Data.length) break;
+        all.unshift(...j.Data.Data);
+        toTs = j.Data.Data[0].time - 1;
+      }
+      if (all.length > 100) {
+        const seen = new Set();
+        const d = all.filter(x => { if (seen.has(x.time)) return false; seen.add(x.time); return true; })
+          .map(x => ({ date: new Date(x.time * 1000), price: x.close }))
+          .filter(x => x.price > 0)
+          .sort((a, b) => a.date - b.date);
+        data = d; source = "CryptoCompare";
+      }
+    } catch(e) { console.warn("CryptoCompare failed:", e); }
+  }
+
+  if (!data || data.length < 100) {
+    document.getElementById("loading").innerText = "ALL DATA SOURCES FAILED";
+    return;
+  }
+
+  const clean = data.filter(x => x.price > 0.05);
+  analyzedData = prepareData(clean);
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("hud").style.display = "block";
+
+  currentIndex = Math.floor(analyzedData.length * 0.2);
+  isPlaying = true;
+  console.log(`Macro Rings loaded: ${analyzedData.length} days from ${source}`);
+  requestAnimationFrame(renderLoop);
 }
 
 const canvas = document.getElementById("canvas");
