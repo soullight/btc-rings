@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — The Scout</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: 8px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.2); letter-spacing: 3px; margin-top: 4px; }
+  .loading { text-align: center; padding: 60px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  @keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 15px rgba(0,230,118,0.05); }
+    50% { box-shadow: 0 0 30px rgba(0,230,118,0.15); }
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; background:#00E676; box-shadow:0 0 6px #00E676; }
+
+  .explainer {
+    max-width: 650px; width: 100%; margin: 14px 0;
+    padding: 16px 20px; border-radius: 10px;
+    background: rgba(0,230,118,0.02); border: 1px solid rgba(0,230,118,0.08);
+    font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.8;
+  }
+  .explainer strong { color: #00E676; font-weight: 700; }
+  .explainer em { color: rgba(255,255,255,0.55); font-style: normal; }
+
+  .section {
+    max-width: 650px; width: 100%; margin-top: 16px;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.015);
+  }
+  .section-header {
+    padding: 12px 18px; font-size: 11px; letter-spacing: 4px; font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .col-header {
+    display: grid; padding: 6px 18px; gap: 8px;
+    font-size: 9px; color: rgba(255,255,255,0.2); letter-spacing: 1px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .row {
+    display: grid; align-items: center; padding: 10px 18px; gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+    transition: background 0.2s;
+  }
+  .row:hover { background: rgba(255,255,255,0.03); }
+
+  .rank { font-size: 10px; color: rgba(255,255,255,0.2); font-weight: 700; }
+  .coin-name { display: flex; flex-direction: column; }
+  .symbol { font-size: 12px; font-weight: 700; letter-spacing: 2px; }
+  .full-name { font-size: 9px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+  .val { font-size: 11px; font-weight: 600; text-align: right; }
+  .dim { color: rgba(255,255,255,0.15); }
+  .warm { color: #FF9800; }
+  .hot { color: #E040FB; }
+  .fire { color: #00E676; text-shadow: 0 0 8px rgba(0,230,118,0.3); }
+
+  .tag {
+    display: inline-block; padding: 2px 6px; border-radius: 3px;
+    font-size: 8px; letter-spacing: 1px; font-weight: 700; margin-left: 6px;
+  }
+  .tag-new { background: rgba(0,230,118,0.1); color: #00E676; border: 1px solid rgba(0,230,118,0.25); }
+  .tag-fresh { background: rgba(224,64,251,0.1); color: #E040FB; border: 1px solid rgba(224,64,251,0.25); }
+  .tag-vol { background: rgba(255,152,0,0.1); color: #FF9800; border: 1px solid rgba(255,152,0,0.2); }
+  .tag-cat { background: rgba(79,195,247,0.08); color: #4FC3F7; border: 1px solid rgba(79,195,247,0.2); }
+
+  /* Early bird highlight */
+  .early-bird {
+    border: 1px solid rgba(0,230,118,0.2) !important;
+    background: rgba(0,230,118,0.02) !important;
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+
+  .scout-grid-5 { grid-template-columns: 32px 1fr 70px 70px 80px; }
+  .scout-grid-6 { grid-template-columns: 32px 1fr 65px 65px 65px 70px; }
+
+  .footer { margin-top: 20px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; padding-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>THE SCOUT</h1>
+  <div class="subtitle">FIND THE NEXT ONE BEFORE ANYONE ELSE</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">SCANNING THE FRONTIER<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+
+  <div class="explainer">
+    <strong>What this does:</strong> Scans coins ranked 200-750 by market cap — the frontier where the next breakout projects live before they're household names.
+    Looks for three signals that together mean <em>"something is waking up"</em>:<br><br>
+    <strong>Near ATL</strong> — still close to all-time low. The move hasn't happened yet. Early.<br>
+    <strong>Fresh</strong> — ATL date is recent (last 12 months). This is a newer project, not a dead coin from 2018.<br>
+    <strong>Volume</strong> — trading activity is high relative to market cap. Money is arriving.<br><br>
+    A coin that hits all three is <em>quietly accumulating</em>. That's the signal you want. The 100x happens after this phase, not during the trending phase.
+  </div>
+
+  <div id="early-section" class="section" style="display:none;">
+    <div class="section-header" style="color: #00E676;">EARLY BIRDS — NEAR ATL + FRESH + VOLUME</div>
+    <div class="col-header scout-grid-6">
+      <div></div><div>COIN</div><div style="text-align:right">FROM ATL</div><div style="text-align:right">VOL/MCAP</div><div style="text-align:right">7D CHG</div><div style="text-align:right">MCAP</div>
+    </div>
+    <div id="early-list"></div>
+  </div>
+
+  <div id="atl-section" class="section" style="display:none;">
+    <div class="section-header" style="color: #4FC3F7;">NEAR ALL-TIME LOW — HASN'T MOVED YET</div>
+    <div class="col-header scout-grid-6">
+      <div></div><div>COIN</div><div style="text-align:right">FROM ATL</div><div style="text-align:right">ATL DATE</div><div style="text-align:right">7D CHG</div><div style="text-align:right">MCAP</div>
+    </div>
+    <div id="atl-list"></div>
+  </div>
+
+  <div id="vol-section" class="section" style="display:none;">
+    <div class="section-header" style="color: #FF9800;">VOLUME WAKING UP — MONEY ARRIVING</div>
+    <div class="col-header scout-grid-6">
+      <div></div><div>COIN</div><div style="text-align:right">VOL/MCAP</div><div style="text-align:right">24H VOL</div><div style="text-align:right">7D CHG</div><div style="text-align:right">MCAP</div>
+    </div>
+    <div id="vol-list"></div>
+  </div>
+
+  <div id="cat-section" class="section" style="display:none;">
+    <div class="section-header" style="color: #E040FB;">HOT CATEGORIES — WHERE NARRATIVES ARE BUILDING</div>
+    <div id="cat-list"></div>
+  </div>
+</div>
+
+<div class="footer">THE 100x HAPPENS IN SILENCE · VOLUME WHISPERS BEFORE PRICE SCREAMS · FIND THEM EARLY</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// THE SCOUT
+// ═══════════════════════════════════════════════════════════════
+//
+// The Rotation catches alt-season at the macro level.
+// The Scout catches individual projects before they move.
+//
+// What makes a coin "early":
+//  1. It's still near its all-time low (the move hasn't happened)
+//  2. It's relatively new (ATL date is recent, not a 2017 zombie)
+//  3. Volume is arriving (money is showing up before price moves)
+//
+// We scan coins ranked 200-750 by market cap — the frontier.
+// Top 100 coins are already discovered. Below 750 is too risky/illiquid.
+// The sweet spot is 200-750: real projects, real teams, not yet mainstream.
+//
+// ═══════════════════════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700";
+const CYAN = "#4FC3F7", PURPLE = "#E040FB", ORANGE = "#FF9800";
+
+// Stablecoins and wrapped tokens to exclude
+const EXCLUDE = new Set([
+  'tether', 'usd-coin', 'binance-usd', 'dai', 'true-usd',
+  'first-digital-usd', 'ethena-usde', 'usds', 'paxos-standard',
+  'wrapped-bitcoin', 'wrapped-ether', 'staked-ether',
+  'wrapped-steth', 'coinbase-wrapped-btc', 'binance-bitcoin',
+  'rocket-pool-eth', 'wrapped-eeth', 'binance-peg-ethereum',
+  'bridged-usdc-polygon-pos-bridge', 'bridged-usdt'
+]);
+
+function fmtUsd(v) {
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(0) + 'M';
+  if (v >= 1e3) return '$' + (v / 1e3).toFixed(0) + 'K';
+  return '$' + v.toFixed(0);
+}
+
+function fmtPct(v) { return (v >= 0 ? '+' : '') + v.toFixed(1) + '%'; }
+
+function monthsAgo(dateStr) {
+  if (!dateStr) return 999;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return (now - d) / (30 * 24 * 60 * 60 * 1000);
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+async function fetchFrontier() {
+  // Fetch coins ranked ~200-750 (pages 1-3 with per_page=250)
+  // Page 1 = 1-250, Page 2 = 251-500, Page 3 = 501-750
+  const pages = [];
+
+  for (let page = 1; page <= 3; page++) {
+    try {
+      const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}&price_change_percentage=7d,24h`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+      pages.push(...data);
+      // Small delay to respect rate limits
+      if (page < 3) await new Promise(r => setTimeout(r, 2000));
+    } catch (e) {
+      console.warn(`Page ${page}:`, e);
+    }
+  }
+
+  // Filter to rank 200-750, exclude stables/wrapped
+  return pages.filter(c =>
+    c.market_cap_rank >= 200 &&
+    c.market_cap_rank <= 750 &&
+    !EXCLUDE.has(c.id) &&
+    c.market_cap > 0 &&
+    c.total_volume > 0 &&
+    c.atl != null
+  );
+}
+
+async function fetchCategories() {
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/coins/categories?order=market_cap_change_24h_desc");
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    // Return top categories by 24h market cap change
+    return data
+      .filter(c => c.market_cap > 1e8 && c.market_cap_change_24h != null)
+      .slice(0, 10)
+      .map(c => ({
+        name: c.name,
+        mcap: c.market_cap,
+        change24h: c.market_cap_change_24h,
+        volume24h: c.volume_24h,
+        top3: c.top_3_coins || []
+      }));
+  } catch (e) {
+    console.warn("Categories:", e);
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════
+// ANALYSIS
+// ═══════════════════════════════════════════════
+function analyzeFrontier(coins) {
+  const results = coins.map(c => {
+    const atlChangePct = c.atl_change_percentage || 0;
+    const atlMonths = monthsAgo(c.atl_date);
+    const volToMcap = c.total_volume / c.market_cap;
+    const pct7d = c.price_change_percentage_7d_in_currency || 0;
+    const pct24h = c.price_change_percentage_24h_in_currency || 0;
+
+    // Scoring
+    const nearAtl = atlChangePct < 200;  // Within 200% of ATL — still early
+    const veryNearAtl = atlChangePct < 50; // Within 50% — very early
+    const fresh = atlMonths < 12;  // ATL is recent = newer project
+    const veryFresh = atlMonths < 6;
+    const hasVolume = volToMcap > 0.10; // 10%+ vol/mcap = active
+    const hotVolume = volToMcap > 0.30; // 30%+ = very active
+    const rising = pct7d > 0;
+
+    // Early bird score: how many signals converge?
+    let score = 0;
+    if (nearAtl) score++;
+    if (veryNearAtl) score++;
+    if (fresh) score++;
+    if (veryFresh) score++;
+    if (hasVolume) score++;
+    if (hotVolume) score++;
+    if (rising) score++;
+
+    return {
+      symbol: c.symbol.toUpperCase(),
+      name: c.name,
+      id: c.id,
+      rank: c.market_cap_rank,
+      price: c.current_price,
+      mcap: c.market_cap,
+      volume: c.total_volume,
+      volToMcap,
+      atlChangePct,
+      atlDate: c.atl_date,
+      atlMonths,
+      pct7d,
+      pct24h,
+      nearAtl, veryNearAtl, fresh, veryFresh, hasVolume, hotVolume, rising,
+      score
+    };
+  });
+
+  // Early birds: near ATL + fresh + volume — the real finds
+  const earlyBirds = results
+    .filter(r => r.nearAtl && r.fresh && r.hasVolume)
+    .sort((a, b) => b.score - a.score);
+
+  // Near ATL: coins still close to their low
+  const nearAtlCoins = results
+    .filter(r => r.nearAtl && r.rising)
+    .sort((a, b) => a.atlChangePct - b.atlChangePct)
+    .slice(0, 15);
+
+  // Volume waking up: highest vol/mcap ratio
+  const volumeWaking = results
+    .filter(r => r.hasVolume && r.rising)
+    .sort((a, b) => b.volToMcap - a.volToMcap)
+    .slice(0, 15);
+
+  return { earlyBirds, nearAtlCoins, volumeWaking };
+}
+
+// ═══════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════
+
+function renderEarlyBirds(birds) {
+  if (!birds.length) return;
+  const container = document.getElementById("early-list");
+  container.innerHTML = "";
+
+  birds.forEach((b, i) => {
+    const row = document.createElement("div");
+    row.className = "row scout-grid-6 early-bird";
+    const tags = [];
+    if (b.veryNearAtl) tags.push('<span class="tag tag-new">VERY EARLY</span>');
+    if (b.veryFresh) tags.push('<span class="tag tag-fresh">NEW PROJECT</span>');
+    if (b.hotVolume) tags.push('<span class="tag tag-vol">HOT VOLUME</span>');
+
+    row.innerHTML = `
+      <div class="rank">${i + 1}</div>
+      <div class="coin-name">
+        <div class="symbol">${b.symbol} ${tags.join('')}</div>
+        <div class="full-name">${b.name} · #${b.rank} · $${b.price < 1 ? b.price.toFixed(4) : b.price.toFixed(2)}</div>
+      </div>
+      <div class="val fire">${fmtPct(b.atlChangePct)}</div>
+      <div class="val ${b.hotVolume ? 'hot' : 'warm'}">${(b.volToMcap * 100).toFixed(0)}%</div>
+      <div class="val ${b.pct7d > 5 ? 'fire' : b.pct7d > 0 ? 'hot' : 'dim'}">${fmtPct(b.pct7d)}</div>
+      <div class="val dim">${fmtUsd(b.mcap)}</div>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById("early-section").style.display = "block";
+}
+
+function renderNearAtl(coins) {
+  if (!coins.length) return;
+  const container = document.getElementById("atl-list");
+  container.innerHTML = "";
+
+  coins.slice(0, 10).forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "row scout-grid-6";
+    const freshTag = c.fresh ? '<span class="tag tag-fresh">FRESH</span>' : '';
+
+    row.innerHTML = `
+      <div class="rank">${i + 1}</div>
+      <div class="coin-name">
+        <div class="symbol">${c.symbol} ${freshTag}</div>
+        <div class="full-name">${c.name} · #${c.rank}</div>
+      </div>
+      <div class="val ${c.veryNearAtl ? 'fire' : 'hot'}">${fmtPct(c.atlChangePct)}</div>
+      <div class="val dim">${c.atlMonths < 6 ? '<span style="color:#E040FB">' + c.atlMonths.toFixed(0) + 'mo</span>' : c.atlMonths.toFixed(0) + 'mo'}</div>
+      <div class="val ${c.pct7d > 5 ? 'fire' : c.pct7d > 0 ? 'hot' : 'dim'}">${fmtPct(c.pct7d)}</div>
+      <div class="val dim">${fmtUsd(c.mcap)}</div>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById("atl-section").style.display = "block";
+}
+
+function renderVolume(coins) {
+  if (!coins.length) return;
+  const container = document.getElementById("vol-list");
+  container.innerHTML = "";
+
+  coins.slice(0, 10).forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "row scout-grid-6";
+
+    row.innerHTML = `
+      <div class="rank">${i + 1}</div>
+      <div class="coin-name">
+        <div class="symbol">${c.symbol}${c.hotVolume ? ' <span class="tag tag-vol">HOT</span>' : ''}</div>
+        <div class="full-name">${c.name} · #${c.rank}</div>
+      </div>
+      <div class="val ${c.hotVolume ? 'hot' : 'warm'}">${(c.volToMcap * 100).toFixed(0)}%</div>
+      <div class="val dim">${fmtUsd(c.volume)}</div>
+      <div class="val ${c.pct7d > 5 ? 'fire' : c.pct7d > 0 ? 'hot' : 'dim'}">${fmtPct(c.pct7d)}</div>
+      <div class="val dim">${fmtUsd(c.mcap)}</div>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById("vol-section").style.display = "block";
+}
+
+function renderCategories(cats) {
+  if (!cats.length) return;
+  const container = document.getElementById("cat-list");
+  container.innerHTML = "";
+
+  cats.forEach(c => {
+    const row = document.createElement("div");
+    row.style.cssText = "padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.02); display: flex; justify-content: space-between; align-items: center;";
+    const changeColor = c.change24h > 3 ? PURPLE : c.change24h > 0 ? ORANGE : "rgba(255,255,255,0.15)";
+    row.innerHTML = `
+      <div>
+        <div style="font-size: 11px; font-weight: 700; letter-spacing: 1px; color: ${changeColor}">${c.name}</div>
+        <div style="font-size: 9px; color: rgba(255,255,255,0.2); margin-top: 3px;">MCap ${fmtUsd(c.mcap)}</div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 12px; font-weight: 600; color: ${changeColor}">${fmtPct(c.change24h)}</div>
+        <div style="font-size: 9px; color: rgba(255,255,255,0.2);">24h change</div>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById("cat-section").style.display = "block";
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount + 1) % 4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  try {
+    const [frontier, categories] = await Promise.all([
+      fetchFrontier(),
+      fetchCategories()
+    ]);
+
+    clearInterval(dotTimer);
+
+    if (!frontier.length) {
+      document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
+      return;
+    }
+
+    const { earlyBirds, nearAtlCoins, volumeWaking } = analyzeFrontier(frontier);
+
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+    document.getElementById("badgeText").textContent = `LIVE · ${frontier.length} coins scanned · CoinGecko`;
+
+    renderEarlyBirds(earlyBirds);
+    renderNearAtl(nearAtlCoins);
+    renderVolume(volumeWaking);
+    renderCategories(categories);
+
+  } catch (e) {
+    clearInterval(dotTimer);
+    document.getElementById("loading").innerHTML = `<div class="loading-text" style="color:#FF1744">ERROR: ${e.message}</div>`;
+  }
+}
+
+main();
+</script>
+</body>
+</html>
