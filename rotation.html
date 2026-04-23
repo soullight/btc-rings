@@ -68,6 +68,68 @@
   .positive { color: #E040FB; }
   .negative { color: rgba(255,255,255,0.15); }
   .strong { color: #00E676; text-shadow: 0 0 8px rgba(0,230,118,0.3); }
+
+  .section-panel {
+    margin-top: 16px; max-width: 650px; width: 100%;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.015);
+  }
+  .section-header {
+    padding: 12px 18px; font-size: 11px; letter-spacing: 4px; font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .trending-row {
+    display: grid; grid-template-columns: 32px 1fr 90px 70px;
+    align-items: center; padding: 10px 18px; gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+    transition: background 0.2s;
+  }
+  .trending-row:hover { background: rgba(255,255,255,0.03); }
+  .trending-score { font-size: 9px; color: rgba(255,255,255,0.3); text-align: right; }
+  .vol-tag {
+    display: inline-block; padding: 2px 6px; border-radius: 3px;
+    font-size: 8px; letter-spacing: 1px; font-weight: 700;
+  }
+  .vol-hot { background: rgba(224,64,251,0.15); color: #E040FB; border: 1px solid rgba(224,64,251,0.3); }
+  .vol-warm { background: rgba(255,152,0,0.1); color: #FF9800; border: 1px solid rgba(255,152,0,0.2); }
+
+  #investigate-panel {
+    margin-top: 16px; max-width: 650px; width: 100%;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(0,230,118,0.25);
+    background: rgba(0,230,118,0.03);
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+  @keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 15px rgba(0,230,118,0.05); }
+    50% { box-shadow: 0 0 30px rgba(0,230,118,0.15); }
+  }
+  .investigate-header {
+    padding: 14px 18px; font-size: 12px; letter-spacing: 4px; font-weight: 700;
+    color: #00E676; border-bottom: 1px solid rgba(0,230,118,0.15);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .investigate-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #00E676;
+    box-shadow: 0 0 8px #00E676; animation: pulse 1.5s ease-in-out infinite;
+  }
+  .investigate-row {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(0,230,118,0.06);
+  }
+  .investigate-coin {
+    font-size: 16px; font-weight: 700; letter-spacing: 3px; color: #00E676;
+    margin-bottom: 6px;
+  }
+  .investigate-reason {
+    font-size: 10px; color: rgba(255,255,255,0.4); line-height: 1.6;
+  }
+  .investigate-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: 8px; letter-spacing: 1px; font-weight: 700; margin-right: 6px;
+    background: rgba(0,230,118,0.1); color: #00E676; border: 1px solid rgba(0,230,118,0.25);
+  }
 </style>
 </head>
 <body>
@@ -86,6 +148,13 @@
   <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
   <canvas id="canvas"></canvas>
   <div id="context" class="context-bar"></div>
+  <div id="investigate-panel" style="display:none;">
+    <div class="investigate-header">
+      <div class="investigate-dot"></div>
+      INVESTIGATE — MULTI-SIGNAL CONVERGENCE
+    </div>
+    <div id="investigate-list"></div>
+  </div>
   <div id="movers" style="display:none;">
     <div class="movers-header">FIRST MOVERS — OUTPERFORMING BTC</div>
     <div class="mover-col-header">
@@ -93,7 +162,18 @@
     </div>
     <div id="movers-list"></div>
   </div>
-  <div class="footer">ETH/BTC IS THE CANARY · FIRST MOVERS LEAD THE ROTATION · CATCH THEM EARLY</div>
+  <div id="trending-panel" class="section-panel" style="display:none;">
+    <div class="section-header" style="color: #E040FB;">TRENDING NOW — ATTENTION BEFORE PRICE</div>
+    <div id="trending-list"></div>
+  </div>
+  <div id="surge-panel" class="section-panel" style="display:none;">
+    <div class="section-header" style="color: #FF9800;">VOLUME SURGES — SOMETHING JUST WOKE UP</div>
+    <div class="mover-col-header" style="grid-template-columns: 32px 1fr 80px 80px 70px;">
+      <div></div><div>COIN</div><div style="text-align:right">24H VOL/MCAP</div><div style="text-align:right">24H vs BTC</div><div style="text-align:right">7D vs BTC</div>
+    </div>
+    <div id="surge-list"></div>
+  </div>
+  <div class="footer">ATTENTION LEADS PRICE · VOLUME LEADS DIRECTION · CATCH THE ROTATION EARLY</div>
 </div>
 
 <script>
@@ -735,14 +815,170 @@ function renderMovers(movers) {
 }
 
 // ═══════════════════════════════════════════════
+// TRENDING COINS — attention before price
+// ═══════════════════════════════════════════════
+async function fetchTrending() {
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/search/trending");
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+
+    return (data.coins || []).map(c => ({
+      symbol: c.item.symbol.toUpperCase(),
+      name: c.item.name,
+      rank: c.item.market_cap_rank,
+      score: c.item.score,
+      priceBtc: c.item.price_btc,
+      thumb: c.item.thumb
+    }));
+  } catch (e) {
+    console.warn("Trending fetch:", e);
+    return [];
+  }
+}
+
+function renderTrending(trending) {
+  if (!trending.length) return;
+
+  const container = document.getElementById("trending-list");
+  container.innerHTML = "";
+
+  trending.forEach((t, i) => {
+    const row = document.createElement("div");
+    row.className = "trending-row";
+    const rankStr = t.rank ? `#${t.rank}` : "NEW";
+    const rankColor = t.rank && t.rank <= 100 ? "rgba(255,255,255,0.3)" : "#00E676";
+    row.innerHTML = `
+      <div class="mover-rank">${i + 1}</div>
+      <div class="mover-name">
+        <div class="mover-symbol">${t.symbol}</div>
+        <div class="mover-full">${t.name} · <span style="color:${rankColor}">${rankStr}</span></div>
+      </div>
+      <div style="font-size:10px; color:#E040FB; text-align:right;">TRENDING</div>
+      <div class="trending-score">${t.priceBtc ? t.priceBtc.toFixed(8) + ' ₿' : '—'}</div>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById("trending-panel").style.display = "block";
+}
+
+// ═══════════════════════════════════════════════
+// VOLUME SURGES — coins with outsized volume relative to market cap
+// ═══════════════════════════════════════════════
+async function fetchVolumeSurges() {
+  try {
+    // Fetch pages 1 and 2 (top 200 coins) to catch mid-caps
+    const [p1, p2] = await Promise.all([
+      fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=7d,24h"),
+      fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=2&price_change_percentage=7d,24h")
+    ]);
+
+    let coins = [];
+    if (p1.ok) coins = coins.concat(await p1.json());
+    if (p2.ok) coins = coins.concat(await p2.json());
+
+    // Exclude stablecoins, wrapped tokens, BTC
+    const excludeIds = new Set([
+      'bitcoin', 'tether', 'usd-coin', 'binance-usd', 'dai', 'true-usd',
+      'first-digital-usd', 'ethena-usde', 'usds',
+      'wrapped-bitcoin', 'wrapped-ether', 'staked-ether',
+      'wrapped-steth', 'coinbase-wrapped-btc', 'binance-bitcoin',
+      'rocket-pool-eth', 'wrapped-eeth'
+    ]);
+
+    // Get BTC price for relative calc
+    const btcCoin = coins.find(c => c.id === 'bitcoin');
+    const btcPrice = btcCoin ? btcCoin.current_price : 77000;
+    const btc24h = btcCoin ? btcCoin.price_change_percentage_24h || 0 : 0;
+    const btc7d = btcCoin ? btcCoin.price_change_percentage_7d_in_currency || 0 : 0;
+
+    const alts = coins
+      .filter(c => !excludeIds.has(c.id) && c.market_cap > 0 && c.total_volume > 0)
+      .map(c => {
+        const volToMcap = c.total_volume / c.market_cap;
+        const rel24h = (c.price_change_percentage_24h || 0) - btc24h;
+        const rel7d = (c.price_change_percentage_7d_in_currency || 0) - btc7d;
+        return {
+          symbol: c.symbol.toUpperCase(),
+          name: c.name,
+          rank: c.market_cap_rank,
+          volToMcap,
+          rel24h,
+          rel7d,
+          price: c.current_price,
+          volume: c.total_volume,
+          mcap: c.market_cap
+        };
+      });
+
+    // Sort by volume/market cap ratio — highest = most unusual activity
+    alts.sort((a, b) => b.volToMcap - a.volToMcap);
+
+    // Take top 10 with high vol/mcap AND positive BTC-relative performance
+    // These are coins where something is happening AND they're outperforming BTC
+    const surges = alts
+      .filter(c => c.volToMcap > 0.15 && c.rel24h > 0)
+      .slice(0, 10);
+
+    return surges;
+  } catch (e) {
+    console.warn("Volume surge fetch:", e);
+    return [];
+  }
+}
+
+function fmtUsd(v) {
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(0) + 'M';
+  if (v >= 1e3) return '$' + (v / 1e3).toFixed(0) + 'K';
+  return '$' + v.toFixed(0);
+}
+
+function renderSurges(surges) {
+  if (!surges.length) return;
+
+  const container = document.getElementById("surge-list");
+  container.innerHTML = "";
+
+  surges.forEach((s, i) => {
+    const volPct = (s.volToMcap * 100).toFixed(0);
+    const isHot = s.volToMcap > 0.5;
+    const tagClass = isHot ? "vol-hot" : "vol-warm";
+    const tagLabel = isHot ? "HOT" : "ACTIVE";
+    const rel24hClass = s.rel24h > 5 ? "strong" : s.rel24h > 0 ? "positive" : "negative";
+    const rel7dClass = s.rel7d > 10 ? "strong" : s.rel7d > 0 ? "positive" : "negative";
+
+    const row = document.createElement("div");
+    row.className = "mover-row";
+    row.style.gridTemplateColumns = "32px 1fr 80px 80px 70px";
+    row.innerHTML = `
+      <div class="mover-rank">${i + 1}</div>
+      <div class="mover-name">
+        <div class="mover-symbol">${s.symbol} <span class="vol-tag ${tagClass}">${tagLabel}</span></div>
+        <div class="mover-full">${s.name} · #${s.rank || '?'} · Vol ${fmtUsd(s.volume)}</div>
+      </div>
+      <div class="mover-7d" style="color:${ORANGE}">${volPct}%</div>
+      <div class="mover-7d ${rel24hClass}">${s.rel24h >= 0 ? '+' : ''}${s.rel24h.toFixed(1)}%</div>
+      <div class="mover-7d ${rel7dClass}">${s.rel7d >= 0 ? '+' : ''}${s.rel7d.toFixed(1)}%</div>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById("surge-panel").style.display = "block";
+}
+
+// ═══════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════
 
 async function main() {
-  // Fetch rotation data and first movers in parallel
-  const [ratioResult, movers] = await Promise.all([
+  // Fetch everything in parallel
+  const [ratioResult, movers, trending, surges] = await Promise.all([
     fetchData(),
-    fetchFirstMovers()
+    fetchFirstMovers(),
+    fetchTrending(),
+    fetchVolumeSurges()
   ]);
 
   clearInterval(dotTimer);
@@ -763,8 +999,75 @@ async function main() {
   document.getElementById("app").style.display = "flex";
   document.getElementById("badgeText").textContent = `LIVE · ${ratioResult.source}`;
 
-  // Render first movers
+  // ── Cross-reference: find coins in MULTIPLE signals ──
+  const moverSymbols = new Set(movers.map(m => m.symbol));
+  const trendingSymbols = new Set(trending.map(t => t.symbol));
+  const surgeSymbols = new Set(surges.map(s => s.symbol));
+
+  const investigate = [];
+
+  // Check every coin across all three lists
+  const allSymbols = new Set([...moverSymbols, ...trendingSymbols, ...surgeSymbols]);
+  for (const sym of allSymbols) {
+    const signals = [];
+    const mover = movers.find(m => m.symbol === sym);
+    const trend = trending.find(t => t.symbol === sym);
+    const surge = surges.find(s => s.symbol === sym);
+
+    if (mover) signals.push(`OUTPERFORMING BTC +${mover.pct7d.toFixed(1)}% (7d)`);
+    if (trend) signals.push("TRENDING in searches");
+    if (surge) signals.push(`VOLUME SURGE ${(surge.volToMcap * 100).toFixed(0)}% vol/mcap`);
+
+    // Need at least 2 signals to flag
+    if (signals.length >= 2) {
+      const rank = mover?.mcapRank || trend?.rank || surge?.rank;
+      const name = mover?.name || trend?.name || surge?.name || sym;
+      const isNew = !rank || rank > 100;
+      investigate.push({ symbol: sym, name, rank, signals, isNew });
+    }
+  }
+
+  // Also flag any trending coin NOT in top 100 that's outperforming BTC
+  for (const t of trending) {
+    if ((!t.rank || t.rank > 100) && !investigate.find(x => x.symbol === t.symbol)) {
+      const mover = movers.find(m => m.symbol === t.symbol);
+      if (mover && mover.pct7d > 0) {
+        investigate.push({
+          symbol: t.symbol, name: t.name, rank: t.rank,
+          signals: ["TRENDING + NEW PROJECT", `+${mover.pct7d.toFixed(1)}% vs BTC (7d)`],
+          isNew: true
+        });
+      }
+    }
+  }
+
+  // Render investigate panel
+  if (investigate.length > 0) {
+    const container = document.getElementById("investigate-list");
+    container.innerHTML = "";
+    investigate.sort((a, b) => b.signals.length - a.signals.length);
+
+    for (const item of investigate) {
+      const row = document.createElement("div");
+      row.className = "investigate-row";
+      const newTag = item.isNew ? '<span class="investigate-tag">NEW PROJECT</span>' : '';
+      const signalTags = item.signals.map(s => `<span class="investigate-tag">${s}</span>`).join('');
+      row.innerHTML = `
+        <div class="investigate-coin">${item.symbol} ${newTag}</div>
+        <div class="investigate-reason">
+          ${item.name}${item.rank ? ' · #' + item.rank : ''}<br>
+          ${signalTags}
+        </div>
+      `;
+      container.appendChild(row);
+    }
+    document.getElementById("investigate-panel").style.display = "block";
+  }
+
+  // Render all scanner sections
   if (movers.length) renderMovers(movers);
+  if (trending.length) renderTrending(trending);
+  if (surges.length) renderSurges(surges);
 
   animate();
   window.addEventListener("resize", draw);
