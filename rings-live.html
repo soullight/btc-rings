@@ -127,9 +127,9 @@ canvas { border-radius:12px; display:block; }
     </div>
 
     <div class="hud-section">
-      <div class="hud-label">21-WEEK EMA</div>
-      <div class="hud-value sm" id="ema21w" style="color:#4FC3F7;">—</div>
-      <div class="hud-sub" id="ema21wSub"></div>
+      <div class="hud-label">DUAL MOMENTUM (20D/60D ROC · 5D CONFIRM)</div>
+      <div class="hud-value sm" id="dualMom" style="color:#4FC3F7;">—</div>
+      <div class="hud-sub" id="dualMomSub"></div>
     </div>
 
     <div class="hud-section">
@@ -388,10 +388,12 @@ canvas { border-radius:12px; display:block; }
 
   /* ── HUD UPDATE ── */
   function updateHUD() {
-    // Regime
-    const regime = S.livePrice >= S.ema21w ? 'EXPANSION' : 'CONTRACTION';
-    const isExpansion = regime === 'EXPANSION';
-    const priceColor = isExpansion ? GREEN : RED;
+    // Regime from DUAL MOMENTUM (not EMA)
+    const isBull = S.momentum === 1;
+    const isBear = S.momentum === -1;
+    const regime = isBull ? 'BULL (20d/60d CONFIRMED)' : isBear ? 'BEAR (20d/60d CONFIRMED)' : 'NEUTRAL (MIXED SIGNALS)';
+    const isExpansion = !isBear; // green for bull or neutral, red only for confirmed bear
+    const priceColor = isBear ? RED : GREEN;
 
     // Live price
     const lp = $('livePrice');
@@ -405,7 +407,7 @@ canvas { border-radius:12px; display:block; }
       $('livePriceSub').textContent = fmtPct(pctFromATH) + ' from ATH';
     }
 
-    // Regime badge
+    // Regime badge — driven by dual momentum
     const rb = $('regimeBadge');
     rb.className = 'regime-badge ' + (isExpansion ? 'regime-expansion' : 'regime-contraction');
     $('regimeText').textContent = regime;
@@ -414,12 +416,12 @@ canvas { border-radius:12px; display:block; }
     $('athValue').textContent = fmt(S.ath, 0);
     if(S.athDate) $('athDate').textContent = 'Set: ' + S.athDate.slice(0,10);
 
-    // 21W EMA
-    $('ema21w').textContent = fmt(S.ema21w, 0);
-    if(S.livePrice && S.ema21w) {
-      const d = ((S.livePrice / S.ema21w)-1)*100;
-      $('ema21wSub').textContent = fmtPct(d,1) + ' from 21W EMA';
-    }
+    // Dual Momentum in the panel (replaces 21W EMA)
+    const momLabel = isBull ? '▲ BULL' : isBear ? '▼ BEAR' : '● NEUTRAL';
+    const momEl = $('dualMom');
+    momEl.textContent = momLabel;
+    momEl.style.color = priceColor;
+    $('dualMomSub').textContent = `ROC 20d: ${fmtPct(S.roc20,1)} · ROC 60d: ${fmtPct(S.roc60,1)}`;
 
     // Projections
     $('projHigh').textContent = fmt(S.projHigh[0],0) + ' — ' + fmt(S.projHigh[1],0);
@@ -513,22 +515,10 @@ canvas { border-radius:12px; display:block; }
     // ATH label
     drawLabel(cx, cy - rATH - 10, 'ATH ' + fmt(S.ath,0), 'rgba(255,255,255,0.6)', 9);
 
-    // ── 21W EMA Ring ──
-    if(S.ema21w) {
-      const rEma = logMap(S.ema21w, pMin, pMax, minR, maxR);
-      ctx.beginPath();
-      ctx.arc(cx, cy, rEma, 0, Math.PI*2);
-      ctx.strokeStyle = 'rgba(79,195,247,0.35)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3,5]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      drawLabel(cx + rEma * 0.6, cy - rEma * 0.75, '21W EMA', 'rgba(79,195,247,0.5)', 8);
-    }
-
     // ── Live Price Ring (bold, glowing) ──
-    const isExpansion = S.livePrice >= S.ema21w;
-    const liveColor = isExpansion ? GREEN : RED;
+    // Colored by DUAL MOMENTUM, not EMA
+    const isBear = S.momentum === -1;
+    const liveColor = isBear ? RED : GREEN;
 
     // Glow
     ctx.beginPath();
