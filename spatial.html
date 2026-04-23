@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Spatial Rings</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #030305; color: #fff;
+    font-family: 'SF Mono','Fira Code','Courier New', monospace;
+    overflow: hidden; display: flex; justify-content: center; align-items: center;
+    height: 100vh; width: 100vw;
+  }
+
+  canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+
+  #hud {
+    position: absolute; top: 30px; left: 30px; z-index: 10;
+    pointer-events: none;
+  }
+
+  h1 { font-size: 16px; letter-spacing: 6px; font-weight: 700; color: #fff; margin-bottom: 20px;}
+
+  .data-row {
+    margin-bottom: 15px; display: flex; flex-direction: column;
+  }
+  .label { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 3px; margin-bottom: 4px; }
+  .value { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+
+  #live-price-val { font-size: 36px; text-shadow: 0 0 20px rgba(0,0,0,0.5); }
+
+  .regime-badge {
+    display: inline-block; padding: 4px 10px; border-radius: 4px;
+    font-size: 11px; letter-spacing: 2px; font-weight: bold; margin-top: 5px;
+    border: 1px solid; width: fit-content;
+  }
+
+  #loading {
+    position: absolute; z-index: 100; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 12px; letter-spacing: 4px; color: #fff; animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div id="loading">CALIBRATING GEOMETRY & WEBSOCKETS...</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="hud" style="display:none;">
+  <h1>CYCLE GEOMETRY</h1>
+
+  <div class="data-row">
+    <div class="label">EXPECTED EXPANSION (NEXT CYCLE TOP)</div>
+    <div class="value" id="top-val" style="color: rgba(255,255,255,0.7)">--</div>
+  </div>
+
+  <div class="data-row">
+    <div class="label">CURRENT CYCLE ALL-TIME HIGH</div>
+    <div class="value" id="ath-val" style="color: #FFD700">--</div>
+  </div>
+
+  <div class="data-row" style="margin: 30px 0;">
+    <div class="label" style="color: #fff">LIVE PRICE (BINANCE WS)</div>
+    <div class="value" id="live-price-val">--</div>
+    <div class="regime-badge" id="regime-badge">--</div>
+  </div>
+
+  <div class="data-row">
+    <div class="label">EXPECTED CONTRACTION (CYCLE BOTTOM)</div>
+    <div class="value" id="bottom-val" style="color: #4FC3F7">--</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// USER CONFIGURATION
+// ═══════════════════════════════════════════════
+const TARGET_BOTTOM = 45000;
+const TARGET_TOP = 180000;
+const MAX_SCALE_PRICE = TARGET_TOP * 1.1;
+
+const GREEN = "#00E676";
+const RED = "#FF1744";
+const GOLD = "#FFD700";
+const BLUE = "#4FC3F7";
+
+let currentPrice = 0;
+let displayedPrice = 0;
+let athPrice = 0;
+let ema21w = 0;
+let currentRegime = "CALIBRATING";
+let regimeColor = "#ffffff";
+
+// ─── FETCH HISTORICAL DATA ───
+async function fetchMacroData() {
+  let closes = [];
+  let highest = 0;
+
+  // Try Binance first
+  try {
+    const res = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=500");
+    if (res.ok) {
+      const data = await res.json();
+      data.forEach(candle => {
+        const close = parseFloat(candle[4]);
+        closes.push(close);
+        if (close > highest) highest = close;
+      });
+    }
+  } catch(e) { console.warn("Binance daily failed:", e); }
+
+  // Fallback: CoinGecko
+  if (closes.length < 100) {
+    try {
+      const res = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=500&interval=daily");
+      if (res.ok) {
+        const j = await res.json();
+        closes = j.prices.map(p => p[1]);
+        highest = Math.max(...closes);
+      }
+    } catch(e) { console.warn("CoinGecko failed:", e); }
+  }
+
+  // Fallback: CryptoCompare
+  if (closes.length < 100) {
+    try {
+      const res = await fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=500");
+      if (res.ok) {
+        const j = await res.json();
+        closes = j.Data.Data.map(d => d.close).filter(c => c > 0);
+        highest = Math.max(...closes);
+      }
+    } catch(e) { console.warn("CryptoCompare failed:", e); }
+  }
+
+  if (closes.length < 100) {
+    document.getElementById("loading").innerText = "ALL DATA SOURCES FAILED";
+    return;
+  }
+
+  athPrice = highest;
+
+  // Calculate 21-Week EMA (approx 147 days)
+  const N = 147;
+  const k = 2 / (N + 1);
+  let initialSma = 0;
+  for (let i = 0; i < Math.min(N, closes.length); i++) initialSma += closes[i];
+  initialSma = initialSma / Math.min(N, closes.length);
+
+  let currentEma = initialSma;
+  for (let i = N; i < closes.length; i++) {
+    currentEma = (closes[i] * k) + (currentEma * (1 - k));
+  }
+  ema21w = currentEma;
+
+  document.getElementById("top-val").innerText = `$${TARGET_TOP.toLocaleString()}`;
+  document.getElementById("ath-val").innerText = `$${athPrice.toLocaleString()}`;
+  document.getElementById("bottom-val").innerText = `$${TARGET_BOTTOM.toLocaleString()}`;
+
+  currentPrice = closes[closes.length - 1];
+  displayedPrice = currentPrice;
+
+  startWebSocket();
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("hud").style.display = "block";
+  requestAnimationFrame(render);
+}
+
+// ─── BINANCE LIVE WEBSOCKET ───
+function startWebSocket() {
+  const ws = new WebSocket("wss://stream.binance.com:9443/ws/btcusdt@trade");
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    currentPrice = parseFloat(msg.p);
+
+    if (currentPrice > ema21w) {
+      currentRegime = "EXPANSION (PRICE > 21W EMA)";
+      regimeColor = GREEN;
+    } else {
+      currentRegime = "CONTRACTION (PRICE < 21W EMA)";
+      regimeColor = RED;
+    }
+
+    document.getElementById("live-price-val").innerText = `$${currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    document.getElementById("live-price-val").style.color = regimeColor;
+
+    const badge = document.getElementById("regime-badge");
+    badge.innerText = currentRegime;
+    badge.style.color = regimeColor;
+    badge.style.borderColor = regimeColor;
+    badge.style.backgroundColor = `${regimeColor}20`;
+  };
+
+  ws.onerror = () => {
+    console.error("WebSocket Error — falling back to polling");
+    setInterval(async () => {
+      try {
+        const r = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+        const d = await r.json();
+        currentPrice = parseFloat(d.price);
+
+        if (currentPrice > ema21w) {
+          currentRegime = "EXPANSION (PRICE > 21W EMA)";
+          regimeColor = GREEN;
+        } else {
+          currentRegime = "CONTRACTION (PRICE < 21W EMA)";
+          regimeColor = RED;
+        }
+
+        document.getElementById("live-price-val").innerText = `$${currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        document.getElementById("live-price-val").style.color = regimeColor;
+
+        const badge = document.getElementById("regime-badge");
+        badge.innerText = currentRegime + " (POLL)";
+        badge.style.color = regimeColor;
+        badge.style.borderColor = regimeColor;
+        badge.style.backgroundColor = `${regimeColor}20`;
+      } catch(e) { console.warn("Polling failed:", e); }
+    }, 5000);
+  };
+}
+
+// ─── RENDER ENGINE ───
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d", { alpha: false });
+
+function getRadius(price, maxR) {
+  return (price / MAX_SCALE_PRICE) * maxR;
+}
+
+function drawRing(cx, cy, price, maxR, color, lineWidth, isDashed, label) {
+  const r = getRadius(price, maxR);
+  if (r <= 0) return;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  if (isDashed) ctx.setLineDash([4, 8]);
+  else ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  ctx.stroke();
+
+  if (label) {
+    ctx.fillStyle = color;
+    ctx.font = "10px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(label, cx, cy - r - 6);
+  }
+}
+
+function render() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const maxR = Math.min(window.innerWidth, window.innerHeight) / 2;
+
+  ctx.fillStyle = "#030305";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Axis lines
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy); ctx.stroke();
+
+  // Target expansion ring (outer)
+  drawRing(cx, cy, TARGET_TOP, maxR, "rgba(255,255,255,0.2)", 1, true, "EXPECTED EXPANSION TOP");
+
+  // ATH watermark
+  drawRing(cx, cy, athPrice, maxR, "rgba(255, 215, 0, 0.4)", 2, true, "CURRENT ATH");
+
+  // 21W EMA ring
+  drawRing(cx, cy, ema21w, maxR, "rgba(255,255,255,0.15)", 1, true, `21W EMA: $${Math.round(ema21w).toLocaleString()}`);
+
+  // Target contraction ring (inner)
+  drawRing(cx, cy, TARGET_BOTTOM, maxR, "rgba(79, 195, 247, 0.4)", 1, true, "EXPECTED CONTRACTION BOTTOM");
+
+  // Smooth interpolation
+  displayedPrice += (currentPrice - displayedPrice) * 0.1;
+  const liveR = getRadius(displayedPrice, maxR);
+
+  // Live ring outer glow
+  ctx.beginPath();
+  ctx.arc(cx, cy, liveR, 0, Math.PI * 2);
+  ctx.strokeStyle = regimeColor;
+  ctx.lineWidth = 15;
+  ctx.globalAlpha = 0.15;
+  ctx.setLineDash([]);
+  ctx.stroke();
+
+  // Live ring medium glow
+  ctx.beginPath();
+  ctx.arc(cx, cy, liveR, 0, Math.PI * 2);
+  ctx.strokeStyle = regimeColor;
+  ctx.lineWidth = 6;
+  ctx.globalAlpha = 0.4;
+  ctx.stroke();
+
+  // Live ring core
+  ctx.beginPath();
+  ctx.arc(cx, cy, liveR, 0, Math.PI * 2);
+  ctx.strokeStyle = regimeColor;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 1.0;
+  ctx.stroke();
+
+  // Price tracker dot (pulses)
+  const pulseScale = 1 + 0.2 * Math.sin(Date.now() / 500);
+  ctx.beginPath();
+  ctx.arc(cx, cy - liveR, 6 * pulseScale, 0, Math.PI * 2);
+  ctx.fillStyle = regimeColor;
+  ctx.globalAlpha = 0.9;
+  ctx.fill();
+
+  // Inner glow dot
+  ctx.beginPath();
+  ctx.arc(cx, cy - liveR, 12 * pulseScale, 0, Math.PI * 2);
+  ctx.fillStyle = regimeColor;
+  ctx.globalAlpha = 0.1;
+  ctx.fill();
+
+  ctx.globalAlpha = 1;
+
+  // Price label on the ring
+  ctx.fillStyle = regimeColor;
+  ctx.font = "bold 11px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(`$${Math.round(displayedPrice).toLocaleString()}`, cx, cy - liveR - 18);
+
+  // Distance markers
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+
+  if (athPrice > displayedPrice) {
+    const pctToATH = ((athPrice - displayedPrice) / displayedPrice * 100).toFixed(1);
+    ctx.fillText(`${pctToATH}% to ATH`, cx + 80, cy - getRadius(athPrice, maxR));
+  }
+
+  const pctToTop = ((TARGET_TOP - displayedPrice) / displayedPrice * 100).toFixed(1);
+  ctx.fillText(`${pctToTop}% to target`, cx + 80, cy - getRadius(TARGET_TOP, maxR));
+
+  const pctToBottom = ((displayedPrice - TARGET_BOTTOM) / displayedPrice * 100).toFixed(1);
+  ctx.fillText(`${pctToBottom}% above bottom`, cx + 80, cy - getRadius(TARGET_BOTTOM, maxR));
+
+  requestAnimationFrame(render);
+}
+
+window.addEventListener("resize", () => {});
+
+fetchMacroData();
+</script>
+</body>
+</html>
