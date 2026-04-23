@@ -35,6 +35,39 @@
     font-size: 10px; color: rgba(255,255,255,0.35); text-align: center; line-height: 1.8;
   }
   .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; }
+  #movers {
+    margin-top: 16px; max-width: 650px; width: 100%;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.015);
+  }
+  .movers-header {
+    padding: 12px 18px; font-size: 11px; letter-spacing: 4px; font-weight: 700;
+    color: rgba(255,255,255,0.5);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .mover-row {
+    display: grid; grid-template-columns: 32px 1fr 80px 80px 60px;
+    align-items: center; padding: 10px 18px; gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+    transition: background 0.2s;
+  }
+  .mover-row:hover { background: rgba(255,255,255,0.03); }
+  .mover-rank { font-size: 10px; color: rgba(255,255,255,0.2); font-weight: 700; }
+  .mover-name { display: flex; flex-direction: column; }
+  .mover-symbol { font-size: 12px; font-weight: 700; letter-spacing: 2px; }
+  .mover-full { font-size: 9px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+  .mover-7d, .mover-14d { font-size: 11px; font-weight: 600; text-align: right; }
+  .mover-mcap { font-size: 9px; color: rgba(255,255,255,0.2); text-align: right; }
+  .mover-col-header {
+    display: grid; grid-template-columns: 32px 1fr 80px 80px 60px;
+    padding: 6px 18px; gap: 8px;
+    font-size: 9px; color: rgba(255,255,255,0.2); letter-spacing: 1px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .positive { color: #E040FB; }
+  .negative { color: rgba(255,255,255,0.15); }
+  .strong { color: #00E676; text-shadow: 0 0 8px rgba(0,230,118,0.3); }
 </style>
 </head>
 <body>
@@ -53,7 +86,14 @@
   <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
   <canvas id="canvas"></canvas>
   <div id="context" class="context-bar"></div>
-  <div class="footer">ETH/BTC IS THE CANARY · WHEN IT RISES, ALTS FOLLOW · WHEN IT FALLS, BTC IS KING</div>
+  <div id="movers" style="display:none;">
+    <div class="movers-header">FIRST MOVERS — OUTPERFORMING BTC</div>
+    <div class="mover-col-header">
+      <div></div><div>COIN</div><div style="text-align:right">7D vs BTC</div><div style="text-align:right">24H vs BTC</div><div style="text-align:right">BTC PRICE</div>
+    </div>
+    <div id="movers-list"></div>
+  </div>
+  <div class="footer">ETH/BTC IS THE CANARY · FIRST MOVERS LEAD THE ROTATION · CATCH THEM EARLY</div>
 </div>
 
 <script>
@@ -595,16 +635,124 @@ const dotTimer = setInterval(() => {
   if (el) el.textContent = ".".repeat(dotCount);
 }, 400);
 
+// ═══════════════════════════════════════════════
+// FIRST MOVERS SCANNER
+// ═══════════════════════════════════════════════
+// Fetches top coins priced in BTC.
+// Coins outperforming BTC = their BTC price is rising.
+// We rank by 7-day BTC-relative performance to find
+// what's leading the rotation.
+
+async function fetchFirstMovers() {
+  // Exclude stablecoins and wrapped tokens — we want real alts
+  const excludeIds = new Set([
+    'tether', 'usd-coin', 'binance-usd', 'dai', 'true-usd',
+    'first-digital-usd', 'ethena-usde', 'usds',
+    'wrapped-bitcoin', 'wrapped-ether', 'staked-ether',
+    'wrapped-steth', 'coinbase-wrapped-btc', 'binance-bitcoin',
+    'rocket-pool-eth', 'wrapped-eeth'
+  ]);
+
+  try {
+    // CoinGecko: top 50 coins by market cap, priced in BTC
+    // This gives us price_change_percentage_24h and 7d sparkline
+    const url = "https://api.coingecko.com/api/v3/coins/markets?" +
+      "vs_currency=btc&order=market_cap_desc&per_page=50&page=1" +
+      "&price_change_percentage=7d,14d,24h" +
+      "&sparkline=false";
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status);
+    const coins = await res.json();
+
+    // Filter out BTC itself, stablecoins, and wrapped tokens
+    const alts = coins.filter(c =>
+      c.id !== 'bitcoin' &&
+      !excludeIds.has(c.id) &&
+      c.price_change_percentage_7d_in_currency != null
+    );
+
+    // Sort by 7-day BTC-relative performance (descending)
+    alts.sort((a, b) =>
+      (b.price_change_percentage_7d_in_currency || 0) -
+      (a.price_change_percentage_7d_in_currency || 0)
+    );
+
+    // Take top 10 outperformers
+    return alts.slice(0, 10).map(c => ({
+      symbol: c.symbol.toUpperCase(),
+      name: c.name,
+      pct7d: c.price_change_percentage_7d_in_currency || 0,
+      pct24h: c.price_change_percentage_24h_in_currency || 0,
+      pct14d: c.price_change_percentage_14d_in_currency || 0,
+      mcap: c.market_cap,
+      mcapRank: c.market_cap_rank,
+      btcPrice: c.current_price,
+      image: c.image
+    }));
+  } catch (e) {
+    console.warn("First movers fetch:", e);
+    return [];
+  }
+}
+
+function formatMcap(mcap) {
+  // mcap here is in BTC, convert to rough USD for display
+  // Actually CoinGecko markets endpoint returns market_cap in the vs_currency
+  // So this is in BTC — let's just show rank instead
+  if (!mcap) return "—";
+  if (mcap >= 1e6) return (mcap / 1e6).toFixed(1) + "M₿";
+  if (mcap >= 1e3) return (mcap / 1e3).toFixed(0) + "K₿";
+  return mcap.toFixed(0) + "₿";
+}
+
+function renderMovers(movers) {
+  if (!movers.length) return;
+
+  const container = document.getElementById("movers-list");
+  container.innerHTML = "";
+
+  movers.forEach((m, i) => {
+    const pct7dClass = m.pct7d > 15 ? "strong" : m.pct7d > 0 ? "positive" : "negative";
+    const pct24hClass = m.pct24h > 5 ? "strong" : m.pct24h > 0 ? "positive" : "negative";
+
+    const row = document.createElement("div");
+    row.className = "mover-row";
+    row.innerHTML = `
+      <div class="mover-rank">${i + 1}</div>
+      <div class="mover-name">
+        <div class="mover-symbol">${m.symbol}</div>
+        <div class="mover-full">${m.name}${m.mcapRank ? ' · #' + m.mcapRank : ''}</div>
+      </div>
+      <div class="mover-7d ${pct7dClass}">${m.pct7d >= 0 ? '+' : ''}${m.pct7d.toFixed(1)}%</div>
+      <div class="mover-14d ${pct24hClass}">${m.pct24h >= 0 ? '+' : ''}${m.pct24h.toFixed(1)}%</div>
+      <div class="mover-mcap">${m.btcPrice ? m.btcPrice.toFixed(6) : '—'}</div>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById("movers").style.display = "block";
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+
 async function main() {
-  const result = await fetchData();
+  // Fetch rotation data and first movers in parallel
+  const [ratioResult, movers] = await Promise.all([
+    fetchData(),
+    fetchFirstMovers()
+  ]);
+
   clearInterval(dotTimer);
 
-  if (result.ratio.length < 30) {
+  if (ratioResult.ratio.length < 30) {
     document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
     return;
   }
 
-  rotationState = analyzeRotation(result.ratio);
+  rotationState = analyzeRotation(ratioResult.ratio);
 
   if (!rotationState) {
     document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">INSUFFICIENT DATA</div>';
@@ -613,7 +761,10 @@ async function main() {
 
   document.getElementById("loading").style.display = "none";
   document.getElementById("app").style.display = "flex";
-  document.getElementById("badgeText").textContent = `LIVE · ${result.source}`;
+  document.getElementById("badgeText").textContent = `LIVE · ${ratioResult.source}`;
+
+  // Render first movers
+  if (movers.length) renderMovers(movers);
 
   animate();
   window.addEventListener("resize", draw);
