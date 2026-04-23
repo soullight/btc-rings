@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — The Rotation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: 8px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.2); letter-spacing: 3px; margin-top: 4px; }
+  canvas { border-radius: 12px; margin-top: 14px; }
+  .loading { text-align: center; padding: 100px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(224,64,251,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(224,64,251,0.08); border: 1px solid rgba(224,64,251,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:#E040FB; box-shadow:0 0 6px #E040FB; }
+  .context-bar {
+    margin-top: 14px; max-width: 650px; width: 100%;
+    padding: 12px 18px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    font-size: 10px; color: rgba(255,255,255,0.35); text-align: center; line-height: 1.8;
+  }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>THE ROTATION</h1>
+  <div class="subtitle">WATCH THE RATIO · SEE THE SHIFT · CATCH THE ALT SEASON</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">READING THE ROTATION<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="context" class="context-bar"></div>
+  <div class="footer">ETH/BTC IS THE CANARY · WHEN IT RISES, ALTS FOLLOW · WHEN IT FALLS, BTC IS KING</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// THE ROTATION
+// ═══════════════════════════════════════════════════════════════
+//
+// Alt-season doesn't arrive with an announcement.
+// It shows up in the breathing of ETH/BTC.
+//
+// When capital rotates from Bitcoin to altcoins,
+// ETH/BTC starts rising — slowly at first, then obviously.
+// ETH is the gateway. Where ETH goes, alts follow.
+//
+// This tool reads that ratio like the Vibe reads BTC's cycles.
+// Same philosophy: troughs, crests, momentum.
+// But instead of deploy/ride/exit for BTC swings,
+// it tells you:
+//
+//   BTC SEASON  — ratio falling, money flowing into BTC.
+//                 Stay in BTC. Alts are bleeding.
+//
+//   SHIFT       — ratio bottoming, momentum flattening.
+//                 The rotation may be starting. Watch closely.
+//
+//   ALT SEASON  — ratio rising, ETH outperforming BTC.
+//                 Capital is rotating. Time to look at alts.
+//
+//   LATE ALTS   — ratio at extreme, momentum slowing.
+//                 Alt season is mature. Take profits, rotate back.
+//
+// ═══════════════════════════════════════════════════════════════
+
+const GREEN = "#00E676", RED = "#FF1744", GOLD = "#FFD700";
+const CYAN = "#4FC3F7", PURPLE = "#E040FB", ORANGE = "#FF9800";
+
+let animProgress = 0;
+let rotationState = null;
+
+// ═══════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════
+function mean(arr) {
+  if (!arr || !arr.length) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function findTroughs(prices, halfWindow) {
+  const troughs = [];
+  for (let i = halfWindow; i < prices.length - halfWindow; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= halfWindow; j++) {
+      if (prices[i] > prices[i - j] || prices[i] > prices[i + j]) { isTrough = false; break; }
+    }
+    if (isTrough && (troughs.length === 0 || (i - troughs[troughs.length - 1]) >= halfWindow)) {
+      troughs.push(i);
+    }
+  }
+  return troughs;
+}
+
+function filterTroughs(troughs, prices, nominal, tol) {
+  if (troughs.length <= 1) return troughs;
+  const minGap = nominal * (1 - tol);
+  const filtered = [troughs[0]];
+  for (let i = 1; i < troughs.length; i++) {
+    const gap = troughs[i] - filtered[filtered.length - 1];
+    if (gap >= minGap) filtered.push(troughs[i]);
+    else if (prices[troughs[i]] < prices[filtered[filtered.length - 1]]) filtered[filtered.length - 1] = troughs[i];
+  }
+  return filtered;
+}
+
+function findCrest(prices, start, end) {
+  let max = -Infinity, idx = start;
+  for (let i = start; i <= Math.min(end, prices.length - 1); i++) {
+    if (prices[i] > max) { max = prices[i]; idx = i; }
+  }
+  return { idx, price: max };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════
+async function fetchData() {
+  let btcPrices = [], ethPrices = [], source = "ERROR";
+
+  // CoinGecko: fetch BTC and ETH in parallel
+  try {
+    const [btcRes, ethRes] = await Promise.all([
+      fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily"),
+      fetch("https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=usd&days=365&interval=daily")
+    ]);
+    if (btcRes.ok && ethRes.ok) {
+      const btcJson = await btcRes.json();
+      const ethJson = await ethRes.json();
+      btcPrices = btcJson.prices.map(([ts, p]) => ({ date: new Date(ts), price: p }));
+      ethPrices = ethJson.prices.map(([ts, p]) => ({ date: new Date(ts), price: p }));
+      source = "CoinGecko";
+    }
+  } catch (e) { console.warn("CoinGecko:", e); }
+
+  // Fallback: CryptoCompare
+  if (btcPrices.length < 30) {
+    try {
+      const [btcRes, ethRes] = await Promise.all([
+        fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=365"),
+        fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=ETH&tsym=USD&limit=365")
+      ]);
+      if (btcRes.ok && ethRes.ok) {
+        const btcJson = await btcRes.json();
+        const ethJson = await ethRes.json();
+        btcPrices = btcJson.Data.Data.map(d => ({ date: new Date(d.time * 1000), price: d.close })).filter(d => d.price > 0);
+        ethPrices = ethJson.Data.Data.map(d => ({ date: new Date(d.time * 1000), price: d.close })).filter(d => d.price > 0);
+        source = "CryptoCompare";
+      }
+    } catch (e) { console.warn("CryptoCompare:", e); }
+  }
+
+  if (btcPrices.length < 30 || ethPrices.length < 30) return { ratio: [], source: "ERROR" };
+
+  // Align by date and compute ETH/BTC ratio
+  const minLen = Math.min(btcPrices.length, ethPrices.length);
+  const ratio = [];
+  for (let i = 0; i < minLen; i++) {
+    if (btcPrices[i].price > 0) {
+      ratio.push({
+        date: btcPrices[i].date,
+        value: ethPrices[i].price / btcPrices[i].price,
+        ethPrice: ethPrices[i].price,
+        btcPrice: btcPrices[i].price
+      });
+    }
+  }
+
+  return { ratio, source };
+}
+
+// ═══════════════════════════════════════════════
+// THE ROTATION ENGINE
+// ═══════════════════════════════════════════════
+function analyzeRotation(ratioData) {
+  if (ratioData.length < 60) return null;
+
+  const values = ratioData.map(d => d.value);
+  const now = values.length - 1;
+  const currentRatio = values[now];
+  const currentEthPrice = ratioData[now].ethPrice;
+  const currentBtcPrice = ratioData[now].btcPrice;
+
+  // ── ETH/BTC range context ──
+  const values90 = values.slice(-90);
+  const values30 = values.slice(-30);
+  const high90 = Math.max(...values90);
+  const low90 = Math.min(...values90);
+  const high30 = Math.max(...values30);
+  const low30 = Math.min(...values30);
+  const posIn90 = (currentRatio - low90) / (high90 - low90 || 0.0001); // 0=at low, 1=at high
+
+  // ── Momentum ──
+  const ma20 = mean(values.slice(-20));
+  const ma60 = mean(values.slice(-60));
+  const roc20 = (currentRatio - values[Math.max(0, now - 20)]) / values[Math.max(0, now - 20)];
+  const roc60 = (currentRatio - values[Math.max(0, now - 60)]) / values[Math.max(0, now - 60)];
+
+  // 5-day rate of change for momentum direction
+  const roc5 = (currentRatio - values[Math.max(0, now - 5)]) / values[Math.max(0, now - 5)];
+
+  // ── Trend ──
+  const aboveMa20 = currentRatio > ma20;
+  const aboveMa60 = currentRatio > ma60;
+  const ma20rising = ma20 > mean(values.slice(-25, -5));
+  const ma60rising = ma60 > mean(values.slice(-65, -5));
+
+  // ── Trough/Crest detection on the ratio ──
+  // Use longer windows — ETH/BTC cycles are slower than BTC's 60-day swings
+  let troughs = findTroughs(values, 15);
+  troughs = filterTroughs(troughs, values, 90, 0.5);
+  if (troughs.length < 1) {
+    troughs = findTroughs(values, 10);
+    troughs = filterTroughs(troughs, values, 60, 0.6);
+  }
+
+  const lastTrough = troughs.length > 0 ? troughs[troughs.length - 1] : 0;
+  const daysSinceTrough = now - lastTrough;
+  const troughValue = values[lastTrough];
+  const crest = findCrest(values, lastTrough, now);
+  const moveFromTrough = (currentRatio - troughValue) / troughValue;
+  const moveFromCrest = (currentRatio - crest.price) / crest.price;
+  const pastCrest = currentRatio < crest.price * 0.95;
+
+  // ── Average cycle metrics ──
+  let avgCycleLen = 90;
+  if (troughs.length >= 2) {
+    const lens = [];
+    for (let i = Math.max(0, troughs.length - 4); i < troughs.length - 1; i++) {
+      lens.push(troughs[i + 1] - troughs[i]);
+    }
+    if (lens.length) avgCycleLen = Math.round(mean(lens));
+  }
+  const progress = daysSinceTrough / avgCycleLen;
+
+  // ═══════════════════════════════════════════════
+  // THE STATE
+  // ═══════════════════════════════════════════════
+  let state, stateColor, stateDesc;
+
+  // Scoring approach — like the Vibe
+  const altScore =
+    (roc20 > 0.03 ? 3 : roc20 > 0.01 ? 2 : roc20 > 0 ? 1 : 0) +
+    (aboveMa20 ? 1 : 0) +
+    (aboveMa60 ? 1 : 0) +
+    (ma20rising ? 1 : 0) +
+    (posIn90 > 0.7 ? 1 : 0);
+
+  const btcScore =
+    (roc20 < -0.03 ? 3 : roc20 < -0.01 ? 2 : roc20 < 0 ? 1 : 0) +
+    (!aboveMa20 ? 1 : 0) +
+    (!aboveMa60 ? 1 : 0) +
+    (!ma20rising ? 1 : 0) +
+    (posIn90 < 0.3 ? 1 : 0);
+
+  if (altScore >= 5 && posIn90 > 0.8) {
+    state = "LATE ALTS";
+    stateColor = ORANGE;
+    stateDesc = "Alt season is mature. Ratio extended. Consider rotating back to BTC.";
+  } else if (altScore >= 4) {
+    state = "ALT SEASON";
+    stateColor = PURPLE;
+    stateDesc = "Capital rotating into alts. ETH outperforming BTC. Look for opportunities.";
+  } else if (btcScore >= 4) {
+    state = "BTC SEASON";
+    stateColor = GOLD;
+    stateDesc = "Money flowing into BTC. Alts underperforming. Stay in Bitcoin.";
+  } else if (roc5 > 0.005 && roc20 > -0.01 && posIn90 < 0.4) {
+    state = "SHIFT";
+    stateColor = CYAN;
+    stateDesc = "Ratio may be bottoming. Early signs of rotation starting. Watch closely.";
+  } else if (roc5 < -0.005 && posIn90 > 0.6) {
+    state = "SHIFT";
+    stateColor = CYAN;
+    stateDesc = "Ratio rolling over from highs. Alt season may be fading.";
+  } else {
+    state = "NEUTRAL";
+    stateColor = "rgba(255,255,255,0.5)";
+    stateDesc = "No clear rotation direction. Ratio is ranging.";
+  }
+
+  return {
+    state, stateColor, stateDesc,
+    currentRatio, currentEthPrice, currentBtcPrice,
+    posIn90, high90, low90, high30, low30,
+    roc5, roc20, roc60,
+    ma20, ma60, aboveMa20, aboveMa60, ma20rising,
+    troughs, lastTrough, daysSinceTrough, troughValue,
+    crest, moveFromTrough, moveFromCrest, pastCrest,
+    avgCycleLen, progress,
+    altScore, btcScore,
+    values, ratioData
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function fmtR(r) { return r.toFixed(4); }
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en", { maximumFractionDigits: 0 }) : p.toFixed(2); }
+function fmtPct(p) { return (p * 100).toFixed(1) + "%"; }
+
+function draw() {
+  const canvas = document.getElementById("canvas");
+  const container = canvas.parentElement;
+  const size = Math.min(container.clientWidth - 20, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size * dpr; canvas.height = size * dpr;
+  canvas.style.width = size + "px"; canvas.style.height = size + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const cx = size / 2, cy = size / 2;
+
+  if (!rotationState) return;
+  const s = rotationState;
+  const startAngle = -Math.PI / 2;
+
+  // ── Background ──
+  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0, 0, size, size);
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size / 2);
+  bg.addColorStop(0, "rgba(15,15,30,0.5)"); bg.addColorStop(1, "rgba(10,10,15,0)");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+
+  const maxR = (size / 2) * 0.90;
+
+  // ═════════════════════════════════════════════
+  // OUTER RING — ETH/BTC RATIO POSITION IN 90-DAY RANGE
+  // ═════════════════════════════════════════════
+  // Shows where the ratio sits: bottom = BTC season, top = alt season
+  const rOuter = maxR * 0.88;
+
+  // Full ring background — gradient from gold (BTC dominant) to purple (alts rising)
+  const segments = 100;
+  for (let i = 0; i < segments; i++) {
+    const pct = i / segments;
+    const a1 = startAngle + pct * Math.PI * 2;
+    const a2 = startAngle + (pct + 1 / segments) * Math.PI * 2;
+
+    // Color: 0=gold (BTC season), 50=neutral, 100=purple (alt season)
+    const segVal = pct * 100;
+    let r, g, b;
+    if (segVal < 33) {
+      const t = segVal / 33;
+      r = Math.round(255 - t * 176); g = Math.round(215 - t * 20); b = Math.round(0 + t * 247);
+    } else if (segVal < 66) {
+      const t = (segVal - 33) / 33;
+      r = Math.round(79 + t * 145); g = Math.round(195 - t * 131); b = Math.round(247 - t * 6);
+    } else {
+      const t = (segVal - 66) / 34;
+      r = Math.round(224); g = Math.round(64); b = Math.round(251);
+    }
+
+    ctx.beginPath(); ctx.arc(cx, cy, rOuter, a1, a2 + 0.01);
+    ctx.strokeStyle = `rgba(${r},${g},${b},0.06)`; ctx.lineWidth = 20; ctx.stroke();
+  }
+
+  // Position needle — where ETH/BTC sits in its 90-day range
+  const posAngle = startAngle + s.posIn90 * Math.PI * 2;
+
+  // Bright arc from start to current position
+  ctx.beginPath(); ctx.arc(cx, cy, rOuter, startAngle, posAngle);
+  ctx.strokeStyle = s.stateColor; ctx.lineWidth = 6; ctx.globalAlpha = 0.7 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Glow
+  ctx.beginPath(); ctx.arc(cx, cy, rOuter, startAngle, posAngle);
+  ctx.strokeStyle = s.stateColor; ctx.lineWidth = 24; ctx.globalAlpha = 0.08 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Needle marker
+  const needleX = cx + rOuter * Math.cos(posAngle);
+  const needleY = cy + rOuter * Math.sin(posAngle);
+  const pulseScale = 1 + 0.12 * Math.sin(Date.now() / 700);
+
+  ctx.beginPath(); ctx.arc(needleX, needleY, 18 * pulseScale, 0, Math.PI * 2);
+  ctx.fillStyle = s.stateColor; ctx.globalAlpha = 0.05; ctx.fill();
+  ctx.beginPath(); ctx.arc(needleX, needleY, 10, 0, Math.PI * 2);
+  ctx.fillStyle = s.stateColor; ctx.globalAlpha = 0.12; ctx.fill();
+  ctx.beginPath(); ctx.arc(needleX, needleY, 6, 0, Math.PI * 2);
+  ctx.fillStyle = s.stateColor; ctx.globalAlpha = 0.9 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Zone labels
+  ctx.font = "bold 8px monospace"; ctx.textAlign = "center";
+
+  const btcZoneAngle = startAngle + 0.12 * Math.PI * 2;
+  ctx.fillStyle = GOLD; ctx.globalAlpha = 0.25;
+  ctx.fillText("BTC SEASON", cx + (rOuter + 20) * Math.cos(btcZoneAngle), cy + (rOuter + 20) * Math.sin(btcZoneAngle) + 3);
+
+  const neutralAngle = startAngle + 0.5 * Math.PI * 2;
+  ctx.fillStyle = CYAN; ctx.globalAlpha = 0.2;
+  ctx.fillText("NEUTRAL", cx + (rOuter + 20) * Math.cos(neutralAngle), cy + (rOuter + 20) * Math.sin(neutralAngle) + 3);
+
+  const altZoneAngle = startAngle + 0.85 * Math.PI * 2;
+  ctx.fillStyle = PURPLE; ctx.globalAlpha = 0.2;
+  ctx.fillText("ALT SEASON", cx + (rOuter + 20) * Math.cos(altZoneAngle), cy + (rOuter + 20) * Math.sin(altZoneAngle) + 3);
+  ctx.globalAlpha = 1;
+
+  // Ring label
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = s.stateColor; ctx.globalAlpha = 0.35;
+  ctx.fillText("ETH/BTC · 90D RANGE", cx, cy - rOuter - 12);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // MIDDLE RING — RATIO HISTORY (60 days)
+  // ═════════════════════════════════════════════
+  const rMid = maxR * 0.60;
+  const history = s.values.slice(-60);
+  const histHigh = Math.max(...history);
+  const histLow = Math.min(...history);
+
+  for (let i = 0; i < history.length; i++) {
+    const pct = i / history.length;
+    const a1 = startAngle + pct * Math.PI * 2;
+    const a2 = startAngle + (pct + 1 / history.length) * Math.PI * 2;
+    const normalized = (history[i] - histLow) / (histHigh - histLow || 0.0001);
+    const barHeight = normalized * 25 + 3;
+
+    // Color by direction: rising = purple, falling = gold
+    const prevI = Math.max(0, i - 1);
+    const isRising = history[i] >= history[prevI];
+    const color = isRising
+      ? `rgba(224,64,251,${0.25 * animProgress})`
+      : `rgba(255,215,0,${0.20 * animProgress})`;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, rMid - barHeight / 2, a1, a2 + 0.01);
+    ctx.strokeStyle = color; ctx.lineWidth = barHeight; ctx.stroke();
+  }
+
+  // Today's marker
+  const todayAngle = startAngle + ((history.length - 1) / history.length) * Math.PI * 2;
+  const todayX = cx + rMid * Math.cos(todayAngle);
+  const todayY = cy + rMid * Math.sin(todayAngle);
+  ctx.beginPath(); ctx.arc(todayX, todayY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = s.stateColor; ctx.globalAlpha = 0.8 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Label
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = s.stateColor; ctx.globalAlpha = 0.3;
+  ctx.fillText("RATIO · 60D HISTORY", cx, cy - rMid - 12);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // INNER RING — MOMENTUM
+  // ═══════════════════════════════════════════════
+  const rInner = maxR * 0.35;
+
+  // 20-day ROC as a gauge
+  // Map ROC from [-10%, +10%] to [0, 1] for the ring
+  const rocNormalized = Math.max(0, Math.min(1, (s.roc20 + 0.10) / 0.20));
+  const rocAngle = startAngle + rocNormalized * Math.PI * 2;
+  const rocColor = s.roc20 > 0.01 ? PURPLE : s.roc20 < -0.01 ? GOLD : CYAN;
+
+  // Background
+  ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.03)"; ctx.lineWidth = 8; ctx.stroke();
+
+  // Midpoint marker (0% ROC = 12 o'clock doesn't apply here, but center of ring = neutral)
+  const midAngle = startAngle + 0.5 * Math.PI * 2;
+  const midX = cx + rInner * Math.cos(midAngle);
+  const midY = cy + rInner * Math.sin(midAngle);
+  ctx.beginPath(); ctx.arc(midX, midY, 2, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fill();
+
+  // Elapsed arc
+  ctx.beginPath(); ctx.arc(cx, cy, rInner, startAngle, rocAngle);
+  ctx.strokeStyle = rocColor; ctx.lineWidth = 4; ctx.globalAlpha = 0.5 * animProgress;
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Marker
+  const rocX = cx + rInner * Math.cos(rocAngle);
+  const rocY = cy + rInner * Math.sin(rocAngle);
+  ctx.beginPath(); ctx.arc(rocX, rocY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = rocColor; ctx.globalAlpha = 0.8 * animProgress; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Label
+  ctx.font = "bold 8px monospace"; ctx.fillStyle = rocColor; ctx.globalAlpha = 0.3;
+  ctx.fillText("20D MOMENTUM", cx, cy - rInner - 10);
+  ctx.font = "7px monospace";
+  ctx.fillText(fmtPct(s.roc20), cx, cy - rInner - 22);
+  ctx.globalAlpha = 1;
+
+  // ═════════════════════════════════════════════
+  // CENTER — THE STATE
+  // ═════════════════════════════════════════════
+  ctx.textAlign = "center";
+
+  // State word
+  ctx.font = "bold 32px monospace"; ctx.fillStyle = s.stateColor;
+  ctx.globalAlpha = 0.95 * animProgress;
+  ctx.fillText(s.state, cx, cy - 24);
+  ctx.globalAlpha = 1;
+
+  // Description
+  ctx.font = "10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  const words = s.stateDesc.split(' ');
+  let line = '', y = cy + 0;
+  for (const word of words) {
+    const test = line + (line ? ' ' : '') + word;
+    if (ctx.measureText(test).width > size * 0.45) {
+      ctx.fillText(line, cx, y); line = word; y += 13;
+    } else { line = test; }
+  }
+  if (line) ctx.fillText(line, cx, y);
+
+  // ETH/BTC ratio
+  y += 20;
+  ctx.font = "bold 16px monospace"; ctx.fillStyle = s.stateColor; ctx.globalAlpha = 0.7;
+  ctx.fillText(`ETH/BTC ${fmtR(s.currentRatio)}`, cx, y);
+  ctx.globalAlpha = 1;
+
+  // Prices
+  y += 16;
+  ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fillText(`ETH $${fmtP(s.currentEthPrice)} · BTC $${fmtP(s.currentBtcPrice)}`, cx, y);
+
+  // Position in range
+  y += 16;
+  ctx.font = "9px monospace"; ctx.fillStyle = s.stateColor; ctx.globalAlpha = 0.4;
+  ctx.fillText(`${(s.posIn90 * 100).toFixed(0)}% of 90d range · Low ${fmtR(s.low90)} · High ${fmtR(s.high90)}`, cx, y);
+  ctx.globalAlpha = 1;
+
+  // Moving averages
+  y += 14;
+  ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.15)";
+  const above20str = s.aboveMa20 ? "above" : "below";
+  const above60str = s.aboveMa60 ? "above" : "below";
+  ctx.fillText(`${above20str} 20d MA (${fmtR(s.ma20)}) · ${above60str} 60d MA (${fmtR(s.ma60)})`, cx, y);
+
+  // ═════════════════════════════════════════════
+  // CONTEXT BAR
+  // ═════════════════════════════════════════════
+  const rocDir = s.roc20 > 0.01 ? "rising" : s.roc20 < -0.01 ? "falling" : "flat";
+  const maStatus = s.ma20rising ? "20d MA rising" : "20d MA falling";
+
+  document.getElementById("context").innerHTML = `
+    <span style="color:${s.stateColor};font-weight:700">${s.state}</span> ·
+    ETH/BTC: <span style="color:${s.stateColor}">${fmtR(s.currentRatio)}</span> ·
+    90d range: ${(s.posIn90 * 100).toFixed(0)}% (${fmtR(s.low90)} → ${fmtR(s.high90)}) ·
+    20d ROC: <span style="color:${rocColor}">${fmtPct(s.roc20)} (${rocDir})</span> ·
+    ${maStatus} ·
+    ${s.aboveMa60 ? '<span style="color:' + PURPLE + '">Above 60d MA</span>' : '<span style="color:' + GOLD + '">Below 60d MA</span>'} ·
+    Alt score: ${s.altScore} · BTC score: ${s.btcScore}
+  `;
+
+  if (animProgress >= 1) requestAnimationFrame(() => draw());
+}
+
+// ═══════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════
+function animate() {
+  if (animProgress < 1) {
+    animProgress += 0.025;
+    if (animProgress > 1) animProgress = 1;
+    draw();
+    requestAnimationFrame(animate);
+  } else {
+    draw();
+  }
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount + 1) % 4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  const result = await fetchData();
+  clearInterval(dotTimer);
+
+  if (result.ratio.length < 30) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
+    return;
+  }
+
+  rotationState = analyzeRotation(result.ratio);
+
+  if (!rotationState) {
+    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">INSUFFICIENT DATA</div>';
+    return;
+  }
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("badgeText").textContent = `LIVE · ${result.source}`;
+
+  animate();
+  window.addEventListener("resize", draw);
+}
+
+main();
+</script>
+</body>
+</html>
