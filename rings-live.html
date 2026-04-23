@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — Live</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0f; color:#fff;
+  font-family:'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
+  min-height:100vh; overflow-x:hidden;
+}
+
+/* Layout */
+.container { display:flex; width:100%; min-height:100vh; }
+.left-panel { flex:0 0 70%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; position:relative; }
+.right-panel {
+  flex:0 0 30%; display:flex; flex-direction:column; padding:20px 18px;
+  background:rgba(255,255,255,0.015); border-left:1px solid rgba(255,255,255,0.06);
+  overflow-y:auto;
+}
+
+@media(max-width:800px){
+  .container { flex-direction:column; }
+  .left-panel, .right-panel { flex:none; width:100%; }
+  .right-panel { border-left:none; border-top:1px solid rgba(255,255,255,0.06); }
+}
+
+/* Canvas area */
+.canvas-header { text-align:center; margin-bottom:8px; }
+.canvas-header h1 { font-size:20px; font-weight:700; letter-spacing:6px; }
+.canvas-header .sub { font-size:9px; color:rgba(255,255,255,0.22); letter-spacing:3px; margin-top:3px; }
+canvas { border-radius:12px; display:block; }
+
+/* Right panel HUD */
+.hud-section {
+  padding:14px 12px; border-radius:8px; margin-bottom:10px;
+  background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06);
+}
+.hud-label {
+  font-size:8px; letter-spacing:2.5px; color:rgba(255,255,255,0.32);
+  margin-bottom:6px; text-transform:uppercase;
+}
+.hud-value { font-size:22px; font-weight:700; letter-spacing:1px; }
+.hud-value.sm { font-size:15px; }
+.hud-value.xs { font-size:12px; }
+.hud-sub { font-size:9px; color:rgba(255,255,255,0.25); margin-top:3px; }
+
+.regime-badge {
+  display:inline-flex; align-items:center; gap:7px;
+  padding:5px 14px; border-radius:20px; font-size:10px; letter-spacing:2px;
+  margin-top:8px; font-weight:700;
+}
+.regime-badge .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.regime-expansion { background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.25); color:#00E676; }
+.regime-expansion .dot { background:#00E676; box-shadow:0 0 8px #00E676; }
+.regime-contraction { background:rgba(255,23,68,0.1); border:1px solid rgba(255,23,68,0.25); color:#FF1744; }
+.regime-contraction .dot { background:#FF1744; box-shadow:0 0 8px #FF1744; }
+
+.divider { height:1px; background:rgba(255,255,255,0.04); margin:8px 0; }
+.hud-row { display:flex; justify-content:space-between; align-items:center; margin:4px 0; }
+.hud-row .lbl { font-size:9px; color:rgba(255,255,255,0.3); letter-spacing:1px; }
+.hud-row .val { font-size:12px; font-weight:700; }
+
+.footer-hud { margin-top:auto; text-align:center; font-size:8px; color:rgba(255,255,255,0.1); letter-spacing:1px; padding-top:12px; }
+
+/* Loading */
+.loading-overlay {
+  position:fixed; inset:0; background:#0a0a0f; z-index:999;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.loading-text { font-size:13px; color:rgba(255,255,255,0.4); letter-spacing:3px; }
+.pulse-ring {
+  width:50px; height:50px; border-radius:50%; margin-top:24px;
+  border:2px solid rgba(0,230,118,0.3); animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+.hidden { display:none!important; }
+
+/* Glow keyframes for live price */
+@keyframes glowGreen { 0%,100%{text-shadow:0 0 8px rgba(0,230,118,0.4)} 50%{text-shadow:0 0 20px rgba(0,230,118,0.7)} }
+@keyframes glowRed { 0%,100%{text-shadow:0 0 8px rgba(255,23,68,0.4)} 50%{text-shadow:0 0 20px rgba(255,23,68,0.7)} }
+.glow-green { animation:glowGreen 2s ease-in-out infinite; }
+.glow-red { animation:glowRed 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay" class="loading-overlay">
+  <div class="loading-text">LOADING BITCOIN RINGS<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" class="container hidden">
+  <!-- LEFT: Canvas -->
+  <div class="left-panel">
+    <div class="canvas-header">
+      <h1>BITCOIN RINGS</h1>
+      <div class="sub">BLOOD ZONE · ATH · GOLDEN ZONE · LIVE PRICE · DUAL MOMENTUM</div>
+    </div>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- RIGHT: HUD -->
+  <div class="right-panel">
+
+    <div class="hud-section">
+      <div class="hud-label">EXPECTED EXPANSION (NEXT CYCLE TOP)</div>
+      <div class="hud-value" id="projHigh" style="color:#FFD700;">—</div>
+      <div class="hud-sub" id="projHighRange"></div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-label">CURRENT CYCLE ALL-TIME HIGH</div>
+      <div class="hud-value sm" id="athValue" style="color:#FFD700;">—</div>
+      <div class="hud-sub" id="athDate"></div>
+    </div>
+
+    <div class="hud-section" style="border-color:rgba(255,255,255,0.12);">
+      <div class="hud-label">LIVE PRICE (BINANCE)</div>
+      <div class="hud-value" id="livePrice" style="font-size:28px;">—</div>
+      <div class="hud-sub" id="livePriceSub"></div>
+      <div id="regimeBadge" class="regime-badge regime-expansion" style="margin-top:10px;">
+        <span class="dot"></span><span id="regimeText">—</span>
+      </div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-label">21-WEEK EMA</div>
+      <div class="hud-value sm" id="ema21w" style="color:#4FC3F7;">—</div>
+      <div class="hud-sub" id="ema21wSub"></div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-label">EXPECTED CONTRACTION (CYCLE BOTTOM)</div>
+      <div class="hud-value sm" id="projLow" style="color:#FF1744;">—</div>
+      <div class="hud-sub" id="projLowRange"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="hud-section">
+      <div class="hud-label">DUAL MOMENTUM</div>
+      <div class="hud-row"><span class="lbl">ROC 20D</span><span class="val" id="roc20">—</span></div>
+      <div class="hud-row"><span class="lbl">ROC 60D</span><span class="val" id="roc60">—</span></div>
+      <div class="hud-row"><span class="lbl">SIGNAL</span><span class="val" id="momSignal">—</span></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="hud-section">
+      <div class="hud-label">TOTAL CRYPTO MARKET CAP</div>
+      <div class="hud-value sm" id="totalMcap" style="color:#4FC3F7;">—</div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-label">BTC DOMINANCE</div>
+      <div class="hud-value sm" id="btcDom" style="color:#FFD700;">—</div>
+    </div>
+
+    <div class="footer-hud">BITCOIN RINGS · LIVE · CYCLE GEOMETRY HUD</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ── CONSTANTS ── */
+  const GREEN  = '#00E676';
+  const RED    = '#FF1744';
+  const GOLD   = '#FFD700';
+  const BLUE   = '#4FC3F7';
+  const BG     = '#0a0a0f';
+
+  /* ── STATE ── */
+  let S = {
+    closes: [],           // daily closes for momentum
+    ath: 0,
+    athDate: '',
+    ema21w: 0,
+    livePrice: 0,
+    displayPrice: 0,      // for smooth interpolation
+    projLow: [0,0],
+    projHigh: [0,0],
+    roc20: 0,
+    roc60: 0,
+    momentum: 0,          // +1 bull, -1 bear
+    momConfirmDays: 0,
+    totalMcap: 0,
+    btcDom: 0,
+    wsConnected: false,
+    ready: false,
+    lastWsTick: 0,
+  };
+
+  /* ── DOM ── */
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+
+  /* ── LOADING DOTS ── */
+  let dotCount = 0;
+  const dotTimer = setInterval(()=>{
+    dotCount = (dotCount+1) % 4;
+    const d = $('dots');
+    if(d) d.textContent = '.'.repeat(dotCount);
+  }, 400);
+
+  /* ── HELPERS ── */
+  function fmt(n, dec=0) {
+    if(!n || isNaN(n)) return '—';
+    return '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:dec, maximumFractionDigits:dec});
+  }
+  function fmtPct(n, dec=1) {
+    if(isNaN(n)) return '—';
+    const s = (n>=0?'+':'') + n.toFixed(dec) + '%';
+    return s;
+  }
+  function fmtMcap(n) {
+    if(!n) return '—';
+    if(n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+    if(n >= 1e9) return '$' + (n/1e9).toFixed(1) + 'B';
+    return '$' + (n/1e6).toFixed(0) + 'M';
+  }
+
+  /* ── DATA FETCHING (TRIPLE FALLBACK) ── */
+  async function fetchJSON(url, timeout=12000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>ctrl.abort(), timeout);
+    try {
+      const r = await fetch(url, {signal:ctrl.signal});
+      clearTimeout(t);
+      if(!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch(e) { clearTimeout(t); throw e; }
+  }
+
+  async function fetchHistoricalCoinGecko() {
+    const d = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily');
+    return d.prices.map(p => ({t: p[0], c: p[1]}));
+  }
+
+  async function fetchHistoricalBinance() {
+    const d = await fetchJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200');
+    return d.map(k => ({t: Number(k[0]), c: Number(k[4])}));
+  }
+
+  async function fetchHistoricalCryptoCompare() {
+    const d = await fetchJSON('https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=200');
+    return d.Data.Data.map(p => ({t: p.time*1000, c: p.close}));
+  }
+
+  async function getHistorical() {
+    const sources = [fetchHistoricalCoinGecko, fetchHistoricalBinance, fetchHistoricalCryptoCompare];
+    for(const fn of sources) {
+      try { const d = await fn(); if(d && d.length > 50) return d; } catch(e) { console.warn('Source failed:', e.message); }
+    }
+    throw new Error('All historical sources failed');
+  }
+
+  /* ── FETCH ATH ── */
+  async function fetchATH() {
+    try {
+      const d = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false');
+      return { ath: d.market_data.ath.usd, date: d.market_data.ath_date.usd };
+    } catch(e) {
+      // Fallback: compute from historical
+      return null;
+    }
+  }
+
+  /* ── FETCH GLOBAL MARKET DATA ── */
+  async function fetchGlobal() {
+    try {
+      const d = await fetchJSON('https://api.coingecko.com/api/v3/global');
+      S.totalMcap = d.data.total_market_cap.usd;
+      S.btcDom = d.data.market_cap_percentage.btc;
+      updateHUD();
+    } catch(e) { console.warn('Global fetch failed:', e.message); }
+  }
+
+  /* ── COMPUTE ANALYTICS ── */
+  function compute(hist) {
+    const closes = hist.map(h => h.c);
+    S.closes = closes;
+
+    // ATH from data (may be overridden by API)
+    if(!S.ath) {
+      S.ath = Math.max(...closes);
+      const idx = closes.indexOf(S.ath);
+      S.athDate = new Date(hist[idx].t).toISOString().slice(0,10);
+    }
+
+    // Projections
+    S.projLow  = [S.ath * 0.20, S.ath * 0.30];
+    S.projHigh = [S.ath * 1.50, S.ath * 2.50];
+
+    // 21W EMA ≈ 147-day EMA, seed with 147-day SMA
+    const emaLen = 147;
+    if(closes.length >= emaLen) {
+      let sma = 0;
+      for(let i=0;i<emaLen;i++) sma += closes[i];
+      sma /= emaLen;
+      const k = 2/(emaLen+1);
+      let ema = sma;
+      for(let i=emaLen;i<closes.length;i++) {
+        ema = closes[i]*k + ema*(1-k);
+      }
+      S.ema21w = ema;
+    }
+
+    // ROC
+    const n = closes.length;
+    if(n > 60) {
+      S.roc20 = ((closes[n-1]/closes[n-21])-1)*100;
+      S.roc60 = ((closes[n-1]/closes[n-61])-1)*100;
+    }
+
+    // Dual momentum: both ROC positive for 5 consecutive days => bull
+    computeDualMomentum(closes);
+  }
+
+  function computeDualMomentum(closes) {
+    const n = closes.length;
+    if(n < 66) { S.momentum = 0; return; }
+    let bullDays = 0;
+    let bearDays = 0;
+    for(let d=0; d<5; d++) {
+      const idx = n-1-d;
+      const r20 = ((closes[idx]/closes[idx-20])-1)*100;
+      const r60 = ((closes[idx]/closes[idx-60])-1)*100;
+      if(r20 > 0 && r60 > 0) bullDays++;
+      if(r20 < 0 && r60 < 0) bearDays++;
+    }
+    if(bullDays >= 5) S.momentum = 1;
+    else if(bearDays >= 5) S.momentum = -1;
+    else S.momentum = 0; // mixed
+  }
+
+  /* ── WEBSOCKET ── */
+  let ws = null;
+  let wsRetryDelay = 1000;
+  let pollingTimer = null;
+
+  function connectWS() {
+    try {
+      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+      ws.onopen = () => {
+        S.wsConnected = true;
+        wsRetryDelay = 1000;
+        if(pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+        console.log('WS connected');
+      };
+      ws.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          S.livePrice = parseFloat(d.p);
+          S.lastWsTick = Date.now();
+          updateHUD();
+        } catch(err) {}
+      };
+      ws.onclose = () => {
+        S.wsConnected = false;
+        console.warn('WS closed, retrying in', wsRetryDelay);
+        setTimeout(connectWS, wsRetryDelay);
+        wsRetryDelay = Math.min(wsRetryDelay*2, 30000);
+        startPollingFallback();
+      };
+      ws.onerror = () => { ws.close(); };
+    } catch(e) {
+      startPollingFallback();
+    }
+  }
+
+  function startPollingFallback() {
+    if(pollingTimer) return;
+    pollingTimer = setInterval(async ()=>{
+      try {
+        const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000);
+        S.livePrice = parseFloat(d.price);
+        S.lastWsTick = Date.now();
+        updateHUD();
+      } catch(e) {}
+    }, 3000);
+  }
+
+  /* ── HUD UPDATE ── */
+  function updateHUD() {
+    // Regime
+    const regime = S.livePrice >= S.ema21w ? 'EXPANSION' : 'CONTRACTION';
+    const isExpansion = regime === 'EXPANSION';
+    const priceColor = isExpansion ? GREEN : RED;
+
+    // Live price
+    const lp = $('livePrice');
+    lp.textContent = fmt(S.livePrice, 2);
+    lp.style.color = priceColor;
+    lp.className = 'hud-value ' + (isExpansion ? 'glow-green' : 'glow-red');
+
+    // Distance from ATH
+    if(S.ath && S.livePrice) {
+      const pctFromATH = ((S.livePrice / S.ath) - 1) * 100;
+      $('livePriceSub').textContent = fmtPct(pctFromATH) + ' from ATH';
+    }
+
+    // Regime badge
+    const rb = $('regimeBadge');
+    rb.className = 'regime-badge ' + (isExpansion ? 'regime-expansion' : 'regime-contraction');
+    $('regimeText').textContent = regime;
+
+    // ATH
+    $('athValue').textContent = fmt(S.ath, 0);
+    if(S.athDate) $('athDate').textContent = 'Set: ' + S.athDate.slice(0,10);
+
+    // 21W EMA
+    $('ema21w').textContent = fmt(S.ema21w, 0);
+    if(S.livePrice && S.ema21w) {
+      const d = ((S.livePrice / S.ema21w)-1)*100;
+      $('ema21wSub').textContent = fmtPct(d,1) + ' from 21W EMA';
+    }
+
+    // Projections
+    $('projHigh').textContent = fmt(S.projHigh[0],0) + ' — ' + fmt(S.projHigh[1],0);
+    $('projHighRange').textContent = '1.5x — 2.5x ATH';
+    $('projLow').textContent = fmt(S.projLow[0],0) + ' — ' + fmt(S.projLow[1],0);
+    $('projLowRange').textContent = '-70% to -80% from ATH';
+
+    // Dual Momentum
+    const r20el = $('roc20'); const r60el = $('roc60');
+    r20el.textContent = fmtPct(S.roc20,2);
+    r20el.style.color = S.roc20 >= 0 ? GREEN : RED;
+    r60el.textContent = fmtPct(S.roc60,2);
+    r60el.style.color = S.roc60 >= 0 ? GREEN : RED;
+    const sigEl = $('momSignal');
+    if(S.momentum === 1) { sigEl.textContent = 'BULLISH'; sigEl.style.color = GREEN; }
+    else if(S.momentum === -1) { sigEl.textContent = 'BEARISH'; sigEl.style.color = RED; }
+    else { sigEl.textContent = 'MIXED'; sigEl.style.color = '#aaa'; }
+
+    // Global
+    $('totalMcap').textContent = fmtMcap(S.totalMcap);
+    $('btcDom').textContent = S.btcDom ? S.btcDom.toFixed(1) + '%' : '—';
+  }
+
+  /* ── CANVAS RING VISUALIZATION ── */
+  function resizeCanvas() {
+    const lp = document.querySelector('.left-panel');
+    const w = lp.clientWidth - 32;
+    const maxH = window.innerHeight - 100;
+    const sz = Math.min(w, maxH, 720);
+    canvas.width = sz;
+    canvas.height = sz;
+  }
+
+  function logMap(price, minP, maxP, minR, maxR) {
+    // Map price to radius using log scale
+    if(price <= 0 || minP <= 0) return minR;
+    const logMin = Math.log(minP);
+    const logMax = Math.log(maxP);
+    const logP = Math.log(Math.max(price, minP));
+    const t = (logP - logMin) / (logMax - logMin);
+    return minR + t * (maxR - minR);
+  }
+
+  function drawRings() {
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w/2, cy = h/2;
+    const maxR = Math.min(cx,cy) - 30;
+    const minR = 50;
+
+    ctx.clearRect(0,0,w,h);
+
+    // Background
+    ctx.fillStyle = BG;
+    ctx.fillRect(0,0,w,h);
+
+    if(!S.ready) return;
+
+    // Price range for log mapping
+    const pMin = S.projLow[0] * 0.7;
+    const pMax = S.projHigh[1] * 1.2;
+
+    // Radii
+    const rBloodInner = logMap(S.projLow[0], pMin, pMax, minR, maxR);
+    const rBloodOuter = logMap(S.projLow[1], pMin, pMax, minR, maxR);
+    const rATH        = logMap(S.ath, pMin, pMax, minR, maxR);
+    const rGoldInner  = logMap(S.projHigh[0], pMin, pMax, minR, maxR);
+    const rGoldOuter  = logMap(S.projHigh[1], pMin, pMax, minR, maxR);
+
+    // Smooth interpolation for live price ring
+    const targetR = logMap(S.livePrice || S.ath, pMin, pMax, minR, maxR);
+    if(!S._animR) S._animR = targetR;
+    S._animR += (targetR - S._animR) * 0.08;
+    const rLive = S._animR;
+
+    // ── Blood Zone (red) ──
+    drawZoneRing(cx, cy, rBloodInner, rBloodOuter, 'rgba(255,23,68,0.08)', 'rgba(255,23,68,0.35)', 'rgba(255,23,68,0.6)');
+
+    // ── Golden Zone (gold) ──
+    drawZoneRing(cx, cy, rGoldInner, rGoldOuter, 'rgba(255,215,0,0.06)', 'rgba(255,215,0,0.3)', 'rgba(255,215,0,0.5)');
+
+    // ── ATH Ring (white/silver) ──
+    ctx.beginPath();
+    ctx.arc(cx, cy, rATH, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ATH label
+    drawLabel(cx, cy - rATH - 10, 'ATH ' + fmt(S.ath,0), 'rgba(255,255,255,0.6)', 9);
+
+    // ── 21W EMA Ring ──
+    if(S.ema21w) {
+      const rEma = logMap(S.ema21w, pMin, pMax, minR, maxR);
+      ctx.beginPath();
+      ctx.arc(cx, cy, rEma, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(79,195,247,0.35)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3,5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      drawLabel(cx + rEma * 0.6, cy - rEma * 0.75, '21W EMA', 'rgba(79,195,247,0.5)', 8);
+    }
+
+    // ── Live Price Ring (bold, glowing) ──
+    const isExpansion = S.livePrice >= S.ema21w;
+    const liveColor = isExpansion ? GREEN : RED;
+
+    // Glow
+    ctx.beginPath();
+    ctx.arc(cx, cy, rLive, 0, Math.PI*2);
+    ctx.strokeStyle = liveColor;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = liveColor;
+    ctx.shadowBlur = 18;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Second pass for crispness
+    ctx.beginPath();
+    ctx.arc(cx, cy, rLive, 0, Math.PI*2);
+    ctx.strokeStyle = liveColor;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Live price label
+    drawLabel(cx, cy + rLive + 16, fmt(S.livePrice,0), liveColor, 11, true);
+
+    // ── Pull Lines between zones ──
+    // ATH to Live
+    drawPullLine(cx, cy, rATH, rLive, Math.PI * -0.25, 'rgba(255,255,255,0.12)');
+    if(S.livePrice && S.ath) {
+      const pct = ((S.livePrice/S.ath)-1)*100;
+      const midR = (rATH + rLive)/2;
+      const ang = Math.PI * -0.25;
+      drawLabel(cx + Math.cos(ang)*midR + 20, cy + Math.sin(ang)*midR, fmtPct(pct,1), 'rgba(255,255,255,0.35)', 8);
+    }
+
+    // Live to Blood zone
+    drawPullLine(cx, cy, rLive, (rBloodInner+rBloodOuter)/2, Math.PI * 0.75, 'rgba(255,23,68,0.15)');
+    if(S.livePrice && S.projLow[0]) {
+      const midTarget = (S.projLow[0]+S.projLow[1])/2;
+      const pct = ((midTarget/S.livePrice)-1)*100;
+      const midR2 = (rLive + (rBloodInner+rBloodOuter)/2)/2;
+      const ang2 = Math.PI * 0.75;
+      drawLabel(cx + Math.cos(ang2)*midR2 - 20, cy + Math.sin(ang2)*midR2, fmtPct(pct,0)+' to blood', 'rgba(255,23,68,0.45)', 8);
+    }
+
+    // Live to Golden zone
+    drawPullLine(cx, cy, rLive, (rGoldInner+rGoldOuter)/2, Math.PI * -0.7, 'rgba(255,215,0,0.15)');
+    if(S.livePrice && S.projHigh[0]) {
+      const midTarget = (S.projHigh[0]+S.projHigh[1])/2;
+      const pct = ((midTarget/S.livePrice)-1)*100;
+      const midR3 = (rLive + (rGoldInner+rGoldOuter)/2)/2;
+      const ang3 = Math.PI * -0.7;
+      drawLabel(cx + Math.cos(ang3)*midR3 + 25, cy + Math.sin(ang3)*midR3, fmtPct(pct,0)+' to gold', 'rgba(255,215,0,0.5)', 8);
+    }
+
+    // ── Zone labels ──
+    drawLabel(cx, cy + rBloodInner - 5, 'BLOOD ZONE', 'rgba(255,23,68,0.6)', 8);
+    drawLabel(cx, cy - rGoldOuter + 12, 'GOLDEN ZONE', 'rgba(255,215,0,0.55)', 8);
+    drawLabel(cx, cy + (rBloodInner+rBloodOuter)/2, fmt(S.projLow[0],0)+' — '+fmt(S.projLow[1],0), 'rgba(255,23,68,0.4)', 7);
+    drawLabel(cx, cy - (rGoldInner+rGoldOuter)/2, fmt(S.projHigh[0],0)+' — '+fmt(S.projHigh[1],0), 'rgba(255,215,0,0.35)', 7);
+
+    // ── Center text ──
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillText('BUY THE BLOOD', cx, cy - 8);
+    ctx.fillText('SELL THE GOLD', cx, cy + 8);
+
+    // Momentum indicator at center bottom
+    ctx.font = '8px monospace';
+    const momText = S.momentum===1 ? '▲ DUAL MOM: BULLISH' : S.momentum===-1 ? '▼ DUAL MOM: BEARISH' : '◆ DUAL MOM: MIXED';
+    const momCol = S.momentum===1 ? GREEN : S.momentum===-1 ? RED : '#888';
+    ctx.fillStyle = momCol;
+    ctx.globalAlpha = 0.5;
+    ctx.fillText(momText, cx, cy + 26);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawZoneRing(cx, cy, rInner, rOuter, fillColor, strokeInner, strokeOuter) {
+    // Fill the annulus
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOuter, 0, Math.PI*2);
+    ctx.arc(cx, cy, rInner, 0, Math.PI*2, true);
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+
+    // Inner circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, rInner, 0, Math.PI*2);
+    ctx.strokeStyle = strokeInner;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Outer circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOuter, 0, Math.PI*2);
+    ctx.strokeStyle = strokeOuter;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  function drawPullLine(cx, cy, r1, r2, angle, color) {
+    const x1 = cx + Math.cos(angle)*r1;
+    const y1 = cy + Math.sin(angle)*r1;
+    const x2 = cx + Math.cos(angle)*r2;
+    const y2 = cy + Math.sin(angle)*r2;
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2,3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawLabel(x, y, text, color, size, bold) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = (bold?'bold ':'') + size + 'px monospace';
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  /* ── ANIMATION LOOP ── */
+  function animate() {
+    drawRings();
+    requestAnimationFrame(animate);
+  }
+
+  /* ── INIT ── */
+  async function init() {
+    try {
+      // Fetch historical + ATH in parallel
+      const [hist, athData] = await Promise.all([
+        getHistorical(),
+        fetchATH()
+      ]);
+
+      if(athData) {
+        S.ath = athData.ath;
+        S.athDate = athData.date;
+      }
+
+      compute(hist);
+
+      // If live price not yet set, use last close
+      if(!S.livePrice) {
+        S.livePrice = hist[hist.length-1].c;
+        S.displayPrice = S.livePrice;
+      }
+
+      // Update ATH if current price exceeds it
+      if(S.livePrice > S.ath) {
+        S.ath = S.livePrice;
+        S.athDate = new Date().toISOString().slice(0,10);
+        S.projLow  = [S.ath * 0.20, S.ath * 0.30];
+        S.projHigh = [S.ath * 1.50, S.ath * 2.50];
+      }
+
+      S.ready = true;
+
+      // Show app
+      $('loadingOverlay').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      clearInterval(dotTimer);
+
+      resizeCanvas();
+      updateHUD();
+      animate();
+
+      // Start WebSocket
+      connectWS();
+
+      // Fetch global data
+      fetchGlobal();
+      setInterval(fetchGlobal, 60000);
+
+      // Handle resize
+      window.addEventListener('resize', resizeCanvas);
+
+    } catch(e) {
+      console.error('Init failed:', e);
+      $('dots').textContent = '';
+      document.querySelector('.loading-text').textContent = 'ERROR: ' + e.message;
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
