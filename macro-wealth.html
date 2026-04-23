@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Macro Rings — Wealth Physics</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #050508; color: #fff;
+    font-family: 'SF Mono','Fira Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; overflow: hidden;
+  }
+  h1 { font-size: 20px; letter-spacing: 10px; font-weight: 700; color: #fff; text-align: center; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 4px; margin-top: 6px; text-align: center; }
+
+  #ui-layer {
+    position: absolute; top: 30px; left: 0; width: 100%; z-index: 10;
+    pointer-events: none;
+  }
+
+  canvas {
+    cursor: ew-resize;
+  }
+
+  .hud {
+    position: absolute; width: 100%; bottom: 40px; left: 0;
+    text-align: center; pointer-events: none;
+  }
+  .hud-data { font-size: 12px; color: rgba(255,255,255,0.6); letter-spacing: 2px; }
+  .hud-price { font-size: 32px; font-weight: bold; margin: 10px 0; letter-spacing: 2px; }
+  .regime-badge {
+    display: inline-block; padding: 6px 16px; border-radius: 4px;
+    font-size: 10px; letter-spacing: 3px; font-weight: bold;
+    background: rgba(255,255,255,0.05);
+  }
+
+  #loading {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 12px; letter-spacing: 4px; color: #00E676;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+  .timeline-container {
+    position: absolute; bottom: 0; left: 0; width: 100%; height: 6px;
+    background: rgba(255,255,255,0.05);
+  }
+  .timeline-fill {
+    height: 100%; background: #fff; width: 0%; transition: width 0.1s linear;
+  }
+</style>
+</head>
+<body>
+
+<div id="ui-layer">
+  <h1>THE MACRO RINGS</h1>
+  <div class="subtitle">ALL-TIME GEOMETRY · 20W/60W REGIME</div>
+</div>
+
+<div id="loading">FETCHING HISTORY...</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="hud" id="hud" style="display:none;">
+  <div class="hud-data" id="hudDate">OCTOBER 2021</div>
+  <div class="hud-price" id="hudPrice">$60,000</div>
+  <div class="regime-badge" id="hudRegime">MACRO BULL (EXPANSION)</div>
+  <div class="hud-data" style="margin-top:10px; font-size: 9px; opacity: 0.5;">
+    SCRUB MOUSE LEFT/RIGHT TO TRAVEL TIME
+  </div>
+</div>
+
+<div class="timeline-container"><div class="timeline-fill" id="timeline"></div></div>
+
+<script>
+const GREEN = "#00E676";
+const RED = "#FF1744";
+const GOLD = "#FFD700";
+
+let rawData = [];
+let analyzedData = [];
+let currentIndex = 0;
+let isHovering = false;
+let isPlaying = false;
+
+const MIN_LOG_PRICE = 0.1;
+const MAX_LOG_PRICE = 250000;
+
+function getRadius(price, maxRadius) {
+  if (price < MIN_LOG_PRICE) return 0;
+  if (price > MAX_LOG_PRICE) return maxRadius;
+  const logMin = Math.log10(MIN_LOG_PRICE);
+  const logMax = Math.log10(MAX_LOG_PRICE);
+  const logPrice = Math.log10(price);
+  return ((logPrice - logMin) / (logMax - logMin)) * maxRadius;
+}
+
+function prepareData(data) {
+  const result = [];
+  let currentATH = 0;
+  const W20_DAYS = 140;
+  const W60_DAYS = 420;
+
+  for (let i = 0; i < data.length; i++) {
+    const p = data[i].price;
+    if (p > currentATH) currentATH = p;
+
+    let sma20w = p;
+    let sma60w = p;
+
+    if (i >= W20_DAYS) {
+      let sum = 0;
+      for (let j = 0; j < W20_DAYS; j++) sum += data[i - j].price;
+      sma20w = sum / W20_DAYS;
+    }
+
+    if (i >= W60_DAYS) {
+      let sum = 0;
+      for (let j = 0; j < W60_DAYS; j++) sum += data[i - j].price;
+      sma60w = sum / W60_DAYS;
+    }
+
+    let regimeState = "ACCUMULATION";
+    let color = GREEN;
+
+    if (i >= W60_DAYS) {
+      if (sma20w > sma60w) {
+        regimeState = "BULL FLOW (EXPANSION)";
+        color = GREEN;
+      } else {
+        regimeState = "BEAR WINTER (CONTRACTION)";
+        color = RED;
+      }
+    }
+
+    result.push({
+      date: data[i].date,
+      price: p,
+      ath: currentATH,
+      sma20w: sma20w,
+      sma60w: sma60w,
+      regime: regimeState,
+      color: color,
+      isMonthClose: i % 30 === 0
+    });
+  }
+  return result;
+}
+
+async function fetchData() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    const j = await r.json();
+    const d = j.prices.map(([ts, p]) => ({ date: new Date(ts), price: p }));
+    const clean = d.filter(x => x.price > 0.05);
+
+    analyzedData = prepareData(clean);
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("hud").style.display = "block";
+
+    currentIndex = Math.floor(analyzedData.length * 0.2);
+    isPlaying = true;
+    requestAnimationFrame(renderLoop);
+  } catch (e) {
+    document.getElementById("loading").innerText = "DATA FETCH FAILED";
+    console.error(e);
+  }
+}
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d", { alpha: false });
+
+function drawFrame() {
+  const size = Math.min(window.innerWidth, window.innerHeight - 150);
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2 - 30;
+  const maxR = size / 2;
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  ctx.fillStyle = "#050508";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.03)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy); ctx.stroke();
+
+  if (!analyzedData.length) return;
+  const currentData = analyzedData[currentIndex];
+
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= currentIndex; i++) {
+    if (analyzedData[i].isMonthClose) {
+      const r = getRadius(analyzedData[i].price, maxR);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.02)";
+      ctx.stroke();
+    }
+  }
+
+  const athR = getRadius(currentData.ath, maxR);
+  ctx.beginPath();
+  ctx.arc(cx, cy, athR, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255, 215, 0, 0.3)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 10]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "rgba(255, 215, 0, 0.5)";
+  ctx.textAlign = "center";
+  ctx.fillText(`ATH WATERMARK: $${currentData.ath.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, cx, cy - athR - 8);
+
+  const futureR = getRadius(MAX_LOG_PRICE, maxR);
+  ctx.beginPath();
+  ctx.arc(cx, cy, futureR, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillText("FUTURE CYCLE TARGET: $250,000", cx, cy - futureR - 8);
+
+  const activeR = getRadius(currentData.price, maxR);
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, activeR, 0, Math.PI * 2);
+  ctx.strokeStyle = currentData.color;
+  ctx.lineWidth = 10;
+  ctx.globalAlpha = 0.15;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, activeR, 0, Math.PI * 2);
+  ctx.strokeStyle = currentData.color;
+  ctx.lineWidth = 3;
+  ctx.globalAlpha = 1.0;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy - activeR, 5, 0, Math.PI * 2);
+  ctx.fillStyle = currentData.color;
+  ctx.fill();
+
+  document.getElementById("hudDate").innerText = currentData.date.toISOString().split('T')[0];
+  document.getElementById("hudPrice").innerText = `$${currentData.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  const regimeEl = document.getElementById("hudRegime");
+  regimeEl.innerText = currentData.regime;
+  regimeEl.style.color = currentData.color;
+  regimeEl.style.border = `1px solid ${currentData.color}`;
+
+  document.getElementById("timeline").style.width = `${(currentIndex / analyzedData.length) * 100}%`;
+}
+
+function renderLoop(time) {
+  if (isPlaying && !isHovering) {
+    currentIndex += 2;
+    if (currentIndex >= analyzedData.length - 1) {
+      currentIndex = analyzedData.length - 1;
+      isPlaying = false;
+    }
+  }
+  drawFrame();
+  requestAnimationFrame(renderLoop);
+}
+
+window.addEventListener("mousemove", (e) => {
+  if (!analyzedData.length) return;
+  if (e.clientY > 100) {
+    isHovering = true;
+    const percent = Math.max(0, Math.min(1, e.clientX / window.innerWidth));
+    currentIndex = Math.floor(percent * (analyzedData.length - 1));
+  } else {
+    isHovering = false;
+  }
+});
+
+window.addEventListener("mouseleave", () => {
+  isHovering = false;
+  isPlaying = true;
+});
+
+window.addEventListener("resize", drawFrame);
+
+fetchData();
+</script>
+</body>
+</html>
