@@ -93,6 +93,35 @@
   .scout-grid-6 { grid-template-columns: 32px 1fr 65px 65px 65px 70px; }
 
   .footer { margin-top: 20px; font-size: 9px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; padding-bottom: 20px; }
+
+  /* Qualification panel */
+  .row { cursor: pointer; }
+  .qualify-panel {
+    padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: rgba(0,0,0,0.3); animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .qual-loading { text-align: center; padding: 20px; font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 2px; }
+  .qual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .score-row { display: flex; align-items: center; gap: 8px; }
+  .score-label { font-size: 9px; letter-spacing: 2px; font-weight: 700; width: 72px; flex-shrink: 0; }
+  .score-bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .score-val { font-size: 10px; font-weight: 700; width: 28px; text-align: right; flex-shrink: 0; }
+  .score-detail { font-size: 8px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+  .qual-grade {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 6px 14px; border-radius: 6px; margin-bottom: 10px;
+  }
+  .grade-letter { font-size: 22px; font-weight: 900; letter-spacing: 2px; }
+  .grade-verdict { font-size: 9px; letter-spacing: 1px; color: rgba(255,255,255,0.5); }
+  .qual-narratives { margin: 8px 0; }
+  .qual-narratives .tag { margin: 2px 3px 2px 0; }
+  .qual-links { font-size: 9px; color: rgba(255,255,255,0.25); margin-top: 8px; }
+  .qual-links a { color: #4FC3F7; text-decoration: none; }
+  .qual-links a:hover { text-decoration: underline; }
+  .qual-desc { font-size: 9px; color: rgba(255,255,255,0.3); line-height: 1.6; margin-top: 8px; max-height: 60px; overflow: hidden; }
+  .qual-hint { font-size: 8px; color: rgba(255,255,255,0.12); letter-spacing: 1px; text-align: center; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -116,7 +145,8 @@
     <strong>Near ATL</strong> — still close to all-time low. The move hasn't happened yet. Early.<br>
     <strong>Fresh</strong> — ATL date is recent (last 12 months). This is a newer project, not a dead coin from 2018.<br>
     <strong>Volume</strong> — trading activity is high relative to market cap. Money is arriving.<br><br>
-    A coin that hits all three is <em>quietly accumulating</em>. That's the signal you want. The 100x happens after this phase, not during the trending phase.
+    A coin that hits all three is <em>quietly accumulating</em>. That's the signal you want. The 100x happens after this phase, not during the trending phase.<br><br>
+    <strong>Tap any coin to QUALIFY it</strong> — fetches deep data and scores across four dimensions: <em>Builder</em> (GitHub activity), <em>Community</em> (social following), <em>Narrative</em> (hot categories), and <em>Legitimacy</em> (website, description, sentiment). Grades A through D. Separates real projects from noise.
   </div>
 
   <div id="early-section" class="section" style="display:none;">
@@ -149,7 +179,7 @@
   </div>
 </div>
 
-<div class="footer">THE 100x HAPPENS IN SILENCE · VOLUME WHISPERS BEFORE PRICE SCREAMS · FIND THEM EARLY</div>
+<div class="footer">VOLUME ARRIVES BEFORE PRICE MOVES · THE EDGE IS ASYMMETRY · FIND THE COILED SPRING</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -335,6 +365,8 @@ function renderEarlyBirds(birds) {
   birds.forEach((b, i) => {
     const row = document.createElement("div");
     row.className = "row scout-grid-6 early-bird";
+    row.dataset.coinId = b.id;
+    row.addEventListener('click', handleRowClick);
     const tags = [];
     if (b.veryNearAtl) tags.push('<span class="tag tag-new">VERY EARLY</span>');
     if (b.veryFresh) tags.push('<span class="tag tag-fresh">NEW PROJECT</span>');
@@ -353,6 +385,11 @@ function renderEarlyBirds(birds) {
     `;
     container.appendChild(row);
   });
+  // Hint below early birds
+  const hint = document.createElement('div');
+  hint.className = 'qual-hint';
+  hint.textContent = 'TAP TO QUALIFY + EDGE — IS IT REAL? IS IT BEING ACCUMULATED?';
+  container.appendChild(hint);
 
   document.getElementById("early-section").style.display = "block";
 }
@@ -365,6 +402,8 @@ function renderNearAtl(coins) {
   coins.slice(0, 10).forEach((c, i) => {
     const row = document.createElement("div");
     row.className = "row scout-grid-6";
+    row.dataset.coinId = c.id;
+    row.addEventListener('click', handleRowClick);
     const freshTag = c.fresh ? '<span class="tag tag-fresh">FRESH</span>' : '';
 
     row.innerHTML = `
@@ -392,6 +431,8 @@ function renderVolume(coins) {
   coins.slice(0, 10).forEach((c, i) => {
     const row = document.createElement("div");
     row.className = "row scout-grid-6";
+    row.dataset.coinId = c.id;
+    row.addEventListener('click', handleRowClick);
 
     row.innerHTML = `
       <div class="rank">${i + 1}</div>
@@ -433,6 +474,437 @@ function renderCategories(cats) {
   });
 
   document.getElementById("cat-section").style.display = "block";
+}
+
+// ═══════════════════════════════════════════════
+// THE JUDGE — QUALIFICATION ENGINE
+// ═══════════════════════════════════════════════
+// Click any coin → fetch deep data → score across 4 dimensions:
+//  1. BUILDER: GitHub commits, stars, forks, PRs — is anyone building?
+//  2. COMMUNITY: Twitter, Reddit, Telegram — does anyone care?
+//  3. NARRATIVE: Is it in a hot category (AI, DePIN, RWA, L2)?
+//  4. LEGITIMACY: Website, GitHub repo, description, sentiment
+//
+// Grade A-D. Separates real projects from dead coins with pump volume.
+// ═══════════════════════════════════════════════
+
+const HOT_NARRATIVES = [
+  'artificial intelligence', 'ai', 'machine learning',
+  'depin', 'decentralized physical infrastructure',
+  'real world assets', 'rwa', 'tokenized',
+  'layer 2', 'l2', 'rollup', 'optimistic', 'zk-rollup',
+  'gaming', 'gamefi', 'play-to-earn', 'metaverse',
+  'zero knowledge', 'zk',
+  'defi', 'decentralized finance', 'lending', 'dex',
+  'infrastructure', 'oracle', 'interoperability', 'bridge',
+  'social', 'socialfi',
+  'liquid staking', 'restaking',
+  'modular', 'data availability',
+  'privacy', 'meme'
+];
+
+const qualCache = {};
+
+async function fetchCoinDetail(coinId) {
+  if (qualCache[coinId]) return qualCache[coinId];
+  const url = `https://api.coingecko.com/api/v3/coins/${coinId}?localization=false&tickers=false&market_data=false&community_data=true&developer_data=true`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status}`);
+  const data = await res.json();
+  qualCache[coinId] = data;
+  return data;
+}
+
+function scoreQualification(data) {
+  const dev = data.developer_data || {};
+  const com = data.community_data || {};
+
+  // BUILDER (0-100)
+  const commits = dev.commit_count_4_weeks || 0;
+  const stars = dev.stars || 0;
+  const forks = dev.forks || 0;
+  const prs = dev.pull_requests_merged || 0;
+  const totalIssues = dev.total_issues || 0;
+  const closedIssues = dev.closed_issues || 0;
+  const issueCloseRate = totalIssues > 0 ? closedIssues / totalIssues : 0;
+
+  let builderScore = 0;
+  builderScore += Math.min(commits * 4, 30);       // 30 for 8+ commits/4w
+  builderScore += Math.min(stars / 8, 25);          // 25 for 200+ stars
+  builderScore += Math.min(forks / 4, 15);          // 15 for 60+ forks
+  builderScore += Math.min(prs / 3, 15);            // 15 for 45+ PRs
+  builderScore += issueCloseRate * 15;              // 15 for closing issues
+
+  // COMMUNITY (0-100)
+  const twitter = com.twitter_followers || 0;
+  const reddit = com.reddit_subscribers || 0;
+  const telegram = com.telegram_channel_user_count || 0;
+
+  let communityScore = 0;
+  communityScore += Math.min(twitter / 400, 40);    // 40 for 16K+
+  communityScore += Math.min(reddit / 80, 30);      // 30 for 2.4K+
+  communityScore += Math.min(telegram / 150, 30);   // 30 for 4.5K+
+
+  // NARRATIVE
+  const cats = (data.categories || []).filter(c => c);
+  const matchedNarratives = [];
+  cats.forEach(cat => {
+    const lower = cat.toLowerCase();
+    HOT_NARRATIVES.forEach(h => {
+      if (lower.includes(h) && !matchedNarratives.includes(cat)) {
+        matchedNarratives.push(cat);
+      }
+    });
+  });
+  const narrativeScore = Math.min(matchedNarratives.length * 30, 100);
+
+  // LEGITIMACY (0-100)
+  const hasWebsite = !!(data.links?.homepage?.[0]?.trim());
+  const hasGithub = !!(data.links?.repos_url?.github?.[0]?.trim());
+  const hasDescription = (data.description?.en || '').length > 50;
+  const sentiment = data.sentiment_votes_up_percentage || 50;
+
+  let legitimacyScore = 0;
+  if (hasWebsite) legitimacyScore += 25;
+  if (hasGithub) legitimacyScore += 25;
+  if (hasDescription) legitimacyScore += 25;
+  legitimacyScore += Math.max(0, Math.min((sentiment - 40) / 0.6, 25));
+
+  // OVERALL — weighted blend
+  const overall = Math.round(
+    builderScore * 0.35 +
+    communityScore * 0.25 +
+    narrativeScore * 0.15 +
+    legitimacyScore * 0.25
+  );
+
+  let grade, verdict, gradeColor;
+  if (overall >= 65) {
+    grade = 'A'; verdict = 'STRONG — ACTIVE BUILDERS + REAL COMMUNITY';
+    gradeColor = GREEN;
+  } else if (overall >= 45) {
+    grade = 'B'; verdict = 'LEGITIMATE — MODERATE ACTIVITY, WORTH WATCHING';
+    gradeColor = CYAN;
+  } else if (overall >= 25) {
+    grade = 'C'; verdict = 'EARLY STAGE — LIMITED SIGNALS, HIGHER RISK';
+    gradeColor = ORANGE;
+  } else {
+    grade = 'D'; verdict = 'THIN — WEAK FUNDAMENTALS, CAUTION';
+    gradeColor = RED;
+  }
+
+  return {
+    builderScore: Math.min(Math.round(builderScore), 100),
+    communityScore: Math.min(Math.round(communityScore), 100),
+    narrativeScore: Math.min(Math.round(narrativeScore), 100),
+    legitimacyScore: Math.min(Math.round(legitimacyScore), 100),
+    overall, grade, verdict, gradeColor,
+    matchedNarratives, allCategories: cats,
+    details: {
+      commits, stars, forks, prs, issueCloseRate,
+      twitter, reddit, telegram,
+      hasWebsite, hasGithub, hasDescription, sentiment,
+      homepage: data.links?.homepage?.[0] || '',
+      github: data.links?.repos_url?.github?.[0] || '',
+      description: (data.description?.en || '').replace(/<[^>]*>/g, '').slice(0, 250)
+    }
+  };
+}
+
+function barHTML(label, score, color, detail) {
+  return `
+    <div>
+      <div class="score-row">
+        <div class="score-label" style="color:${color}">${label}</div>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${score}%;background:${color}"></div></div>
+        <div class="score-val" style="color:${color}">${score}</div>
+      </div>
+      <div class="score-detail" style="padding-left:80px">${detail}</div>
+    </div>`;
+}
+
+function renderQualPanel(qual) {
+  const d = qual.details;
+
+  // Builder detail
+  const builderDetail = [
+    d.commits > 0 ? `${d.commits} commits/4w` : null,
+    d.stars > 0 ? `${d.stars} stars` : null,
+    d.forks > 0 ? `${d.forks} forks` : null,
+    d.prs > 0 ? `${d.prs} PRs merged` : null,
+    d.issueCloseRate > 0 ? `${Math.round(d.issueCloseRate * 100)}% issues closed` : null
+  ].filter(Boolean).join(' · ') || 'No GitHub data';
+
+  // Community detail
+  const comDetail = [
+    d.twitter > 0 ? `${(d.twitter/1000).toFixed(1)}K twitter` : null,
+    d.reddit > 0 ? `${(d.reddit/1000).toFixed(1)}K reddit` : null,
+    d.telegram > 0 ? `${(d.telegram/1000).toFixed(1)}K telegram` : null
+  ].filter(Boolean).join(' · ') || 'No community data';
+
+  // Narrative tags
+  const narTags = qual.matchedNarratives.length
+    ? qual.matchedNarratives.map(n => `<span class="tag tag-cat">${n.toUpperCase()}</span>`).join('')
+    : '<span style="font-size:9px;color:rgba(255,255,255,0.2)">No hot narratives matched</span>';
+
+  // Other categories
+  const otherCats = qual.allCategories
+    .filter(c => !qual.matchedNarratives.includes(c))
+    .slice(0, 5)
+    .map(c => `<span class="tag" style="background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.25);border:1px solid rgba(255,255,255,0.06)">${c}</span>`)
+    .join('');
+
+  // Links
+  const links = [];
+  if (d.homepage) links.push(`<a href="${d.homepage}" target="_blank" rel="noopener">Website</a>`);
+  if (d.github) links.push(`<a href="${d.github}" target="_blank" rel="noopener">GitHub</a>`);
+
+  const legitimacyDetail = [
+    d.hasWebsite ? 'Website' : null,
+    d.hasGithub ? 'GitHub' : null,
+    d.hasDescription ? 'Description' : null,
+    `${Math.round(d.sentiment)}% positive sentiment`
+  ].filter(Boolean).join(' · ');
+
+  return `
+    <div class="qual-grade" style="border:1px solid ${qual.gradeColor}33;background:${qual.gradeColor}0D">
+      <div class="grade-letter" style="color:${qual.gradeColor}">${qual.grade}</div>
+      <div class="grade-verdict">${qual.verdict}</div>
+    </div>
+    <div class="qual-grid">
+      ${barHTML('BUILDER', qual.builderScore, qual.builderScore >= 50 ? GREEN : qual.builderScore >= 25 ? ORANGE : RED, builderDetail)}
+      ${barHTML('COMMUNITY', qual.communityScore, qual.communityScore >= 50 ? GREEN : qual.communityScore >= 25 ? ORANGE : RED, comDetail)}
+      ${barHTML('NARRATIVE', qual.narrativeScore, qual.narrativeScore >= 50 ? PURPLE : qual.narrativeScore > 0 ? CYAN : 'rgba(255,255,255,0.15)', qual.matchedNarratives.length ? qual.matchedNarratives.length + ' hot narratives' : 'No hot narratives')}
+      ${barHTML('LEGITIMACY', qual.legitimacyScore, qual.legitimacyScore >= 50 ? GREEN : qual.legitimacyScore >= 25 ? ORANGE : RED, legitimacyDetail)}
+    </div>
+    <div class="qual-narratives">${narTags} ${otherCats}</div>
+    ${d.description ? `<div class="qual-desc">${d.description}</div>` : ''}
+    ${links.length ? `<div class="qual-links">${links.join(' · ')}</div>` : ''}
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// THE EDGE — ASYMMETRY DETECTION
+// ═══════════════════════════════════════════════
+// The Judge asks: "Is this project real?"
+// The Edge asks: "Is this project being ACCUMULATED?"
+//
+// Three signals that precede a 100x:
+//  1. VOLUME TREND — Is volume accelerating? Smart money buys slowly.
+//  2. COMPRESSION — Is price range tightening? Coiled spring.
+//  3. DIVERGENCE — Volume up + price flat = accumulation signature.
+//
+// This is how you caught SOL. Volume arrived before price moved.
+// ═══════════════════════════════════════════════
+
+const chartCache = {};
+
+async function fetchMarketChart(coinId) {
+  if (chartCache[coinId]) return chartCache[coinId];
+  const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=30`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Chart: ${res.status}`);
+  const data = await res.json();
+  chartCache[coinId] = data;
+  return data;
+}
+
+function computeEdge(chart) {
+  const prices = (chart.prices || []).map(p => p[1]);
+  const volumes = (chart.total_volumes || []).map(v => v[1]);
+
+  if (prices.length < 14 || volumes.length < 14) {
+    return { edgeScore: 0, divergence: 'UNKNOWN', edgeVerdict: 'Not enough data', edgeColor: 'rgba(255,255,255,0.15)', dailyPrices: prices.slice(-14), dailyVolumes: volumes.slice(-14), volumeTrend: 0, volumeScore: 0, compression: 0, priceTrend: 0, divergenceScore: 0 };
+  }
+
+  // Volume trend: last 7d average vs prior 7d average
+  const recentVol = volumes.slice(-7);
+  const priorVol = volumes.slice(-14, -7);
+  const avgRecent = recentVol.reduce((a, b) => a + b, 0) / recentVol.length;
+  const avgPrior = priorVol.reduce((a, b) => a + b, 0) / priorVol.length;
+  const volumeTrend = avgPrior > 0 ? (avgRecent - avgPrior) / avgPrior : 0;
+
+  // Price compression: std dev of recent returns vs full window
+  const returns = prices.map((p, i) => i > 0 ? (p - prices[i - 1]) / prices[i - 1] : 0).slice(1);
+  const stdDev = (arr) => {
+    if (!arr.length) return 0;
+    const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return Math.sqrt(arr.reduce((a, v) => a + (v - m) ** 2, 0) / arr.length);
+  };
+  const recentStd = stdDev(returns.slice(-14));
+  const fullStd = stdDev(returns);
+  const compression = fullStd > 0 ? Math.max(0, 1 - (recentStd / fullStd)) : 0;
+
+  // Price trend: last 14 days
+  const p14 = prices.slice(-14);
+  const priceTrend = (p14[p14.length - 1] - p14[0]) / p14[0];
+
+  // Divergence classification
+  let divergence, divergenceScore;
+  if (volumeTrend > 0.15 && Math.abs(priceTrend) < 0.05) {
+    divergence = 'ACCUMULATION'; divergenceScore = 100;
+  } else if (volumeTrend > 0.05 && Math.abs(priceTrend) < 0.10) {
+    divergence = 'QUIET INTEREST'; divergenceScore = 75;
+  } else if (volumeTrend > 0.15 && priceTrend > 0.05) {
+    divergence = 'MOMENTUM'; divergenceScore = 55;
+  } else if (volumeTrend < -0.10 && priceTrend > 0.05) {
+    divergence = 'DISTRIBUTION'; divergenceScore = 10;
+  } else if (volumeTrend < -0.10 && priceTrend < -0.05) {
+    divergence = 'CAPITULATION'; divergenceScore = 35;
+  } else {
+    divergence = 'NEUTRAL'; divergenceScore = 25;
+  }
+
+  const compressionScore = Math.min(Math.round(compression * 150), 100);
+  const volumeScore = Math.min(Math.max(Math.round(volumeTrend * 200), 0), 100);
+
+  const edgeScore = Math.round(volumeScore * 0.35 + compressionScore * 0.25 + divergenceScore * 0.40);
+
+  let edgeVerdict, edgeColor;
+  if (edgeScore >= 70) {
+    edgeVerdict = 'COILED SPRING — Volume arriving, price compressed. Classic pre-breakout setup.';
+    edgeColor = GREEN;
+  } else if (edgeScore >= 50) {
+    edgeVerdict = 'BUILDING — Signals forming. Watch closely for breakout.';
+    edgeColor = CYAN;
+  } else if (edgeScore >= 30) {
+    edgeVerdict = 'FLAT — No clear accumulation pattern yet.';
+    edgeColor = ORANGE;
+  } else {
+    edgeVerdict = 'WEAK — No edge. Volume and price unconvincing.';
+    edgeColor = RED;
+  }
+
+  return {
+    volumeTrend: Math.round(volumeTrend * 100),
+    volumeScore,
+    compression: compressionScore,
+    priceTrend: Math.round(priceTrend * 100),
+    divergence, divergenceScore,
+    edgeScore, edgeVerdict, edgeColor,
+    dailyPrices: prices.slice(-14),
+    dailyVolumes: volumes.slice(-14)
+  };
+}
+
+function renderSparkline(prices, volumes, width, height) {
+  const pMin = Math.min(...prices), pMax = Math.max(...prices);
+  const vMax = Math.max(...volumes);
+  const pRange = pMax - pMin || 1;
+
+  const pPoints = prices.map((p, i) => {
+    const x = (i / (prices.length - 1)) * width;
+    const y = height - ((p - pMin) / pRange) * (height * 0.7) - height * 0.15;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const barW = width / volumes.length * 0.6;
+  const vBars = volumes.map((v, i) => {
+    const x = (i / (volumes.length - 1)) * width;
+    const h = (v / vMax) * (height * 0.4);
+    return `<rect x="${x - barW / 2}" y="${height - h}" width="${barW}" height="${h}" fill="rgba(224,64,251,0.2)" rx="1"/>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;max-width:${width}px;height:${height}px;margin:6px 0">${vBars}<polyline points="${pPoints}" fill="none" stroke="${CYAN}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+}
+
+function renderEdgeSection(edge) {
+  const spark = renderSparkline(edge.dailyPrices, edge.dailyVolumes, 280, 50);
+
+  const divColors = {
+    ACCUMULATION: GREEN, MOMENTUM: CYAN, 'QUIET INTEREST': PURPLE,
+    DISTRIBUTION: RED, CAPITULATION: ORANGE, NEUTRAL: 'rgba(255,255,255,0.3)', UNKNOWN: 'rgba(255,255,255,0.15)'
+  };
+
+  return `
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)">
+      <div style="font-size:9px;letter-spacing:3px;font-weight:700;color:${edge.edgeColor};margin-bottom:10px">
+        EDGE · ${edge.edgeScore}/100
+      </div>
+      <div class="qual-grid">
+        ${barHTML('VOL TREND', edge.volumeScore, edge.volumeScore >= 50 ? GREEN : edge.volumeScore >= 25 ? ORANGE : 'rgba(255,255,255,0.15)', (edge.volumeTrend >= 0 ? '+' : '') + edge.volumeTrend + '% (7d vs prior 7d)')}
+        ${barHTML('COMPRESS', edge.compression, edge.compression >= 50 ? GREEN : edge.compression >= 25 ? ORANGE : 'rgba(255,255,255,0.15)', edge.compression >= 50 ? 'Price range tightening' : edge.compression >= 25 ? 'Moderate range' : 'Wide range')}
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:10px 0 4px">
+        <div style="font-size:11px;letter-spacing:2px;font-weight:900;color:${divColors[edge.divergence]}">${edge.divergence}</div>
+        <div style="font-size:8px;color:rgba(255,255,255,0.2)">Price ${(edge.priceTrend >= 0 ? '+' : '') + edge.priceTrend}% · Vol ${(edge.volumeTrend >= 0 ? '+' : '') + edge.volumeTrend}%</div>
+      </div>
+      <div style="max-width:280px">${spark}</div>
+      <div style="font-size:7px;color:rgba(255,255,255,0.1);letter-spacing:1px">CYAN = PRICE · PURPLE = VOLUME · 14 DAYS</div>
+      <div style="font-size:9px;color:${edge.edgeColor};margin-top:8px;line-height:1.6">${edge.edgeVerdict}</div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// CLICK HANDLER — QUALIFY + EDGE
+// ═══════════════════════════════════════════════
+
+async function handleRowClick(e) {
+  const row = e.currentTarget;
+  const coinId = row.dataset.coinId;
+  if (!coinId) return;
+
+  const existing = row.nextElementSibling;
+  if (existing && existing.classList.contains('qualify-panel')) {
+    existing.remove();
+    return;
+  }
+
+  document.querySelectorAll('.qualify-panel').forEach(p => p.remove());
+
+  const panel = document.createElement('div');
+  panel.className = 'qualify-panel';
+  panel.innerHTML = '<div class="qual-loading">QUALIFYING + EDGE ANALYSIS<span class="qual-dots"></span></div>';
+  row.after(panel);
+
+  let dc = 0;
+  const dt = setInterval(() => {
+    dc = (dc + 1) % 4;
+    const el = panel.querySelector('.qual-dots');
+    if (el) el.textContent = '.'.repeat(dc);
+  }, 300);
+
+  try {
+    // Fetch both in parallel — coin details + 30-day chart
+    const [detail, chart] = await Promise.all([
+      fetchCoinDetail(coinId),
+      fetchMarketChart(coinId)
+    ]);
+
+    const qual = scoreQualification(detail);
+    const edge = computeEdge(chart);
+
+    // Combined verdict
+    const combined = Math.round(qual.overall * 0.5 + edge.edgeScore * 0.5);
+    let finalVerdict, finalColor;
+    if (combined >= 60) {
+      finalVerdict = 'HIGH CONVICTION — Real project + accumulation signals. This is the setup.';
+      finalColor = GREEN;
+    } else if (combined >= 45) {
+      finalVerdict = 'WATCHLIST — Decent fundamentals or emerging edge. Monitor for convergence.';
+      finalColor = CYAN;
+    } else if (combined >= 30) {
+      finalVerdict = 'SPECULATIVE — Weak on one or both dimensions. Needs more signals.';
+      finalColor = ORANGE;
+    } else {
+      finalVerdict = 'PASS — Not enough evidence for asymmetric setup.';
+      finalColor = RED;
+    }
+
+    clearInterval(dt);
+    panel.innerHTML = `
+      ${renderQualPanel(qual)}
+      ${renderEdgeSection(edge)}
+      <div style="margin-top:14px;padding:10px 14px;border-radius:6px;border:1px solid ${finalColor}33;background:${finalColor}0D">
+        <div style="font-size:9px;letter-spacing:3px;font-weight:700;color:${finalColor};margin-bottom:4px">COMBINED · ${combined}/100</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.5);line-height:1.5">${finalVerdict}</div>
+      </div>
+    `;
+  } catch (err) {
+    clearInterval(dt);
+    panel.innerHTML = `<div class="qual-loading" style="color:${RED}">FAILED — ${err.message}. May be rate-limited, try again in 30s.</div>`;
+  }
 }
 
 // ═══════════════════════════════════════════════
