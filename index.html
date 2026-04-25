@@ -62,7 +62,7 @@
   <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
   <canvas id="canvas"></canvas>
   <div id="bottomBar" class="bottom-bar"></div>
-  <div class="footer">LIVE DATA · UPDATED ON LOAD · LOG SCALE RADIUS</div>
+  <div class="footer">LIVE STREAMING · BINANCE WEBSOCKET · LOG SCALE RADIUS</div>
 </div>
 
 <script>
@@ -81,6 +81,8 @@
 const C4_BOTTOM = 15800;
 let allData = [];
 let animProgress = 0;
+let livePrice = 0;
+let wsConnected = false;
 
 // ═══════════════════════════════════════════════
 // PROJECTIONS — derived from cycle analysis
@@ -233,7 +235,7 @@ function draw() {
   if (!allData.length) return;
 
   // Get current price and ATH
-  const currentPrice = allData[allData.length - 1].price;
+  const currentPrice = livePrice || allData[allData.length - 1].price;
   const ath = Math.max(...allData.map(d => d.price));
   const proj = computeProjections(ath);
 
@@ -548,9 +550,56 @@ function animate() {
   if (animProgress < 1) {
     animProgress += 0.02;
     if (animProgress > 1) animProgress = 1;
-    draw();
-    requestAnimationFrame(animate);
   }
+  draw();
+  requestAnimationFrame(animate);
+}
+
+// ═══════════════════════════════════════════════
+// BINANCE WEBSOCKET — LIVE PRICE STREAMING
+// ═══════════════════════════════════════════════
+let ws = null;
+let wsRetryDelay = 1000;
+let pollingTimer = null;
+
+function connectWS() {
+  try {
+    ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+    ws.onopen = () => {
+      wsConnected = true;
+      wsRetryDelay = 1000;
+      if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+      document.getElementById("badgeText").textContent = 'STREAMING · Binance WebSocket';
+    };
+    ws.onmessage = (e) => {
+      try {
+        livePrice = parseFloat(JSON.parse(e.data).p);
+      } catch (err) {}
+    };
+    ws.onclose = () => {
+      wsConnected = false;
+      setTimeout(connectWS, wsRetryDelay);
+      wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
+      startPollingFallback();
+    };
+    ws.onerror = () => { ws.close(); };
+  } catch (e) {
+    startPollingFallback();
+  }
+}
+
+function startPollingFallback() {
+  if (pollingTimer) return;
+  pollingTimer = setInterval(async () => {
+    try {
+      const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+      if (r.ok) {
+        const d = await r.json();
+        livePrice = parseFloat(d.price);
+        document.getElementById("badgeText").textContent = 'LIVE · Binance (polling)';
+      }
+    } catch (e) {}
+  }, 3000);
 }
 
 // ═══════════════════════════════════════════════
@@ -575,9 +624,10 @@ async function main() {
   allData = result.data;
   document.getElementById("loading").style.display = "none";
   document.getElementById("app").style.display = "flex";
-  document.getElementById("badgeText").textContent = `LIVE · ${result.source}`;
+  document.getElementById("badgeText").textContent = `LIVE · ${result.source} · connecting...`;
 
   animate();
+  connectWS();
 
   // Redraw on resize
   window.addEventListener("resize", () => { if (animProgress >= 1) draw(); });
