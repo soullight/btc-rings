@@ -58,6 +58,7 @@ canvas { display:block; border-radius:16px; }
     wavePoints: [],   // {day, price, high, low} — 4h granularity since trough
     troughIdx: 0, troughTime: 0, troughPrice: 0,
     cHi: 0, cLo: 0, cDays: 0, cPct: 0,
+    cHiDay: 0, declining: false, peakPrice: 0,
     livePrice: 0,
     momentum: 0,
     _animAngle: 0,
@@ -162,8 +163,17 @@ canvas { display:block; border-radius:16px; }
     S.cDays = n - 1 - last;
 
     // Cycle range from actual highs/lows
-    S.cHi = Math.max(...highs.slice(last));
-    S.cLo = Math.min(...lows.slice(last));
+    const highsSinceTrough = highs.slice(last);
+    const lowsSinceTrough = lows.slice(last);
+    S.cHi = Math.max(...highsSinceTrough);
+    S.cLo = Math.min(...lowsSinceTrough);
+
+    // Detect peak day and declining phase
+    const peakIdx = highsSinceTrough.indexOf(S.cHi);
+    S.cHiDay = peakIdx;
+    S.peakPrice = S.cHi;
+    const daysAfterPeak = (highsSinceTrough.length - 1) - peakIdx;
+    S.declining = daysAfterPeak >= 3 && closes[n - 1] < S.cHi * 0.995;
 
     // Build wave points from 4h data
     const msPerDay = 24 * 60 * 60 * 1000;
@@ -190,7 +200,7 @@ canvas { display:block; border-radius:16px; }
 
   function updatePosition() {
     const p = S.livePrice || (S.wavePoints.length ? S.wavePoints[S.wavePoints.length - 1].price : 0);
-    if (p > S.cHi) S.cHi = p;
+    if (p > S.cHi) { S.cHi = p; S.peakPrice = p; S.declining = false; }
     if (p < S.cLo) S.cLo = p;
     const range = S.cHi - S.cLo;
     S.cPct = range > 0 ? Math.max(0, Math.min(100, ((p - S.cLo) / range) * 100)) : 50;
@@ -251,14 +261,18 @@ canvas { display:block; border-radius:16px; }
 
     const p = S.livePrice || (S.wavePoints.length ? S.wavePoints[S.wavePoints.length - 1].price : 0);
 
-    // Geometry
+    // Geometry — pad 15% below cycle low so price has room to break lower
     const outerR = Math.min(cx, cy) - 44;   // cycle high radius
-    const innerR = outerR * 0.32;            // cycle low radius
+    const innerR = outerR * 0.28;            // absolute inner edge (below cycle low)
     const bandW = outerR - innerR;
+    const padFrac = 0.15;                    // 15% of band reserved below cycle low
+    const cycLoR = innerR + bandW * padFrac; // cycle low sits here, not at inner edge
+    const cycBandW = outerR - cycLoR;        // the actual cycle range band
 
     function priceToR(price) {
       const pct = (price - S.cLo) / (S.cHi - S.cLo);
-      return innerR + Math.max(0, Math.min(1, pct)) * bandW;
+      // Map into the cycle band (cycLoR to outerR), but allow overflow into padding below
+      return cycLoR + pct * cycBandW;
     }
 
     // ── Background: subtle radial glow ──
@@ -307,28 +321,86 @@ canvas { display:block; border-radius:16px; }
       ctx.stroke();
     }
 
-    // ── RANGE BAND: the ring between inner and outer ──
-    ctx.beginPath();
-    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
-    ctx.fillStyle = 'rgba(0,230,118,0.02)';
-    ctx.fill();
+    // ── RANGE BAND: split into green (rising) and red (declining) ──
+    const peakAngle = dayToAngle(S.cHiDay);
+    const troughAngle = dayToAngle(0);
+    const currentAngle = dayToAngle(S.cDays);
+
+    if (S.declining) {
+      // Rising portion: trough → peak (green)
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR, troughAngle, peakAngle);
+      ctx.arc(cx, cy, innerR, peakAngle, troughAngle, true);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,230,118,0.04)';
+      ctx.fill();
+
+      // Declining portion: peak → current day (red)
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR, peakAngle, currentAngle);
+      ctx.arc(cx, cy, innerR, currentAngle, peakAngle, true);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255,23,68,0.04)';
+      ctx.fill();
+
+      // Future arc: current → 60 (very faint red hint)
+      if (S.cDays < NOMINAL) {
+        const endAngle = dayToAngle(NOMINAL);
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, currentAngle, endAngle);
+        ctx.arc(cx, cy, innerR, endAngle, currentAngle, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,23,68,0.015)';
+        ctx.fill();
+      }
+    } else {
+      // All rising: trough → current day (green)
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR, troughAngle, currentAngle);
+      ctx.arc(cx, cy, innerR, currentAngle, troughAngle, true);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,230,118,0.04)';
+      ctx.fill();
+
+      // Future arc: current → 60 (very faint)
+      if (S.cDays < NOMINAL) {
+        const endAngle = dayToAngle(NOMINAL);
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, currentAngle, endAngle);
+        ctx.arc(cx, cy, innerR, endAngle, currentAngle, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,255,255,0.01)';
+        ctx.fill();
+      }
+    }
 
     // Boundary rings
     ctx.beginPath();
     ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,230,118,0.12)';
+    ctx.strokeStyle = S.declining ? 'rgba(255,23,68,0.12)' : 'rgba(0,230,118,0.12)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
     ctx.beginPath();
     ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,230,118,0.12)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Cycle low boundary ring (where cycle low actually sits)
+    ctx.beginPath();
+    ctx.arc(cx, cy, cycLoR, 0, Math.PI * 2);
+    ctx.strokeStyle = S.declining ? 'rgba(255,23,68,0.12)' : 'rgba(0,230,118,0.12)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 50% midline
-    const midR = innerR + bandW * 0.5;
+    // Padding zone label
+    ctx.font = '7px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillText('BREAK ROOM', cx, cy + (innerR + cycLoR) / 2);
+
+    // 50% midline (within cycle band)
+    const midR = cycLoR + cycBandW * 0.5;
     ctx.beginPath();
     ctx.arc(cx, cy, midR, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
@@ -337,9 +409,9 @@ canvas { display:block; border-radius:16px; }
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 25% and 75% subtle rings
+    // 25% and 75% subtle rings (within cycle band)
     [0.25, 0.75].forEach(q => {
-      const r = innerR + bandW * q;
+      const r = cycLoR + cycBandW * q;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(255,255,255,0.02)';
@@ -355,7 +427,7 @@ canvas { display:block; border-radius:16px; }
     ctx.textAlign = 'right';
     const labelAngle = Math.PI * -0.02; // just left of 3 o'clock
     ctx.fillText(fmt(S.cHi), cx + Math.cos(labelAngle) * (outerR - 6) - 2, cy + Math.sin(labelAngle) * (outerR - 6));
-    ctx.fillText(fmt(S.cLo), cx + Math.cos(labelAngle) * (innerR + 6) - 2, cy + Math.sin(labelAngle) * (innerR + 6));
+    ctx.fillText(fmt(S.cLo), cx + Math.cos(labelAngle) * (cycLoR + 6) - 2, cy + Math.sin(labelAngle) * (cycLoR + 6));
     const midPrice = S.cLo + (S.cHi - S.cLo) * 0.5;
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.fillText(fmt(midPrice), cx + Math.cos(labelAngle) * (midR - 2) - 2, cy + Math.sin(labelAngle) * (midR - 2));
@@ -365,28 +437,46 @@ canvas { display:block; border-radius:16px; }
     const pts = S.wavePoints;
     if (pts.length > 1) {
 
-      // Draw the high/low ribbon (filled area between high and low wave)
-      ctx.beginPath();
-      // Forward pass: highs
-      for (let i = 0; i < pts.length; i++) {
-        const angle = dayToAngle(pts[i].day);
-        const r = priceToR(pts[i].high);
-        const x = cx + Math.cos(angle) * r;
-        const y = cy + Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      // Draw the high/low ribbon — green before peak, red after peak
+      const peakDayActual = S.cHiDay; // day within cycle the peak occurred
+
+      // Find the split index in wavePoints closest to peak day
+      let splitIdx = pts.length;
+      if (S.declining) {
+        for (let i = 0; i < pts.length; i++) {
+          if (pts[i].day >= peakDayActual) { splitIdx = i; break; }
+        }
       }
-      // Reverse pass: lows
-      for (let i = pts.length - 1; i >= 0; i--) {
-        const angle = dayToAngle(pts[i].day);
-        const r = priceToR(pts[i].low);
-        const x = cx + Math.cos(angle) * r;
-        const y = cy + Math.sin(angle) * r;
-        ctx.lineTo(x, y);
+
+      // Helper to draw a ribbon segment
+      function drawRibbon(start, end, color) {
+        if (end <= start) return;
+        ctx.beginPath();
+        for (let i = start; i < end; i++) {
+          const angle = dayToAngle(pts[i].day);
+          const r = priceToR(pts[i].high);
+          if (i === start) ctx.moveTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+          else ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+        }
+        for (let i = end - 1; i >= start; i--) {
+          const angle = dayToAngle(pts[i].day);
+          const r = priceToR(pts[i].low);
+          ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
       }
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(0,230,118,0.06)';
-      ctx.fill();
+
+      if (S.declining && splitIdx < pts.length) {
+        // Green ribbon: trough to peak
+        drawRibbon(0, splitIdx + 1, 'rgba(0,230,118,0.06)');
+        // Red ribbon: peak to current
+        drawRibbon(splitIdx, pts.length, 'rgba(255,23,68,0.06)');
+      } else {
+        // All green
+        drawRibbon(0, pts.length, 'rgba(0,230,118,0.06)');
+      }
 
       // Draw the close price line (the main wave)
       ctx.beginPath();
@@ -415,12 +505,12 @@ canvas { display:block; border-radius:16px; }
       ctx.shadowBlur = 0;
 
       // ── CURRENT POSITION DOT (bright, glowing) ──
-      const currentDay = S.cDays;
-      const currentAngle = dayToAngle(currentDay);
-      const currentR = priceToR(p);
+      const dotDay = S.cDays;
+      const dotAngle = dayToAngle(dotDay);
+      const dotR = priceToR(p);
 
-      const dotX = cx + Math.cos(currentAngle) * currentR;
-      const dotY = cy + Math.sin(currentAngle) * currentR;
+      const dotX = cx + Math.cos(dotAngle) * dotR;
+      const dotY = cy + Math.sin(dotAngle) * dotR;
 
       // Glow
       ctx.beginPath();
@@ -444,8 +534,8 @@ canvas { display:block; border-radius:16px; }
 
       // Price label near dot
       const labelDist = 22;
-      const lx = dotX + Math.cos(currentAngle) * labelDist;
-      const ly = dotY + Math.sin(currentAngle) * labelDist;
+      const lx = dotX + Math.cos(dotAngle) * labelDist;
+      const ly = dotY + Math.sin(dotAngle) * labelDist;
 
       ctx.font = 'bold 11px monospace';
       ctx.fillStyle = GREEN;
@@ -453,12 +543,12 @@ canvas { display:block; border-radius:16px; }
       ctx.fillText(fmt(p), lx, ly - 6);
       ctx.font = '8px monospace';
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillText('DAY ' + Math.round(currentDay), lx, ly + 6);
+      ctx.fillText('DAY ' + Math.round(dotDay), lx, ly + 6);
 
-      // ── "Now" marker line from center to dot ──
+      // ── "Now" marker line from center to cycle low ring ──
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(currentAngle) * (innerR - 8), cy + Math.sin(currentAngle) * (innerR - 8));
-      ctx.lineTo(cx + Math.cos(currentAngle) * innerR, cy + Math.sin(currentAngle) * innerR);
+      ctx.moveTo(cx + Math.cos(dotAngle) * (cycLoR - 8), cy + Math.sin(dotAngle) * (cycLoR - 8));
+      ctx.lineTo(cx + Math.cos(dotAngle) * cycLoR, cy + Math.sin(dotAngle) * cycLoR);
       ctx.strokeStyle = GREEN;
       ctx.globalAlpha = 0.3;
       ctx.lineWidth = 2;
@@ -466,13 +556,13 @@ canvas { display:block; border-radius:16px; }
       ctx.globalAlpha = 1;
     }
 
-    // ── FUTURE ARC: faint dashed line showing remaining cycle ──
+    // ── FUTURE ARC: dashed midline showing remaining cycle ──
     if (S.cDays < NOMINAL) {
-      const startAngle = dayToAngle(S.cDays);
-      const endAngle = dayToAngle(NOMINAL);
+      const futureStart = dayToAngle(S.cDays);
+      const futureEnd = dayToAngle(NOMINAL);
       ctx.beginPath();
-      ctx.arc(cx, cy, midR, startAngle, endAngle);
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.arc(cx, cy, midR, futureStart, futureEnd);
+      ctx.strokeStyle = S.declining ? 'rgba(255,23,68,0.08)' : 'rgba(255,255,255,0.04)';
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 8]);
       ctx.stroke();
@@ -516,8 +606,8 @@ canvas { display:block; border-radius:16px; }
     // Trough label at 12 o'clock
     ctx.font = '8px monospace';
     ctx.fillStyle = 'rgba(0,230,118,0.4)';
-    ctx.fillText('TROUGH', cx, cy - innerR + 14);
-    ctx.fillText(fmt(S.troughPrice), cx, cy - innerR + 26);
+    ctx.fillText('TROUGH', cx, cy - cycLoR + 14);
+    ctx.fillText(fmt(S.troughPrice), cx, cy - cycLoR + 26);
   }
 
   function updateInfo() {
@@ -525,6 +615,8 @@ canvas { display:block; border-radius:16px; }
     const range = S.cHi - S.cLo;
     const momLabel = S.momentum === 1 ? 'BULL' : S.momentum === -1 ? 'BEAR' : 'NEUTRAL';
     const momColor = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : 'rgba(255,255,255,0.5)';
+    const phaseLabel = S.declining ? 'DECLINING' : 'RISING';
+    const phaseColor = S.declining ? RED : GREEN;
 
     $('info').innerHTML = `
       <div class="info-card">
@@ -538,6 +630,10 @@ canvas { display:block; border-radius:16px; }
       <div class="info-card">
         <div class="lbl">WIDTH</div>
         <div class="val" style="color:${GREEN}">${fmt(range)} <span style="font-size:10px;color:rgba(255,255,255,0.3)">(${fmtPct((range / S.cLo) * 100)})</span></div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">PHASE</div>
+        <div class="val" style="color:${phaseColor}">${phaseLabel}</div>
       </div>
       <div class="info-card">
         <div class="lbl">MOMENTUM</div>

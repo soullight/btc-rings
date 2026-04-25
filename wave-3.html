@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — Wave ×3</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0f; color:#fff;
+  font-family:'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100vh; padding:16px;
+}
+canvas { display:block; border-radius:16px; }
+.info {
+  display:flex; gap:12px; margin-top:14px; flex-wrap:wrap; justify-content:center;
+}
+.info-card {
+  padding:8px 12px; border-radius:8px; text-align:center;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+}
+.info-card .lbl { font-size:8px; letter-spacing:2px; color:rgba(255,255,255,0.5); margin-bottom:3px; }
+.info-card .val { font-size:13px; font-weight:700; }
+.loading {
+  display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh;
+}
+.loading-text { font-size:14px; color:rgba(255,255,255,0.4); letter-spacing:3px; }
+.pulse-ring {
+  width:50px; height:50px; border-radius:50%; margin-top:24px;
+  border:2px solid rgba(0,230,118,0.3); animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+.hidden { display:none!important; }
+.title { font-size:18px; font-weight:700; letter-spacing:8px; margin-bottom:4px; }
+.sub { font-size:9px; color:rgba(255,255,255,0.3); letter-spacing:3px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading">
+  <div class="loading-text">TRACING THREE CYCLES<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" class="hidden" style="display:flex;flex-direction:column;align-items:center;">
+  <div class="title">WAVE ×3</div>
+  <div class="sub">THREE 60-DAY CYCLES · THIRD EACH</div>
+  <canvas id="canvas"></canvas>
+  <div id="info" class="info"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const GREEN = '#00E676', RED = '#FF1744', GOLD = '#FFD700', CYAN = '#4FC3F7', BG = '#0a0a0f';
+  const NOMINAL = 60;
+  const NUM_CYCLES = 3;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+
+  let dotCount = 0;
+  const dotTimer = setInterval(() => {
+    dotCount = (dotCount + 1) % 4;
+    const d = $('dots');
+    if (d) d.textContent = '.'.repeat(dotCount);
+  }, 400);
+
+  function fmt(n) {
+    if (!n || isNaN(n)) return '—';
+    return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+  async function fetchJSON(url, timeout = 15000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeout);
+    try {
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch (e) { clearTimeout(t); throw e; }
+  }
+
+  // ═══════════════════════════════════════════════
+  // TROUGH DETECTION
+  // ═══════════════════════════════════════════════
+  function findTroughs(closes, hw) {
+    const t = [];
+    for (let i = hw; i < closes.length - hw; i++) {
+      let ok = true;
+      for (let j = 1; j <= hw; j++) {
+        if (closes[i] > closes[i - j] || closes[i] > closes[i + j]) { ok = false; break; }
+      }
+      if (ok) t.push(i);
+    }
+    return t;
+  }
+
+  function filterTroughs(troughs, closes, nom, ratio) {
+    if (!troughs.length) return troughs;
+    const gap = Math.round(nom * ratio);
+    const f = [troughs[0]];
+    for (let i = 1; i < troughs.length; i++) {
+      if (troughs[i] - f[f.length - 1] >= gap) f.push(troughs[i]);
+      else if (closes[troughs[i]] < closes[f[f.length - 1]]) f[f.length - 1] = troughs[i];
+    }
+    return f;
+  }
+
+  // ═══════════════════════════════════════════════
+  // DATA
+  // ═══════════════════════════════════════════════
+  async function fetchDailyOHLC(limit) {
+    const d = await fetchJSON(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=${limit}`);
+    return d.map(k => ({
+      t: Number(k[0]), h: Number(k[2]), l: Number(k[3]), c: Number(k[4])
+    }));
+  }
+
+  async function fetch4h(startTime, endTime) {
+    let url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=${startTime}&limit=1000`;
+    if (endTime) url += `&endTime=${endTime}`;
+    const d = await fetchJSON(url);
+    return d.map(k => ({
+      t: Number(k[0]), h: Number(k[2]), l: Number(k[3]), c: Number(k[4])
+    }));
+  }
+
+  // ═══════════════════════════════════════════════
+  // CYCLE STRUCTURE
+  // ═══════════════════════════════════════════════
+  // Each cycle: { troughTime, troughPrice, cHi, cLo, peakDay, declining, wave4h[], days }
+
+  async function buildCycles(daily) {
+    const closes = daily.map(k => k.c);
+    const highs = daily.map(k => k.h);
+    const lows = daily.map(k => k.l);
+
+    let troughs = findTroughs(closes, 12);
+    troughs = filterTroughs(troughs, closes, 60, 0.5);
+    if (troughs.length < 2) {
+      troughs = findTroughs(closes, 8);
+      troughs = filterTroughs(troughs, closes, 60, 0.6);
+    }
+
+    // We need at least NUM_CYCLES troughs (NUM_CYCLES cycles = NUM_CYCLES+1 boundaries, but last cycle is ongoing)
+    // Take the last NUM_CYCLES+1 troughs, or as many as we have
+    // Actually: N cycles needs N troughs (the start of each). The last cycle runs to "now".
+    const needed = Math.min(NUM_CYCLES, troughs.length);
+    const usedTroughs = troughs.slice(-needed);
+
+    const cycles = [];
+    for (let c = 0; c < usedTroughs.length; c++) {
+      const startIdx = usedTroughs[c];
+      const endIdx = (c < usedTroughs.length - 1) ? usedTroughs[c + 1] : daily.length - 1;
+
+      const segH = highs.slice(startIdx, endIdx + 1);
+      const segL = lows.slice(startIdx, endIdx + 1);
+      const segC = closes.slice(startIdx, endIdx + 1);
+      const cHi = Math.max(...segH);
+      const cLo = Math.min(...segL);
+      const peakIdx = segH.indexOf(cHi);
+      const daysInCycle = endIdx - startIdx;
+      const daysAfterPeak = (segH.length - 1) - peakIdx;
+      const declining = daysAfterPeak >= 3 && segC[segC.length - 1] < cHi * 0.995;
+
+      // Fetch 4h data for this cycle
+      const startTime = daily[startIdx].t;
+      const endTime = (c < usedTroughs.length - 1) ? daily[endIdx].t : undefined;
+      const wave4h = await fetch4h(startTime, endTime);
+
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const wavePoints = wave4h.map(k => ({
+        day: (k.t - startTime) / msPerDay,
+        price: k.c, high: k.h, low: k.l
+      }));
+
+      cycles.push({
+        index: c,
+        troughTime: startTime,
+        troughPrice: closes[startIdx],
+        cHi, cLo, peakDay: peakIdx, declining,
+        days: daysInCycle,
+        wavePoints,
+        isLast: c === usedTroughs.length - 1
+      });
+    }
+    return cycles;
+  }
+
+  // ═══════════════════════════════════════════════
+  // WEBSOCKET
+  // ═══════════════════════════════════════════════
+  let livePrice = 0;
+  let ws = null, wsRetry = 1000, pollTimer = null;
+  function connectWS() {
+    try {
+      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+      ws.onmessage = (e) => { try { livePrice = parseFloat(JSON.parse(e.data).p); } catch (err) {} };
+      ws.onclose = () => { setTimeout(connectWS, wsRetry); wsRetry = Math.min(wsRetry * 2, 30000); startPoll(); };
+      ws.onerror = () => { ws.close(); };
+    } catch (e) { startPoll(); }
+  }
+  function startPoll() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
+      try { const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000); livePrice = parseFloat(d.price); } catch (e) {}
+    }, 3000);
+  }
+
+  // ═══════════════════════════════════════════════
+  // CANVAS
+  // ═══════════════════════════════════════════════
+  let cycles = [];
+  let globalHi = 0, globalLo = Infinity;
+
+  function resize() {
+    const sz = Math.min(window.innerWidth - 32, window.innerHeight - 140, 720);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = sz * dpr;
+    canvas.height = sz * dpr;
+    canvas.style.width = sz + 'px';
+    canvas.style.height = sz + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function draw() {
+    const w = parseInt(canvas.style.width);
+    const h = parseInt(canvas.style.height);
+    const cx = w / 2, cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, w, h);
+    if (!cycles.length) return;
+
+    const outerR = Math.min(cx, cy) - 44;
+    const innerR = outerR * 0.25;
+    const bandW = outerR - innerR;
+    const padFrac = 0.12;
+    const cycLoR = innerR + bandW * padFrac;
+    const cycBandW = outerR - cycLoR;
+
+    // Update global range with live price
+    let gHi = globalHi, gLo = globalLo;
+    if (livePrice) {
+      if (livePrice > gHi) gHi = livePrice;
+      if (livePrice < gLo) gLo = livePrice;
+    }
+
+    function priceToR(price) {
+      const pct = (price - gLo) / (gHi - gLo);
+      return cycLoR + Math.max(-0.1, Math.min(1.05, pct)) * cycBandW;
+    }
+
+    const arcPerCycle = (Math.PI * 2) / NUM_CYCLES;
+    const startOffset = -Math.PI / 2; // 12 o'clock
+
+    // ── Draw each cycle segment ──
+    cycles.forEach((cyc, ci) => {
+      const arcStart = startOffset + ci * arcPerCycle;
+      const arcEnd = arcStart + arcPerCycle;
+      const actualDays = cyc.isLast ? (Date.now() - cyc.troughTime) / (24*60*60*1000) : cyc.days;
+      const cycleDuration = Math.max(actualDays, NOMINAL);
+
+      // Map day within this cycle to angle within this cycle's arc
+      function dayToAngle(day) {
+        const frac = day / cycleDuration;
+        return arcStart + frac * arcPerCycle;
+      }
+
+      // ── SEGMENT BACKGROUND ──
+      const peakAngle = dayToAngle(cyc.peakDay);
+      const currentCycAngle = dayToAngle(actualDays);
+
+      if (cyc.declining) {
+        // Green: trough → peak
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, outerR, arcStart, peakAngle);
+        ctx.arc(cx, cy, innerR, peakAngle, arcStart, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0,230,118,0.04)';
+        ctx.fill();
+
+        // Red: peak → current
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, outerR, peakAngle, Math.min(currentCycAngle, arcEnd));
+        ctx.arc(cx, cy, innerR, Math.min(currentCycAngle, arcEnd), peakAngle, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,23,68,0.04)';
+        ctx.fill();
+      } else {
+        // All green: trough → current
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, outerR, arcStart, Math.min(currentCycAngle, arcEnd));
+        ctx.arc(cx, cy, innerR, Math.min(currentCycAngle, arcEnd), arcStart, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0,230,118,0.04)';
+        ctx.fill();
+      }
+
+      // ── SEGMENT BOUNDARY LINES ──
+      // Radial line at start of segment
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(arcStart) * innerR, cy + Math.sin(arcStart) * innerR);
+      ctx.lineTo(cx + Math.cos(arcStart) * outerR, cy + Math.sin(arcStart) * outerR);
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Cycle number label
+      const labelAngle = arcStart + arcPerCycle * 0.5;
+      const labelR = outerR + 32;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillStyle = cyc.isLast ? GREEN : 'rgba(255,255,255,0.35)';
+      ctx.fillText('C' + (ci + 1), cx + Math.cos(labelAngle) * labelR, cy + Math.sin(labelAngle) * labelR);
+
+      // Trough marker at segment start
+      const tX = cx + Math.cos(arcStart) * (outerR + 14);
+      const tY = cy + Math.sin(arcStart) * (outerR + 14);
+      ctx.font = '8px monospace';
+      ctx.fillStyle = CYAN;
+      ctx.fillText('T', tX, tY);
+
+      // ── THE WAVE ──
+      const pts = cyc.wavePoints;
+      if (pts.length > 1) {
+        // Ribbon
+        const splitIdx = cyc.declining
+          ? pts.findIndex(p => p.day >= cyc.peakDay) || pts.length
+          : pts.length;
+
+        function drawRibbon(start, end, color) {
+          if (end <= start) return;
+          ctx.beginPath();
+          for (let i = start; i < end; i++) {
+            const a = dayToAngle(pts[i].day);
+            const r = priceToR(pts[i].high);
+            if (i === start) ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+            else ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+          }
+          for (let i = end - 1; i >= start; i--) {
+            const a = dayToAngle(pts[i].day);
+            const r = priceToR(pts[i].low);
+            ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+          }
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+
+        if (cyc.declining && splitIdx < pts.length) {
+          drawRibbon(0, splitIdx + 1, 'rgba(0,230,118,0.06)');
+          drawRibbon(splitIdx, pts.length, 'rgba(255,23,68,0.06)');
+        } else {
+          drawRibbon(0, pts.length, 'rgba(0,230,118,0.06)');
+        }
+
+        // Close line
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const a = dayToAngle(pts[i].day);
+          const r = priceToR(pts[i].price);
+          if (i === 0) ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+          else ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        }
+
+        // Extend live price on last cycle
+        if (cyc.isLast && livePrice) {
+          const liveA = dayToAngle(actualDays);
+          const liveR = priceToR(livePrice);
+          ctx.lineTo(cx + Math.cos(liveA) * liveR, cy + Math.sin(liveA) * liveR);
+        }
+
+        ctx.strokeStyle = GREEN;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = GREEN;
+        ctx.shadowBlur = 4;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Current dot (only on last cycle)
+        if (cyc.isLast && livePrice) {
+          const dotA = dayToAngle(actualDays);
+          const dotRad = priceToR(livePrice);
+          const dX = cx + Math.cos(dotA) * dotRad;
+          const dY = cy + Math.sin(dotA) * dotRad;
+
+          ctx.beginPath();
+          ctx.arc(dX, dY, 10, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0,230,118,0.15)';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(dX, dY, 4, 0, Math.PI * 2);
+          ctx.fillStyle = GREEN;
+          ctx.shadowColor = GREEN;
+          ctx.shadowBlur = 12;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          // Price label
+          const plX = dX + Math.cos(dotA) * 20;
+          const plY = dY + Math.sin(dotA) * 20;
+          ctx.font = 'bold 10px monospace';
+          ctx.fillStyle = GREEN;
+          ctx.fillText(fmt(livePrice), plX, plY);
+        }
+      }
+
+      // Day markers within this cycle's arc
+      for (let d = 0; d <= cycleDuration; d += 10) {
+        const a = dayToAngle(d);
+        const t1 = outerR + 2;
+        const t2 = outerR + 8;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * t1, cy + Math.sin(a) * t1);
+        ctx.lineTo(cx + Math.cos(a) * t2, cy + Math.sin(a) * t2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        if (d > 0 && d < cycleDuration) {
+          const dayLblR = outerR + 18;
+          ctx.font = '7px monospace';
+          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          ctx.fillText('' + d, cx + Math.cos(a) * dayLblR, cy + Math.sin(a) * dayLblR);
+        }
+      }
+    });
+
+    // ── BOUNDARY RINGS ──
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, cycLoR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Price labels
+    ctx.textAlign = 'right';
+    ctx.font = '9px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillText(fmt(gHi), cx - 6, cy - outerR + 14);
+    ctx.fillText(fmt(gLo), cx - 6, cy - cycLoR + 14);
+
+    // ── CENTER ──
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const lastCyc = cycles[cycles.length - 1];
+    const p = livePrice || lastCyc.wavePoints[lastCyc.wavePoints.length - 1]?.price || 0;
+    const pctInRange = gHi !== gLo ? ((p - gLo) / (gHi - gLo) * 100) : 50;
+    const pctRound = Math.round(pctInRange);
+    const pctColor = pctRound > 80 ? GOLD : pctRound < 20 ? CYAN : GREEN;
+
+    ctx.font = 'bold 28px monospace';
+    ctx.fillStyle = pctColor;
+    ctx.fillText(pctRound + '%', cx, cy - 14);
+
+    ctx.font = '8px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText('OF ' + NUM_CYCLES + '-CYCLE RANGE', cx, cy + 6);
+
+    const phaseLabel = lastCyc.declining ? '▼ DECLINING' : '▲ RISING';
+    const phaseColor = lastCyc.declining ? RED : GREEN;
+    ctx.font = '8px monospace';
+    ctx.fillStyle = phaseColor;
+    ctx.fillText(phaseLabel, cx, cy + 22);
+
+    ctx.font = '7px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillText('BREAK ROOM', cx, cy + (innerR + cycLoR) / 2 - cy + cy);
+  }
+
+  function updateInfo() {
+    if (!cycles.length) return;
+    const lastCyc = cycles[cycles.length - 1];
+    const p = livePrice || 0;
+    const actualDays = lastCyc.isLast ? Math.round((Date.now() - lastCyc.troughTime) / (24*60*60*1000)) : lastCyc.days;
+
+    $('info').innerHTML = cycles.map((c, i) => {
+      const days = c.isLast ? actualDays : c.days;
+      const phase = c.declining ? 'DECLINE' : 'RISE';
+      const phCol = c.declining ? RED : GREEN;
+      const range = c.cHi - c.cLo;
+      return `
+        <div class="info-card">
+          <div class="lbl">CYCLE ${i+1}</div>
+          <div class="val" style="color:${phCol};font-size:11px">${phase} · ${days}d</div>
+          <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:2px">${fmt(c.cLo)} — ${fmt(c.cHi)}</div>
+        </div>
+      `;
+    }).join('') + `
+      <div class="info-card">
+        <div class="lbl">GLOBAL RANGE</div>
+        <div class="val" style="color:${GREEN};font-size:11px">${fmt(globalLo)} — ${fmt(globalHi)}</div>
+      </div>
+    `;
+  }
+
+  function loop() {
+    draw();
+    updateInfo();
+    requestAnimationFrame(loop);
+  }
+
+  // ═══════════════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════════════
+  async function init() {
+    try {
+      // Need enough daily data for NUM_CYCLES × 60 days + detection buffer
+      const daily = await fetchDailyOHLC(NUM_CYCLES * 60 + 80);
+      cycles = await buildCycles(daily);
+
+      // Global range across all cycles
+      globalHi = Math.max(...cycles.map(c => c.cHi));
+      globalLo = Math.min(...cycles.map(c => c.cLo));
+
+      if (!livePrice && cycles.length) {
+        const last = cycles[cycles.length - 1];
+        livePrice = last.wavePoints.length ? last.wavePoints[last.wavePoints.length - 1].price : 0;
+      }
+
+      clearInterval(dotTimer);
+      $('loading').classList.add('hidden');
+      const app = $('app');
+      app.classList.remove('hidden');
+      app.style.display = 'flex';
+
+      resize();
+      loop();
+      connectWS();
+      window.addEventListener('resize', resize);
+
+    } catch (e) {
+      console.error(e);
+      $('dots').textContent = '';
+      document.querySelector('.loading-text').textContent = 'ERROR: ' + e.message;
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
