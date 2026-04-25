@@ -133,6 +133,7 @@ let segments=[];
 let globalHi=0,globalLo=Infinity;
 let livePrice=0,totalDaysElapsed=0;
 let ath=0,athDay=0;
+let bloodLo=0,bloodHi=0; // projected bottom range (20-30% of ATH)
 
 async function buildSegments(){
   const [daily,athVal]=await Promise.all([fetchAllDaily(),fetchATH()]);
@@ -147,6 +148,10 @@ async function buildSegments(){
   // Find ATH day for reference marker
   const maxH=Math.max(...highs);
   athDay=highs.indexOf(maxH);
+
+  // Projected bottom range: 20-30% of ATH
+  bloodLo=ath*0.20;
+  bloodHi=ath*0.30;
 
   // Trough detection
   let troughs=detectTroughs(closes,12);
@@ -246,8 +251,8 @@ function draw(){
   const outerR=Math.min(cx,cy)-44;
   const innerR=outerR*0.18; // tight inner = maximum radial band for segments
 
-  // SCALE: just the actual data. No projected zones blowing it out.
-  const scaleMin=globalLo*0.95; // tiny padding
+  // SCALE: include blood zone floor so we can see where we're heading
+  const scaleMin=bloodLo*0.9; // below blood zone
   const scaleMax=globalHi*1.02;
 
   function priceToR(p){
@@ -258,6 +263,25 @@ function draw(){
   /* ── OUTER RING ── */
   ctx.beginPath();ctx.arc(cx,cy,outerR,0,Math.PI*2);
   ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;ctx.stroke();
+
+  /* ── BLOOD ZONE — estimated cycle bottom range, 40% red ── */
+  const rBloodLo=priceToR(bloodLo);
+  const rBloodHi=priceToR(bloodHi);
+  ctx.beginPath();
+  ctx.arc(cx,cy,rBloodHi,0,Math.PI*2);
+  ctx.arc(cx,cy,rBloodLo,0,Math.PI*2,true);
+  ctx.closePath();
+  ctx.fillStyle='rgba(255,23,68,0.40)';
+  ctx.fill();
+  // Edges
+  ctx.beginPath();ctx.arc(cx,cy,rBloodLo,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,23,68,0.6)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,rBloodHi,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,23,68,0.6)';ctx.lineWidth=1.5;ctx.stroke();
+  // Label
+  ctx.font='bold 8px monospace';ctx.fillStyle='rgba(255,23,68,0.8)';ctx.textAlign='right';
+  ctx.fillText('BLOOD ZONE '+fmt(bloodLo)+' — '+fmt(bloodHi),cx-8,cy+(rBloodLo+rBloodHi)/2+3);
+  ctx.textAlign='center';
 
   /* ── YEAR MARKERS ── */
   ctx.textAlign='center';ctx.textBaseline='middle';
@@ -381,7 +405,18 @@ function draw(){
     ctx.fillStyle=CYAN;ctx.fill();
   });
 
-  /* ── LIVE DOT ── */
+  /* ── LIVE PRICE RADAR RING — full circle at current price level ── */
+  if(livePrice){
+    const liveR=priceToR(livePrice);
+    // Full circle so you see current price relative to every segment, ATH, and blood zone
+    ctx.beginPath();ctx.arc(cx,cy,liveR,0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,230,118,0.5)';ctx.lineWidth=2;ctx.stroke();
+    // Price label on the ring at 12 o'clock position
+    ctx.font='bold 11px monospace';ctx.fillStyle=G;
+    ctx.fillText(fmt(livePrice),cx,cy-liveR-10);
+  }
+
+  /* ── LIVE DOT (position on the clock) ── */
   if(livePrice&&segments.length){
     const nowA=dayToAngle(totalDaysElapsed);
     const nowR=priceToR(livePrice);
@@ -394,12 +429,6 @@ function draw(){
     // Dot
     ctx.beginPath();ctx.arc(nx,ny,5.5,0,Math.PI*2);
     ctx.fillStyle=G;ctx.shadowColor=G;ctx.shadowBlur=20;ctx.fill();ctx.shadowBlur=0;
-
-    // Price label
-    const plx=nx+Math.cos(nowA)*24;
-    const ply=ny+Math.sin(nowA)*24;
-    ctx.font='bold 13px monospace';ctx.fillStyle=G;
-    ctx.fillText(fmt(livePrice),plx,ply);
   }
 
   /* ── FUTURE ARC (dashed, subtle) ── */
