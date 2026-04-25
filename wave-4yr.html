@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE 4-YEAR MAP — Quanta Jumps</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #fff; font-family: 'SF Mono', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+  #ui { position: absolute; top: 30px; width: 100%; text-align: center; pointer-events: none; z-index: 10;}
+  h1 { font-size: 16px; letter-spacing: 8px; font-weight: 700; color: #fff; }
+  .sub { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 4px; margin-top: 6px; }
+  canvas { position: absolute; z-index: 1; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <h1>THE 4-YEAR MAP</h1>
+  <div class="sub">NOV 2022 — NOV 2026 (QUANTA JUMPS)</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+const GREEN = "rgba(0, 230, 118, 0.4)";
+const RED = "rgba(255, 23, 68, 0.4)";
+
+let quantaBlocks =[];
+let globalMax = 0;
+
+async function buildMap() {
+  // 1. Fetch data from roughly Nov 2022
+  const res = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1400&interval=daily");
+  const data = await res.json();
+
+  // Find Nov 21, 2022 bottom (Timestamp roughly 1669000000000)
+  const nov2022TS = 1668988800000;
+  let prices = data.prices.filter(p => p[0] >= nov2022TS).map(p => p[1]);
+
+  // Find dynamic 60-day cycles
+  const troughs =[];
+  const halfWin = 12;
+  for (let i = halfWin; i < prices.length - halfWin; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= halfWin; j++) { if (prices[i] > prices[i-j] || prices[i] > prices[i+j]) isTrough = false; }
+    if (isTrough) troughs.push({ idx: i, price: prices[i] });
+  }
+
+  // Filter 40 day minimum gap
+  const filtered = [troughs[0]];
+  for (let i = 1; i < troughs.length; i++) {
+    if (troughs[i].idx - filtered[filtered.length-1].idx >= 40) filtered.push(troughs[i]);
+    else if (troughs[i].price < filtered[filtered.length-1].price) filtered[filtered.length-1] = troughs[i];
+  }
+
+  // Create the Quanta Blocks
+  for (let i = 0; i < filtered.length - 1; i++) {
+    const startIdx = filtered[i].idx;
+    const endIdx = filtered[i+1].idx;
+    const slice = prices.slice(startIdx, endIdx);
+
+    const cycleMin = Math.min(...slice);
+    const cycleMax = Math.max(...slice);
+    if (cycleMax > globalMax) globalMax = cycleMax;
+
+    // Macro declining means the cycle closed significantly lower than it opened
+    const isDeclining = slice[slice.length-1] < slice[0] * 0.95;
+
+    quantaBlocks.push({
+      startDay: startIdx,
+      endDay: endIdx,
+      low: cycleMin,
+      high: cycleMax,
+      color: isDeclining ? RED : GREEN,
+      path: slice
+    });
+  }
+
+  render();
+}
+
+function render() {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+
+  const outerR = Math.min(cx, cy) - 50;
+  const innerR = 40; // Starts small at the center (Nov 2022)
+
+  // Radar Grid
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, outerR*0.6, 0, Math.PI*2); ctx.stroke();
+
+  // 4 Years = 1461 Days.
+  // Angle 0 (12 o'clock) is Nov 2022. Angle 360 is Nov 2026.
+  const TOTAL_DAYS = 1461;
+
+  function getA(day) { return (day / TOTAL_DAYS) * Math.PI * 2 - Math.PI/2; }
+  function getR(price) { return innerR + (price / globalMax) * (outerR - innerR); }
+
+  // Draw 4-Year Clock Hash Marks
+  ctx.font = "10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.textAlign = "center";
+  ctx.fillText("NOV '22 / NOV '26", cx, cy - outerR - 15);
+  ctx.fillText("NOV '23", cx + outerR + 25, cy + 4);
+  ctx.fillText("NOV '24", cx, cy + outerR + 15);
+  ctx.fillText("NOV '25", cx - outerR - 25, cy + 4);
+
+  // DRAW THE QUANTA BLOCKS
+  quantaBlocks.forEach((block, idx) => {
+    const aStart = getA(block.startDay);
+    const aEnd = getA(block.endDay);
+    const rLow = getR(block.low);
+    const rHigh = getR(block.high);
+
+    // Draw the Geometric Range Block
+    ctx.beginPath();
+    ctx.arc(cx, cy, rHigh, aStart, aEnd);
+    ctx.arc(cx, cy, rLow, aEnd, aStart, true);
+    ctx.closePath();
+    ctx.fillStyle = block.color;
+    ctx.fill();
+
+    // Outline the block
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Draw the price path strictly inside the block
+    ctx.beginPath();
+    block.path.forEach((p, i) => {
+      const a = getA(block.startDay + i);
+      const r = getR(p);
+      if (i===0) ctx.moveTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+      else ctx.lineTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+    });
+    ctx.strokeStyle = "rgba(255,255,255,0.8)";
+    ctx.stroke();
+  });
+}
+
+buildMap();
+</script>
+</body>
+</html>

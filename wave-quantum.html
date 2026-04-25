@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE WAVE — 60-Day Quantum</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #fff; font-family: 'SF Mono', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+  #ui { position: absolute; top: 30px; width: 100%; text-align: center; pointer-events: none; z-index: 10; }
+  h1 { font-size: 16px; letter-spacing: 8px; font-weight: 700; }
+  .sub { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 4px; margin-top: 6px; }
+  canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+  #hud { position: absolute; z-index: 10; text-align: center; pointer-events: none; }
+  .price { font-size: 36px; font-weight: bold; letter-spacing: 2px; }
+  .data { font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 2px; margin-top: 8px; }
+  .badge { display: inline-block; padding: 6px 14px; border-radius: 4px; font-size: 10px; font-weight: bold; letter-spacing: 2px; margin-top: 12px; border: 1px solid; background: rgba(0,0,0,0.5); }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <h1>THE WAVE</h1>
+  <div class="sub">CURRENT 60-DAY QUANTUM RANGE</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="hud" style="display:none;">
+  <div class="data" id="hud-day">DAY 0</div>
+  <div class="price" id="hud-price">--</div>
+  <div class="badge" id="hud-phase">--</div>
+</div>
+
+<script>
+const GREEN = "#00E676", RED = "#FF1744";
+
+let state = {
+  klines4h:[], tDate: null, tPrice: Infinity, cHi: 0, cHiDay: 0,
+  livePrice: 0, daysIn: 0, declining: false
+};
+
+async function init() {
+  try {
+    const rDay = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200");
+    const dDay = await rDay.json();
+    const closes = dDay.map(k => +k[4]);
+
+    // Trough detection (12-day window)
+    const troughs =[];
+    for (let i = 12; i < closes.length - 1; i++) {
+      let isTrough = true;
+      for (let j = 1; j <= 12; j++) { if (closes[i] > closes[i-j] || closes[i] > closes[i+j]) isTrough = false; }
+      if (isTrough) troughs.push({ idx: i, price: closes[i], date: dDay[i][0] });
+    }
+
+    // 30-day gap filter
+    const filtered = [troughs[0]];
+    for (let i = 1; i < troughs.length; i++) {
+      if (troughs[i].idx - filtered[filtered.length-1].idx >= 30) filtered.push(troughs[i]);
+      else if (troughs[i].price < filtered[filtered.length-1].price) filtered[filtered.length-1] = troughs[i];
+    }
+
+    const lastTrough = filtered[filtered.length - 1];
+    state.tDate = lastTrough.date;
+    state.tPrice = lastTrough.price;
+
+    const r4h = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=${state.tDate}&limit=1000`);
+    const d4h = await r4h.json();
+    state.klines4h = d4h.map(k => ({ high: +k[2], low: +k[3], close: +k[4] }));
+
+    state.klines4h.forEach((k, i) => { if (k.high > state.cHi) { state.cHi = k.high; state.cHiDay = i/6; } });
+    state.livePrice = state.klines4h[state.klines4h.length-1].close;
+    state.daysIn = state.klines4h.length / 6;
+
+    document.getElementById("hud").style.display = "block";
+    startWS();
+    requestAnimationFrame(render);
+  } catch (e) { console.error(e); }
+}
+
+function startWS() {
+  const ws = new WebSocket("wss://stream.binance.com:9443/ws/btcusdt@trade");
+  ws.onmessage = (e) => {
+    state.livePrice = parseFloat(JSON.parse(e.data).p);
+
+    // Conservative Phase Detection (Prevents false red flashes)
+    const drop = (state.cHi - state.livePrice) / state.cHi;
+    const daysSincePeak = state.daysIn - state.cHiDay;
+    state.declining = (drop >= 0.10) || (drop >= 0.06 && daysSincePeak >= 5) || (state.daysIn >= 40 && drop >= 0.05);
+
+    document.getElementById("hud-price").innerText = `$${state.livePrice.toLocaleString(undefined, {maximumFractionDigits:0})}`;
+    document.getElementById("hud-price").style.color = state.declining ? RED : GREEN;
+    document.getElementById("hud-day").innerText = `DAY ${state.daysIn.toFixed(1)} OF ~60`;
+
+    const badge = document.getElementById("hud-phase");
+    badge.innerText = state.declining ? "CONTRACTION (RED QUANTUM)" : "EXPANSION (GREEN QUANTUM)";
+    badge.style.color = state.declining ? RED : GREEN;
+    badge.style.borderColor = state.declining ? RED : GREEN;
+  };
+}
+
+function render() {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const cx = canvas.width/2, cy = canvas.height/2;
+
+  const hud = document.getElementById("hud");
+  hud.style.left = (cx - hud.offsetWidth/2) + "px";
+  hud.style.top = (cy - hud.offsetHeight/2) + "px";
+
+  // Base Geometry
+  const outerR = Math.min(cx, cy) - 80;
+  const innerR = outerR * 0.4;
+  const pad = (outerR - innerR) * 0.15;
+  const lowR = innerR + pad; // Cycle low sits slightly above inner boundary
+
+  function getR(p) { return lowR + ((p - state.tPrice) / (state.cHi - state.tPrice || 1)) * (outerR - pad - lowR); }
+  function getA(d) { return (d / 60) * Math.PI * 2 - Math.PI/2; }
+
+  const color = state.declining ? RED : GREEN;
+
+  // DRAW THE QUANTUM RANGE BACKGROUND (30% Opacity Band)
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR - pad, 0, Math.PI*2);
+  ctx.arc(cx, cy, lowR, 0, Math.PI*2, true);
+  ctx.fillStyle = state.declining ? "rgba(255,23,68,0.2)" : "rgba(0,230,118,0.2)";
+  ctx.fill();
+
+  // Grid lines
+  ctx.strokeStyle = "rgba(255,255,255,0.1)";
+  ctx.beginPath(); ctx.arc(cx, cy, outerR - pad, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, lowR, 0, Math.PI*2); ctx.stroke();
+
+  // Draw Time Markers
+  ctx.font = "10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.textAlign = "center";
+  for (let d = 0; d < 60; d += 10) {
+    const a = getA(d);
+    ctx.fillText(d === 0 ? "TROUGH" : `D${d}`, cx + (outerR + 10)*Math.cos(a), cy + (outerR + 10)*Math.sin(a));
+    ctx.beginPath(); ctx.moveTo(cx + outerR*Math.cos(a), cy + outerR*Math.sin(a));
+    ctx.lineTo(cx + (outerR-10)*Math.cos(a), cy + (outerR-10)*Math.sin(a)); ctx.stroke();
+  }
+
+  // Draw 4H Price Path inside the Quantum
+  ctx.beginPath();
+  state.klines4h.forEach((k, i) => {
+    const a = getA(i/6); const r = getR(k.close);
+    if(i===0) ctx.moveTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+    else ctx.lineTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+  });
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+
+  // Live Dot
+  const liveA = getA(state.daysIn); const liveR = getR(state.livePrice);
+  ctx.beginPath(); ctx.arc(cx + liveR*Math.cos(liveA), cy + liveR*Math.sin(liveA), 6, 0, Math.PI*2);
+  ctx.fillStyle = color; ctx.fill();
+
+  requestAnimationFrame(render);
+}
+
+init();
+</script>
+</body>
+</html>
