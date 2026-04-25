@@ -23,19 +23,17 @@ body {
   .left-panel,.right-panel { flex:none; width:100%; }
   .right-panel { border-left:none; border-top:1px solid rgba(255,255,255,0.06); }
 }
-
+canvas { border-radius:12px; display:block; }
 .canvas-header { text-align:center; margin-bottom:6px; }
 .canvas-header h1 { font-size:20px; font-weight:700; letter-spacing:8px; }
 .canvas-header .sub { font-size:9px; color:rgba(255,255,255,0.2); letter-spacing:3px; margin-top:3px; }
-canvas { border-radius:12px; display:block; }
 
-/* HUD */
 .hud-section {
-  padding:12px 12px; border-radius:8px;
+  padding:12px; border-radius:8px;
   background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06);
 }
 .hud-label { font-size:8px; letter-spacing:2.5px; color:rgba(255,255,255,0.28); margin-bottom:6px; }
-.hud-value { font-size:22px; font-weight:700; letter-spacing:1px; }
+.hud-value { font-size:22px; font-weight:700; }
 .hud-value.sm { font-size:14px; }
 .hud-sub { font-size:9px; color:rgba(255,255,255,0.22); margin-top:3px; }
 .hud-row { display:flex; justify-content:space-between; align-items:center; margin:3px 0; }
@@ -43,28 +41,19 @@ canvas { border-radius:12px; display:block; }
 .hud-row .val { font-size:11px; font-weight:700; }
 .divider { height:1px; background:rgba(255,255,255,0.04); margin:4px 0; }
 
-/* Range bar */
 .range-bar-wrap { margin:6px 0; }
 .range-bar-label { display:flex; justify-content:space-between; font-size:8px; color:rgba(255,255,255,0.2); letter-spacing:1px; margin-bottom:3px; }
-.range-bar-bg {
-  height:10px; border-radius:5px; position:relative; overflow:visible;
-  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);
-}
+.range-bar-bg { height:10px; border-radius:5px; position:relative; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); }
 .range-bar-fill { position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
-.range-bar-marker {
-  position:absolute; top:-3px; bottom:-3px; width:3px; border-radius:2px;
-  transform:translateX(-1.5px); z-index:2;
-}
+.range-bar-marker { position:absolute; top:-3px; bottom:-3px; width:3px; border-radius:2px; transform:translateX(-1.5px); z-index:2; }
 .range-pct { font-size:11px; font-weight:900; text-align:right; margin-top:3px; }
 
-/* Regime */
 .regime-badge {
   display:inline-flex; align-items:center; gap:6px;
   padding:4px 12px; border-radius:16px; font-size:9px; letter-spacing:2px; font-weight:700;
 }
 .regime-badge .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
 
-/* Loading */
 .loading-overlay {
   position:fixed; inset:0; background:#0a0a0f; z-index:999;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -75,8 +64,8 @@ canvas { border-radius:12px; display:block; }
   border:2px solid rgba(0,230,118,0.3); animation:pulse 1.4s ease-in-out infinite;
 }
 @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
-@keyframes glowGreen { 0%,100%{text-shadow:0 0 6px rgba(0,230,118,0.3)} 50%{text-shadow:0 0 16px rgba(0,230,118,0.6)} }
-@keyframes glowRed { 0%,100%{text-shadow:0 0 6px rgba(255,23,68,0.3)} 50%{text-shadow:0 0 16px rgba(255,23,68,0.6)} }
+@keyframes glowG { 0%,100%{text-shadow:0 0 6px rgba(0,230,118,0.3)} 50%{text-shadow:0 0 16px rgba(0,230,118,0.6)} }
+@keyframes glowR { 0%,100%{text-shadow:0 0 6px rgba(255,23,68,0.3)} 50%{text-shadow:0 0 16px rgba(255,23,68,0.6)} }
 .hidden { display:none!important; }
 .footer-hud { margin-top:auto; text-align:center; font-size:8px; color:rgba(255,255,255,0.08); letter-spacing:1px; padding-top:10px; }
 </style>
@@ -92,46 +81,51 @@ canvas { border-radius:12px; display:block; }
   <div class="left-panel">
     <div class="canvas-header">
       <h1>THE RANGE</h1>
-      <div class="sub">WHERE YOU ARE · WHERE YOU'RE BOUND</div>
+      <div class="sub">BLOOD ZONE · RANGE BANDS · ATH · GOLDEN ZONE · LIVE</div>
     </div>
     <canvas id="canvas"></canvas>
   </div>
-
   <div class="right-panel">
 
     <div class="hud-section" style="border-color:rgba(255,255,255,0.12)">
-      <div class="hud-label">LIVE PRICE</div>
+      <div class="hud-label">LIVE PRICE (BINANCE)</div>
       <div class="hud-value" id="livePrice" style="font-size:26px;">—</div>
       <div class="hud-sub" id="liveSub"></div>
       <div id="regimeBadge" style="margin-top:8px;"></div>
     </div>
 
     <div class="hud-section">
-      <div class="hud-label">20-DAY RANGE — SHORT TERM</div>
+      <div class="hud-label">20-DAY RANGE (ACTUAL HIGHS & LOWS)</div>
       <div class="range-bar-wrap">
         <div class="range-bar-label"><span id="r20lo">—</span><span id="r20hi">—</span></div>
         <div class="range-bar-bg">
-          <div class="range-bar-fill" id="r20fill" style="background:rgba(0,230,118,0.15)"></div>
-          <div class="range-bar-marker" id="r20marker" style="background:#00E676;box-shadow:0 0 8px #00E676"></div>
+          <div class="range-bar-fill" id="r20fill"></div>
+          <div class="range-bar-marker" id="r20marker"></div>
         </div>
-        <div class="range-pct" id="r20pct" style="color:#00E676">—</div>
+        <div class="range-pct" id="r20pct">—</div>
       </div>
       <div class="hud-row"><span class="lbl">RANGE WIDTH</span><span class="val" id="r20width">—</span></div>
     </div>
 
     <div class="hud-section">
-      <div class="hud-label">CYCLE RANGE — SINCE LAST TROUGH</div>
+      <div class="hud-label">CYCLE RANGE (SINCE LAST 60D TROUGH)</div>
       <div class="range-bar-wrap">
         <div class="range-bar-label"><span id="rClo">—</span><span id="rChi">—</span></div>
         <div class="range-bar-bg">
-          <div class="range-bar-fill" id="rCfill" style="background:rgba(0,230,118,0.08)"></div>
-          <div class="range-bar-marker" id="rCmarker" style="background:#4FC3F7;box-shadow:0 0 8px #4FC3F7"></div>
+          <div class="range-bar-fill" id="rCfill"></div>
+          <div class="range-bar-marker" id="rCmarker"></div>
         </div>
-        <div class="range-pct" id="rCpct" style="color:#4FC3F7">—</div>
+        <div class="range-pct" id="rCpct">—</div>
       </div>
       <div class="hud-row"><span class="lbl">DAYS SINCE TROUGH</span><span class="val" id="rCdays">—</span></div>
       <div class="hud-row"><span class="lbl">TROUGH PRICE</span><span class="val" id="rCtrough">—</span></div>
-      <div class="hud-row"><span class="lbl">RANGE WIDTH</span><span class="val" id="rCwidth">—</span></div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-label">4-YEAR CYCLE POSITION</div>
+      <div class="hud-row"><span class="lbl">DAYS SINCE HALVING</span><span class="val" id="halvDays">—</span></div>
+      <div class="hud-row"><span class="lbl">HALVING DATE</span><span class="val" id="halvDate" style="color:rgba(255,255,255,0.4)">Apr 20, 2024</span></div>
+      <div class="hud-row"><span class="lbl">EST. CYCLE BOTTOM</span><span class="val" id="estBottom" style="color:#FF1744">—</span></div>
     </div>
 
     <div class="hud-section">
@@ -143,14 +137,20 @@ canvas { border-radius:12px; display:block; }
 
     <div class="hud-section">
       <div class="hud-label">REFERENCE LEVELS</div>
-      <div class="hud-row"><span class="lbl">ATH</span><span class="val" id="athVal" style="color:#FFD700">—</span></div>
+      <div class="hud-row"><span class="lbl">ALL-TIME HIGH</span><span class="val" id="athVal" style="color:#FFD700">—</span></div>
       <div class="hud-row"><span class="lbl">FROM ATH</span><span class="val" id="athDist">—</span></div>
       <div class="divider"></div>
       <div class="hud-row"><span class="lbl">BLOOD ZONE</span><span class="val" id="bloodZone" style="color:#FF1744">—</span></div>
       <div class="hud-row"><span class="lbl">GOLDEN ZONE</span><span class="val" id="goldZone" style="color:#FFD700">—</span></div>
     </div>
 
-    <div class="footer-hud">THE RANGE · LIVE · BINANCE WEBSOCKET</div>
+    <div class="hud-section">
+      <div class="hud-label">DATA</div>
+      <div class="hud-row"><span class="lbl">OHLC SOURCE</span><span class="val" id="dataSource" style="color:rgba(255,255,255,0.3)">—</span></div>
+      <div class="hud-row"><span class="lbl">CACHED DAYS</span><span class="val" id="cachedDays" style="color:rgba(255,255,255,0.3)">—</span></div>
+    </div>
+
+    <div class="footer-hud">THE RANGE · LIVE · OHLC DATA · LOCALSTORAGE CACHE</div>
   </div>
 </div>
 
@@ -159,22 +159,22 @@ canvas { border-radius:12px; display:block; }
   'use strict';
 
   const GREEN = '#00E676', RED = '#FF1744', GOLD = '#FFD700', CYAN = '#4FC3F7', BG = '#0a0a0f';
+  const HALVING_DATE = new Date('2024-04-20');
+  const CACHE_KEY = 'btcRings_rangeOHLC_v1';
 
-  /* ── STATE ── */
   const S = {
-    closes: [], hist: [],
+    klines: [],       // {t, o, h, l, c, v}
+    closes: [],
+    highs: [],
+    lows: [],
     ath: 0, athDate: '',
     livePrice: 0,
-    // 20-day range
     r20hi: 0, r20lo: 0, r20pct: 0,
-    // Cycle range
     cHi: 0, cLo: 0, cPct: 0, cTroughIdx: 0, cTroughPrice: 0, cDays: 0,
-    // Momentum
     roc20: 0, roc60: 0, momentum: 0,
-    // Projections
-    projLow: [0,0], projHigh: [0,0],
-    // Animation
-    _animLive: 0, _anim20lo: 0, _anim20hi: 0, _animClo: 0, _animChi: 0,
+    projLow: [0, 0], projHigh: [0, 0],
+    daysSinceHalving: 0,
+    _animLive: 0,
     ready: false
   };
 
@@ -182,7 +182,6 @@ canvas { border-radius:12px; display:block; }
   const canvas = $('canvas');
   const ctx = canvas.getContext('2d');
 
-  /* ── LOADING DOTS ── */
   let dotCount = 0;
   const dotTimer = setInterval(() => {
     dotCount = (dotCount + 1) % 4;
@@ -190,7 +189,6 @@ canvas { border-radius:12px; display:block; }
     if (d) d.textContent = '.'.repeat(dotCount);
   }, 400);
 
-  /* ── HELPERS ── */
   function fmt(n, dec = 0) {
     if (!n || isNaN(n)) return '—';
     return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -200,8 +198,34 @@ canvas { border-radius:12px; display:block; }
     return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
   }
 
-  /* ── DATA ── */
-  async function fetchJSON(url, timeout = 12000) {
+  // ═══════════════════════════════════════════════
+  // LOCAL STORAGE CACHE
+  // ═══════════════════════════════════════════════
+  function loadCache() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || !data.klines || !data.klines.length) return null;
+      console.log('Cache loaded:', data.klines.length, 'days');
+      return data;
+    } catch (e) { return null; }
+  }
+
+  function saveCache(klines) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        lastUpdate: Date.now(),
+        klines: klines.slice(-500) // Keep last 500 days
+      }));
+      console.log('Cache saved:', klines.length, 'days');
+    } catch (e) { console.warn('Cache save failed:', e.message); }
+  }
+
+  // ═══════════════════════════════════════════════
+  // DATA: BINANCE OHLC (actual highs and lows)
+  // ═══════════════════════════════════════════════
+  async function fetchJSON(url, timeout = 15000) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeout);
     try {
@@ -212,25 +236,62 @@ canvas { border-radius:12px; display:block; }
     } catch (e) { clearTimeout(t); throw e; }
   }
 
-  async function getHistorical() {
-    const sources = [
-      async () => {
-        const d = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily');
-        return d.prices.map(p => ({ t: p[0], c: p[1] }));
-      },
-      async () => {
-        const d = await fetchJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=365');
-        return d.map(k => ({ t: Number(k[0]), c: Number(k[4]) }));
-      },
-      async () => {
-        const d = await fetchJSON('https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=365');
-        return d.Data.Data.map(p => ({ t: p.time * 1000, c: p.close }));
-      }
-    ];
+  async function fetchBinanceOHLC() {
+    // Fetch 365 days of daily OHLC from Binance
+    const d = await fetchJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=365');
+    return d.map(k => ({
+      t: Number(k[0]),
+      o: Number(k[1]),
+      h: Number(k[2]),   // ACTUAL daily high
+      l: Number(k[3]),   // ACTUAL daily low
+      c: Number(k[4]),   // Daily close
+      v: Number(k[5])
+    }));
+  }
+
+  async function fetchCoinGeckoOHLC() {
+    // Fallback: CoinGecko OHLC (less granular but works)
+    const d = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin/ohlc?vs_currency=usd&days=365');
+    // CoinGecko OHLC returns [timestamp, open, high, low, close] every 4 days for 365
+    // We need to aggregate to daily — but actually for 365 days it gives us 4-day candles
+    // Better to use market_chart as fallback with close-only
+    const mc = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily');
+    // Close-only fallback: use close as both high and low (less accurate but better than nothing)
+    return mc.prices.map(p => ({
+      t: p[0], o: p[1], h: p[1], l: p[1], c: p[1], v: 0
+    }));
+  }
+
+  async function getOHLC() {
+    // Try Binance first (has actual OHLC), then CoinGecko as fallback
+    const sources = [fetchBinanceOHLC, fetchCoinGeckoOHLC];
     for (const fn of sources) {
-      try { const d = await fn(); if (d && d.length > 60) return d; } catch (e) { console.warn(e.message); }
+      try {
+        const d = await fn();
+        if (d && d.length > 60) {
+          // Merge with cache: keep older data from cache, newer from API
+          const cached = loadCache();
+          let merged = d;
+          if (cached && cached.klines && cached.klines.length) {
+            const apiStart = d[0].t;
+            const older = cached.klines.filter(k => k.t < apiStart);
+            merged = [...older, ...d];
+          }
+          saveCache(merged);
+          $('dataSource').textContent = fn === fetchBinanceOHLC ? 'Binance OHLC' : 'CoinGecko (close only)';
+          return merged;
+        }
+      } catch (e) { console.warn('OHLC source failed:', e.message); }
     }
-    throw new Error('All data sources failed');
+
+    // Last resort: use cache
+    const cached = loadCache();
+    if (cached && cached.klines && cached.klines.length > 60) {
+      $('dataSource').textContent = 'Cache (offline)';
+      return cached.klines;
+    }
+
+    throw new Error('All data sources failed and no cache');
   }
 
   async function fetchATH() {
@@ -240,7 +301,9 @@ canvas { border-radius:12px; display:block; }
     } catch (e) { return null; }
   }
 
-  /* ── TROUGH DETECTION (Vibe's proven algorithm) ── */
+  // ═══════════════════════════════════════════════
+  // TROUGH DETECTION (Vibe's proven algorithm)
+  // ═══════════════════════════════════════════════
   function findTroughs(closes, halfWindow) {
     const troughs = [];
     for (let i = halfWindow; i < closes.length - halfWindow; i++) {
@@ -261,126 +324,137 @@ canvas { border-radius:12px; display:block; }
       const gap = troughs[i] - filtered[filtered.length - 1];
       if (gap >= minGap) {
         filtered.push(troughs[i]);
-      } else {
-        // Keep deeper trough
-        if (closes[troughs[i]] < closes[filtered[filtered.length - 1]]) {
-          filtered[filtered.length - 1] = troughs[i];
-        }
+      } else if (closes[troughs[i]] < closes[filtered[filtered.length - 1]]) {
+        filtered[filtered.length - 1] = troughs[i];
       }
     }
     return filtered;
   }
 
-  /* ── COMPUTE ── */
-  function compute(hist) {
-    const closes = hist.map(h => h.c);
-    S.closes = closes;
-    S.hist = hist;
-    const n = closes.length;
+  // ═══════════════════════════════════════════════
+  // COMPUTE
+  // ═══════════════════════════════════════════════
+  function compute(klines) {
+    S.klines = klines;
+    S.closes = klines.map(k => k.c);
+    S.highs = klines.map(k => k.h);
+    S.lows = klines.map(k => k.l);
+    const n = klines.length;
 
-    // ATH from data if not set
+    $('cachedDays').textContent = n;
+
+    // ATH from data if not set by API
     if (!S.ath) {
-      S.ath = Math.max(...closes);
+      S.ath = Math.max(...S.highs);  // Use actual highs for ATH
     }
 
-    // Projections
+    // Projections based on ATH
     S.projLow = [S.ath * 0.20, S.ath * 0.30];
     S.projHigh = [S.ath * 1.50, S.ath * 2.50];
 
-    // 20-day range
-    const last20 = closes.slice(-20);
-    S.r20hi = Math.max(...last20);
-    S.r20lo = Math.min(...last20);
+    // 20-DAY RANGE: using ACTUAL highs and lows, not closes
+    const last20h = S.highs.slice(-20);
+    const last20l = S.lows.slice(-20);
+    S.r20hi = Math.max(...last20h);
+    S.r20lo = Math.min(...last20l);
 
-    // Trough detection for cycle range
-    let troughs = findTroughs(closes, 12);
-    troughs = filterTroughs(troughs, closes, 60, 0.5);
+    // TROUGH DETECTION on closes
+    let troughs = findTroughs(S.closes, 12);
+    troughs = filterTroughs(troughs, S.closes, 60, 0.5);
     if (troughs.length < 1) {
-      troughs = findTroughs(closes, 8);
-      troughs = filterTroughs(troughs, closes, 60, 0.6);
+      troughs = findTroughs(S.closes, 8);
+      troughs = filterTroughs(troughs, S.closes, 60, 0.6);
     }
 
-    // Last trough
     const lastTrough = troughs.length ? troughs[troughs.length - 1] : 0;
     S.cTroughIdx = lastTrough;
-    S.cTroughPrice = closes[lastTrough];
+    S.cTroughPrice = S.closes[lastTrough];
     S.cDays = n - 1 - lastTrough;
 
-    // Cycle range: from last trough to now
-    const sinceTrough = closes.slice(lastTrough);
-    S.cHi = Math.max(...sinceTrough);
-    S.cLo = Math.min(...sinceTrough);
+    // CYCLE RANGE: actual highs and lows since trough
+    const highsSinceTrough = S.highs.slice(lastTrough);
+    const lowsSinceTrough = S.lows.slice(lastTrough);
+    S.cHi = Math.max(...highsSinceTrough);
+    S.cLo = Math.min(...lowsSinceTrough);
 
-    // ROC
+    // MOMENTUM
     if (n > 60) {
-      S.roc20 = ((closes[n - 1] / closes[n - 21]) - 1) * 100;
-      S.roc60 = ((closes[n - 1] / closes[n - 61]) - 1) * 100;
+      S.roc20 = ((S.closes[n - 1] / S.closes[n - 21]) - 1) * 100;
+      S.roc60 = ((S.closes[n - 1] / S.closes[n - 61]) - 1) * 100;
     }
-
-    // Dual momentum: 5-day confirmation
     if (n >= 66) {
       let bullDays = 0, bearDays = 0;
       for (let d = 0; d < 5; d++) {
         const idx = n - 1 - d;
-        const r20 = ((closes[idx] / closes[idx - 20]) - 1) * 100;
-        const r60 = ((closes[idx] / closes[idx - 60]) - 1) * 100;
+        const r20 = ((S.closes[idx] / S.closes[idx - 20]) - 1) * 100;
+        const r60 = ((S.closes[idx] / S.closes[idx - 60]) - 1) * 100;
         if (r20 > 0 && r60 > 0) bullDays++;
         if (r20 < 0 && r60 < 0) bearDays++;
       }
       S.momentum = bullDays >= 5 ? 1 : bearDays >= 5 ? -1 : 0;
     }
 
-    // Init animation values
-    S._animLive = closes[n - 1];
-    S._anim20lo = S.r20lo;
-    S._anim20hi = S.r20hi;
-    S._animClo = S.cLo;
-    S._animChi = S.cHi;
+    // 4-YEAR CYCLE
+    const now = new Date();
+    S.daysSinceHalving = Math.floor((now - HALVING_DATE) / (24 * 60 * 60 * 1000));
+
+    // Init animation
+    S._animLive = S.closes[n - 1];
   }
 
-  function updateRangePositions() {
+  function updatePositions() {
     const p = S.livePrice || S.closes[S.closes.length - 1];
+
+    // Extend 20d range if live price breaks it
+    if (p > S.r20hi) S.r20hi = p;
+    if (p < S.r20lo) S.r20lo = p;
+    // Extend cycle range too
+    if (p > S.cHi) S.cHi = p;
+    if (p < S.cLo) S.cLo = p;
+
     const r20range = S.r20hi - S.r20lo;
-    S.r20pct = r20range > 0 ? ((p - S.r20lo) / r20range) * 100 : 50;
-    S.r20pct = Math.max(0, Math.min(100, S.r20pct));
+    S.r20pct = r20range > 0 ? Math.max(0, Math.min(100, ((p - S.r20lo) / r20range) * 100)) : 50;
 
     const cRange = S.cHi - S.cLo;
-    S.cPct = cRange > 0 ? ((p - S.cLo) / cRange) * 100 : 50;
-    S.cPct = cRange > 0 ? Math.max(0, Math.min(100, S.cPct)) : 50;
+    S.cPct = cRange > 0 ? Math.max(0, Math.min(100, ((p - S.cLo) / cRange) * 100)) : 50;
   }
 
-  /* ── WEBSOCKET ── */
-  let ws = null, wsRetryDelay = 1000, pollingTimer = null;
+  // ═══════════════════════════════════════════════
+  // WEBSOCKET
+  // ═══════════════════════════════════════════════
+  let ws = null, wsRetry = 1000, pollTimer = null;
 
   function connectWS() {
     try {
       ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-      ws.onopen = () => { wsRetryDelay = 1000; if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; } };
+      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
       ws.onmessage = (e) => {
         try {
           S.livePrice = parseFloat(JSON.parse(e.data).p);
-          updateRangePositions();
+          updatePositions();
           updateHUD();
         } catch (err) {}
       };
-      ws.onclose = () => { setTimeout(connectWS, wsRetryDelay); wsRetryDelay = Math.min(wsRetryDelay * 2, 30000); startPolling(); };
+      ws.onclose = () => { setTimeout(connectWS, wsRetry); wsRetry = Math.min(wsRetry * 2, 30000); startPoll(); };
       ws.onerror = () => { ws.close(); };
-    } catch (e) { startPolling(); }
+    } catch (e) { startPoll(); }
   }
 
-  function startPolling() {
-    if (pollingTimer) return;
-    pollingTimer = setInterval(async () => {
+  function startPoll() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
       try {
         const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000);
         S.livePrice = parseFloat(d.price);
-        updateRangePositions();
+        updatePositions();
         updateHUD();
       } catch (e) {}
     }, 3000);
   }
 
-  /* ── HUD ── */
+  // ═══════════════════════════════════════════════
+  // HUD
+  // ═══════════════════════════════════════════════
   function updateHUD() {
     const p = S.livePrice;
     if (!p) return;
@@ -388,75 +462,69 @@ canvas { border-radius:12px; display:block; }
     const isBear = S.momentum === -1;
     const priceColor = isBear ? RED : GREEN;
 
-    // Live price
     const lp = $('livePrice');
     lp.textContent = fmt(p, 2);
     lp.style.color = priceColor;
-    lp.style.animation = (isBear ? 'glowRed' : 'glowGreen') + ' 2s ease-in-out infinite';
+    lp.style.animation = (isBear ? 'glowR' : 'glowG') + ' 2s ease-in-out infinite';
 
-    // Sub: distance from ATH
-    if (S.ath) {
-      $('liveSub').textContent = fmtPct(((p / S.ath) - 1) * 100) + ' from ATH';
-    }
+    if (S.ath) $('liveSub').textContent = fmtPct(((p / S.ath) - 1) * 100) + ' from ATH';
 
-    // Regime badge
-    const rb = $('regimeBadge');
+    // Regime
     const regimeLabel = S.momentum === 1 ? 'BULL' : S.momentum === -1 ? 'BEAR' : 'NEUTRAL';
-    const regimeColor = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : '#888';
-    rb.innerHTML = `<span class="regime-badge" style="background:${regimeColor}15;border:1px solid ${regimeColor}40;color:${regimeColor}"><span class="dot" style="background:${regimeColor};box-shadow:0 0 6px ${regimeColor}"></span>${regimeLabel} (20d/60d)</span>`;
+    const rc = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : '#888';
+    $('regimeBadge').innerHTML = `<span class="regime-badge" style="background:${rc}15;border:1px solid ${rc}40;color:${rc}"><span class="dot" style="background:${rc};box-shadow:0 0 6px ${rc}"></span>${regimeLabel}</span>`;
 
-    // 20-day range bar
-    const r20pct = S.r20pct;
-    const r20color = r20pct > 80 ? GOLD : r20pct < 20 ? CYAN : GREEN;
+    // 20-day range
+    const r20col = S.r20pct > 80 ? GOLD : S.r20pct < 20 ? CYAN : GREEN;
     $('r20lo').textContent = fmt(S.r20lo, 0);
     $('r20hi').textContent = fmt(S.r20hi, 0);
-    $('r20fill').style.width = Math.max(0, r20pct) + '%';
-    $('r20fill').style.background = r20color + '20';
-    $('r20marker').style.left = Math.max(1, Math.min(99, r20pct)) + '%';
-    $('r20marker').style.background = r20color;
-    $('r20marker').style.boxShadow = '0 0 8px ' + r20color;
-    $('r20pct').textContent = Math.round(r20pct) + '%';
-    $('r20pct').style.color = r20color;
-    const r20w = S.r20hi - S.r20lo;
-    $('r20width').textContent = fmt(r20w, 0) + ' (' + fmtPct((r20w / S.r20lo) * 100) + ')';
+    $('r20fill').style.cssText = `position:absolute;left:0;top:0;bottom:0;border-radius:5px;width:${S.r20pct}%;background:${r20col}20`;
+    $('r20marker').style.cssText = `position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px;transform:translateX(-1.5px);z-index:2;left:${Math.max(1,Math.min(99,S.r20pct))}%;background:${r20col};box-shadow:0 0 8px ${r20col}`;
+    $('r20pct').textContent = Math.round(S.r20pct) + '%';
+    $('r20pct').style.color = r20col;
+    const rw20 = S.r20hi - S.r20lo;
+    $('r20width').textContent = fmt(rw20, 0) + ' (' + fmtPct((rw20 / S.r20lo) * 100) + ')';
 
-    // Cycle range bar
-    const cPct = S.cPct;
-    const cColor = cPct > 80 ? GOLD : cPct < 20 ? CYAN : GREEN;
+    // Cycle range
+    const cCol = S.cPct > 80 ? GOLD : S.cPct < 20 ? CYAN : GREEN;
     $('rClo').textContent = fmt(S.cLo, 0);
     $('rChi').textContent = fmt(S.cHi, 0);
-    $('rCfill').style.width = Math.max(0, cPct) + '%';
-    $('rCfill').style.background = cColor + '15';
-    $('rCmarker').style.left = Math.max(1, Math.min(99, cPct)) + '%';
-    $('rCmarker').style.background = cColor;
-    $('rCmarker').style.boxShadow = '0 0 8px ' + cColor;
-    $('rCpct').textContent = Math.round(cPct) + '%';
-    $('rCpct').style.color = cColor;
+    $('rCfill').style.cssText = `position:absolute;left:0;top:0;bottom:0;border-radius:5px;width:${S.cPct}%;background:${cCol}15`;
+    $('rCmarker').style.cssText = `position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px;transform:translateX(-1.5px);z-index:2;left:${Math.max(1,Math.min(99,S.cPct))}%;background:${cCol};box-shadow:0 0 8px ${cCol}`;
+    $('rCpct').textContent = Math.round(S.cPct) + '%';
+    $('rCpct').style.color = cCol;
     $('rCdays').textContent = S.cDays + ' days';
-    $('rCdays').style.color = S.cDays > 50 ? GOLD : S.cDays > 30 ? GREEN : CYAN;
+    $('rCdays').style.color = S.cDays > 50 ? GOLD : GREEN;
     $('rCtrough').textContent = fmt(S.cTroughPrice, 0);
-    const cW = S.cHi - S.cLo;
-    $('rCwidth').textContent = fmt(cW, 0) + ' (' + fmtPct((cW / S.cLo) * 100) + ')';
+
+    // 4-year cycle
+    $('halvDays').textContent = S.daysSinceHalving + ' days';
+    // Estimated bottom: ~2.5 years after halving (Nov 2026)
+    const estBottomDate = new Date(HALVING_DATE);
+    estBottomDate.setDate(estBottomDate.getDate() + 912); // ~2.5 years
+    const daysToBottom = Math.floor((estBottomDate - new Date()) / (24 * 60 * 60 * 1000));
+    $('estBottom').textContent = '~' + estBottomDate.toLocaleDateString('en-US', {month:'short',year:'numeric'}) + ' (' + daysToBottom + 'd)';
 
     // Momentum
-    const r20el = $('roc20'); const r60el = $('roc60');
-    r20el.textContent = fmtPct(S.roc20);
-    r20el.style.color = S.roc20 >= 0 ? GREEN : RED;
-    r60el.textContent = fmtPct(S.roc60);
-    r60el.style.color = S.roc60 >= 0 ? GREEN : RED;
+    $('roc20').textContent = fmtPct(S.roc20);
+    $('roc20').style.color = S.roc20 >= 0 ? GREEN : RED;
+    $('roc60').textContent = fmtPct(S.roc60);
+    $('roc60').style.color = S.roc60 >= 0 ? GREEN : RED;
     const sig = $('momSignal');
     sig.textContent = S.momentum === 1 ? 'BULLISH' : S.momentum === -1 ? 'BEARISH' : 'MIXED';
     sig.style.color = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : '#888';
 
-    // Reference levels
+    // Reference
     $('athVal').textContent = fmt(S.ath, 0);
     $('athDist').textContent = fmtPct(((p / S.ath) - 1) * 100);
-    $('athDist').style.color = p >= S.ath ? GOLD : RED;
+    $('athDist').style.color = p >= S.ath ? GOLD : 'rgba(255,255,255,0.4)';
     $('bloodZone').textContent = fmt(S.projLow[0], 0) + ' — ' + fmt(S.projLow[1], 0);
     $('goldZone').textContent = fmt(S.projHigh[0], 0) + ' — ' + fmt(S.projHigh[1], 0);
   }
 
-  /* ── CANVAS ── */
+  // ═══════════════════════════════════════════════
+  // CANVAS — LOG SCALE RINGS
+  // ═══════════════════════════════════════════════
   function resizeCanvas() {
     const lp = document.querySelector('.left-panel');
     const w = lp.clientWidth - 32;
@@ -466,113 +534,102 @@ canvas { border-radius:12px; display:block; }
     canvas.height = sz;
   }
 
+  function logMap(price, minP, maxP, minR, maxR) {
+    if (price <= 0 || minP <= 0) return minR;
+    const logMin = Math.log(minP);
+    const logMax = Math.log(maxP);
+    const logP = Math.log(Math.max(price, minP));
+    const t = Math.max(0, Math.min(1, (logP - logMin) / (logMax - logMin)));
+    return minR + t * (maxR - minR);
+  }
+
   function drawRings() {
     const w = canvas.width, h = canvas.height;
     const cx = w / 2, cy = h / 2;
-    const maxR = Math.min(cx, cy) - 24;
-    const minR = 55;
+    const maxR = Math.min(cx, cy) - 28;
+    const minR = 50;
 
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, w, h);
-
     if (!S.ready) return;
 
     const p = S.livePrice || S.closes[S.closes.length - 1];
+    S._animLive += (p - S._animLive) * 0.08;
 
-    // Smooth animation
-    const lerp = 0.06;
-    S._animLive += (p - S._animLive) * lerp;
-    S._anim20lo += (S.r20lo - S._anim20lo) * lerp;
-    S._anim20hi += (S.r20hi - S._anim20hi) * lerp;
-    S._animClo += (S.cLo - S._animClo) * lerp;
-    S._animChi += (S.cHi - S._animChi) * lerp;
+    // Scale: blood zone bottom to golden zone top (log)
+    const scaleMin = S.projLow[0] * 0.8;
+    const scaleMax = S.projHigh[1] * 1.1;
 
-    // Scale: center the visualization around the cycle range
-    // Add padding so the range bands fill most of the canvas
-    const scaleMin = Math.min(S._animClo, S._anim20lo) * 0.97;
-    const scaleMax = Math.max(S._animChi, S._anim20hi, S.ath) * 1.03;
+    function pToR(price) { return logMap(price, scaleMin, scaleMax, minR, maxR); }
 
-    function priceToR(price) {
-      const t = (price - scaleMin) / (scaleMax - scaleMin);
-      return minR + t * (maxR - minR);
+    // ── BLOOD ZONE (red annular ring) ──
+    const rBloodLo = pToR(S.projLow[0]);
+    const rBloodHi = pToR(S.projLow[1]);
+    drawZone(cx, cy, rBloodLo, rBloodHi, 'rgba(255,23,68,0.06)', 'rgba(255,23,68,0.25)');
+    drawLabel(cx, cy + (rBloodLo + rBloodHi) / 2, fmt(S.projLow[0], 0) + ' — ' + fmt(S.projLow[1], 0), 'rgba(255,23,68,0.3)', 7);
+    drawLabel(cx, cy + rBloodHi + 10, 'BLOOD ZONE', 'rgba(255,23,68,0.4)', 7);
+
+    // ── GOLDEN ZONE (gold annular ring) ──
+    const rGoldLo = pToR(S.projHigh[0]);
+    const rGoldHi = Math.min(pToR(S.projHigh[1]), maxR);
+    if (rGoldLo < maxR) {
+      drawZone(cx, cy, rGoldLo, rGoldHi, 'rgba(255,215,0,0.04)', 'rgba(255,215,0,0.2)');
+      drawLabel(cx, cy - (rGoldLo + rGoldHi) / 2, fmt(S.projHigh[0], 0) + ' — ' + fmt(S.projHigh[1], 0), 'rgba(255,215,0,0.25)', 7);
+      drawLabel(cx, cy - rGoldLo + 10, 'GOLDEN ZONE', 'rgba(255,215,0,0.35)', 7);
     }
 
-    // ── Cycle range band (outer, very desaturated) ──
-    const rCycLo = priceToR(S._animClo);
-    const rCycHi = priceToR(S._animChi);
-
+    // ── ATH (gold dashed ring) ──
+    const rATH = pToR(S.ath);
     ctx.beginPath();
-    ctx.arc(cx, cy, rCycHi, 0, Math.PI * 2);
-    ctx.arc(cx, cy, rCycLo, 0, Math.PI * 2, true);
-    ctx.fillStyle = 'rgba(0,230,118,0.03)';
-    ctx.fill();
-
-    // Cycle range borders
-    ctx.beginPath();
-    ctx.arc(cx, cy, rCycLo, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,230,118,0.12)';
-    ctx.lineWidth = 1;
+    ctx.arc(cx, cy, rATH, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,215,0,0.4)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 4]);
     ctx.stroke();
+    ctx.setLineDash([]);
+    drawLabel(cx + rATH * 0.55, cy - rATH * 0.55 - 8, 'ATH ' + fmt(S.ath, 0), 'rgba(255,215,0,0.45)', 7);
 
-    ctx.beginPath();
-    ctx.arc(cx, cy, rCycHi, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,230,118,0.12)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // ── CYCLE RANGE BAND (desaturated green) ──
+    const rCycLo = pToR(S.cLo);
+    const rCycHi = pToR(S.cHi);
+    drawZone(cx, cy, rCycLo, rCycHi, 'rgba(0,230,118,0.025)', 'rgba(0,230,118,0.1)');
 
-    // Cycle range labels
-    drawLabel(cx, cy + rCycLo + 10, 'CYCLE LOW ' + fmt(S.cLo, 0), 'rgba(0,230,118,0.2)', 7);
-    drawLabel(cx, cy - rCycHi - 8, 'CYCLE HIGH ' + fmt(S.cHi, 0), 'rgba(0,230,118,0.2)', 7);
+    // Cycle range labels at angles
+    const angC = Math.PI * 0.25;
+    drawLabelAngled(cx, cy, rCycLo + 8, angC + 0.3, 'CYCLE LOW ' + fmt(S.cLo, 0), 'rgba(0,230,118,0.18)', 7);
+    drawLabelAngled(cx, cy, rCycHi - 8, -angC - 0.1, 'CYCLE HIGH ' + fmt(S.cHi, 0), 'rgba(0,230,118,0.18)', 7);
 
-    // ── 20-day range band (inner, brighter) ──
-    const r20Lo = priceToR(S._anim20lo);
-    const r20Hi = priceToR(S._anim20hi);
+    // ── 20-DAY RANGE BAND (brighter green) ──
+    const r20Lo = pToR(S.r20lo);
+    const r20Hi = pToR(S.r20hi);
+    drawZone(cx, cy, r20Lo, r20Hi, 'rgba(0,230,118,0.05)', 'rgba(0,230,118,0.2)');
 
-    ctx.beginPath();
-    ctx.arc(cx, cy, r20Hi, 0, Math.PI * 2);
-    ctx.arc(cx, cy, r20Lo, 0, Math.PI * 2, true);
-    ctx.fillStyle = 'rgba(0,230,118,0.06)';
-    ctx.fill();
+    // 20d labels at different angles
+    const ang20 = Math.PI * -0.35;
+    drawLabelAngled(cx, cy, r20Lo + 8, ang20 + 0.5, '20D LOW ' + fmt(S.r20lo, 0), 'rgba(0,230,118,0.28)', 7);
+    drawLabelAngled(cx, cy, r20Hi - 8, ang20 - 0.2, '20D HIGH ' + fmt(S.r20hi, 0), 'rgba(0,230,118,0.28)', 7);
 
-    ctx.beginPath();
-    ctx.arc(cx, cy, r20Lo, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,230,118,0.22)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, r20Hi, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,230,118,0.22)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // 20d range labels
-    const ang20 = Math.PI * 0.35;
-    drawLabelAngled(cx, cy, r20Lo, ang20 + 0.1, '20D LOW ' + fmt(S.r20lo, 0), 'rgba(0,230,118,0.3)', 7);
-    drawLabelAngled(cx, cy, r20Hi, -ang20, '20D HIGH ' + fmt(S.r20hi, 0), 'rgba(0,230,118,0.3)', 7);
-
-    // ── ATH ring (gold dashed) ──
-    if (S.ath >= scaleMin && S.ath <= scaleMax * 1.1) {
-      const rATH = priceToR(S.ath);
-      if (rATH <= maxR + 10) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, rATH, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(255,215,0,0.35)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([5, 4]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        drawLabel(cx, cy - rATH - 8, 'ATH ' + fmt(S.ath, 0), 'rgba(255,215,0,0.4)', 7);
-      }
+    // ── PRICE TRAIL: last 20 days as dots ──
+    const trail = S.closes.slice(-20);
+    for (let i = 0; i < trail.length; i++) {
+      const r = pToR(trail[i]);
+      const age = 1 - (i / trail.length); // 0=newest, 1=oldest
+      const angle = Math.PI * 1.5 + (i / trail.length) * Math.PI * 0.4 - Math.PI * 0.2;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      const alpha = 0.06 + (1 - age) * 0.12;
+      ctx.beginPath();
+      ctx.arc(x, y, 2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(79,195,247,${alpha})`;
+      ctx.fill();
     }
 
-    // ── Live price ring (bright, glowing) ──
-    const rLive = priceToR(S._animLive);
+    // ── LIVE PRICE RING (bright, glowing) ──
+    const rLive = pToR(S._animLive);
     const isBear = S.momentum === -1;
     const liveColor = isBear ? RED : GREEN;
 
-    // Glow pass
     ctx.beginPath();
     ctx.arc(cx, cy, rLive, 0, Math.PI * 2);
     ctx.strokeStyle = liveColor;
@@ -582,7 +639,6 @@ canvas { border-radius:12px; display:block; }
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Crisp pass
     ctx.beginPath();
     ctx.arc(cx, cy, rLive, 0, Math.PI * 2);
     ctx.strokeStyle = liveColor;
@@ -592,70 +648,87 @@ canvas { border-radius:12px; display:block; }
     // Live price label
     drawLabel(cx, cy + rLive + 14, fmt(p, 0), liveColor, 11, true);
 
-    // ── Pull lines: live to range boundaries ──
-    // To 20d high
-    if (r20Hi > rLive + 5) {
-      drawPullLine(cx, cy, rLive, r20Hi, Math.PI * -0.4, 'rgba(0,230,118,0.1)');
-      const dist20hi = ((S.r20hi / p) - 1) * 100;
-      const midR = (rLive + r20Hi) / 2;
-      drawLabelAngled(cx, cy, midR, Math.PI * -0.4, fmtPct(dist20hi), 'rgba(0,230,118,0.25)', 8);
-    }
-    // To 20d low
-    if (r20Lo < rLive - 5) {
-      drawPullLine(cx, cy, rLive, r20Lo, Math.PI * 0.7, 'rgba(79,195,247,0.1)');
-      const dist20lo = ((S.r20lo / p) - 1) * 100;
-      const midR2 = (rLive + r20Lo) / 2;
-      drawLabelAngled(cx, cy, midR2, Math.PI * 0.7, fmtPct(dist20lo), 'rgba(79,195,247,0.25)', 8);
+    // ── PULL LINES ──
+    // Live to ATH
+    if (Math.abs(rATH - rLive) > 10) {
+      drawPullLine(cx, cy, rLive, rATH, Math.PI * -0.3, 'rgba(255,215,0,0.1)');
+      const midR = (rLive + rATH) / 2;
+      drawLabelAngled(cx, cy, midR, Math.PI * -0.3, fmtPct(((S.ath / p) - 1) * 100), 'rgba(255,215,0,0.3)', 8);
     }
 
-    // ── Range position in center ──
+    // Live to blood zone
+    const rBloodMid = (rBloodLo + rBloodHi) / 2;
+    if (rLive - rBloodMid > 15) {
+      drawPullLine(cx, cy, rLive, rBloodMid, Math.PI * 0.75, 'rgba(255,23,68,0.1)');
+      const midTarget = (S.projLow[0] + S.projLow[1]) / 2;
+      const midR2 = (rLive + rBloodMid) / 2;
+      drawLabelAngled(cx, cy, midR2, Math.PI * 0.75, fmtPct(((midTarget / p) - 1) * 100) + ' to blood', 'rgba(255,23,68,0.3)', 7);
+    }
+
+    // ── CENTER TEXT ──
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    ctx.font = '8px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.fillText('WHERE YOU ARE', cx, cy - 22);
+    ctx.font = '7px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillText('POSITION IN RANGE', cx, cy - 28);
 
-    // 20d position
+    // 20d pct
     const r20pct = Math.round(S.r20pct);
     const r20col = r20pct > 80 ? GOLD : r20pct < 20 ? CYAN : GREEN;
-    ctx.font = 'bold 14px monospace';
+    ctx.font = 'bold 15px monospace';
     ctx.fillStyle = r20col;
-    ctx.fillText(r20pct + '%', cx - 24, cy);
+    ctx.fillText(r20pct + '%', cx - 26, cy - 6);
     ctx.font = '7px monospace';
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillText('20D', cx - 24, cy + 12);
-
-    // Cycle position
-    const cPct = Math.round(S.cPct);
-    const cCol = cPct > 80 ? GOLD : cPct < 20 ? CYAN : GREEN;
-    ctx.font = 'bold 14px monospace';
-    ctx.fillStyle = cCol;
-    ctx.fillText(cPct + '%', cx + 24, cy);
-    ctx.font = '7px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillText('CYCLE', cx + 24, cy + 12);
+    ctx.fillText('20D', cx - 26, cy + 8);
 
     // Separator
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 10);
-    ctx.lineTo(cx, cy + 8);
+    ctx.moveTo(cx, cy - 16);
+    ctx.lineTo(cx, cy + 4);
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Momentum at bottom of center
+    // Cycle pct
+    const cPct = Math.round(S.cPct);
+    const cCol = cPct > 80 ? GOLD : cPct < 20 ? CYAN : GREEN;
+    ctx.font = 'bold 15px monospace';
+    ctx.fillStyle = cCol;
+    ctx.fillText(cPct + '%', cx + 26, cy - 6);
+    ctx.font = '7px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillText('CYCLE', cx + 26, cy + 8);
+
+    // Momentum + cycle day
     const momText = S.momentum === 1 ? '▲ BULL' : S.momentum === -1 ? '▼ BEAR' : '◆ NEUTRAL';
     ctx.font = '7px monospace';
-    ctx.fillStyle = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : '#666';
+    ctx.fillStyle = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : '#555';
     ctx.globalAlpha = 0.5;
-    ctx.fillText(momText, cx, cy + 28);
+    ctx.fillText(momText + ' · DAY ' + S.cDays, cx, cy + 24);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillText(S.daysSinceHalving + ' DAYS SINCE HALVING', cx, cy + 36);
     ctx.globalAlpha = 1;
+  }
 
-    // Days since trough
-    ctx.font = '7px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    ctx.fillText('DAY ' + S.cDays + ' OF CYCLE', cx, cy + 40);
+  function drawZone(cx, cy, rInner, rOuter, fill, stroke) {
+    if (rOuter <= rInner) return;
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+    ctx.arc(cx, cy, rInner, 0, Math.PI * 2, true);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 
   function drawLabel(x, y, text, color, size, bold) {
@@ -687,29 +760,30 @@ canvas { border-radius:12px; display:block; }
     ctx.setLineDash([]);
   }
 
-  /* ── ANIMATION ── */
   function animate() {
     drawRings();
     requestAnimationFrame(animate);
   }
 
-  /* ── INIT ── */
+  // ═══════════════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════════════
   async function init() {
     try {
-      const [hist, athData] = await Promise.all([getHistorical(), fetchATH()]);
+      const [klines, athData] = await Promise.all([getOHLC(), fetchATH()]);
 
       if (athData) { S.ath = athData.ath; S.athDate = athData.date; }
 
-      compute(hist);
+      compute(klines);
 
-      if (!S.livePrice) S.livePrice = hist[hist.length - 1].c;
+      if (!S.livePrice) S.livePrice = S.closes[S.closes.length - 1];
       if (S.livePrice > S.ath) {
         S.ath = S.livePrice;
         S.projLow = [S.ath * 0.20, S.ath * 0.30];
         S.projHigh = [S.ath * 1.50, S.ath * 2.50];
       }
 
-      updateRangePositions();
+      updatePositions();
       S.ready = true;
 
       $('loadingOverlay').classList.add('hidden');
