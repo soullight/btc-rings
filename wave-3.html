@@ -166,8 +166,9 @@ canvas { display:block; border-radius:16px; }
       const cLo = Math.min(...segL);
       const peakIdx = segH.indexOf(cHi);
       const daysInCycle = endIdx - startIdx;
-      const daysAfterPeak = (segH.length - 1) - peakIdx;
-      const declining = daysAfterPeak >= 3 && segC[segC.length - 1] < cHi * 0.995;
+      const daysPastPeak = daysInCycle - peakIdx;
+      const drop = (cHi - segC[segC.length - 1]) / cHi;
+      const declining = (drop >= 0.10) || (drop >= 0.06 && daysPastPeak >= 5) || (daysInCycle >= 40 && drop >= 0.05);
 
       // Fetch 4h data for this cycle
       const startTime = daily[startIdx].t;
@@ -286,7 +287,7 @@ canvas { display:block; border-radius:16px; }
         ctx.arc(cx, cy, outerR, arcStart, peakAngle);
         ctx.arc(cx, cy, innerR, peakAngle, arcStart, true);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(0,230,118,0.04)';
+        ctx.fillStyle = 'rgba(0,230,118,0.35)';
         ctx.fill();
 
         // Red: peak → current
@@ -295,7 +296,7 @@ canvas { display:block; border-radius:16px; }
         ctx.arc(cx, cy, outerR, peakAngle, Math.min(currentCycAngle, arcEnd));
         ctx.arc(cx, cy, innerR, Math.min(currentCycAngle, arcEnd), peakAngle, true);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(255,23,68,0.04)';
+        ctx.fillStyle = 'rgba(255,23,68,0.35)';
         ctx.fill();
       } else {
         // All green: trough → current
@@ -304,7 +305,7 @@ canvas { display:block; border-radius:16px; }
         ctx.arc(cx, cy, outerR, arcStart, Math.min(currentCycAngle, arcEnd));
         ctx.arc(cx, cy, innerR, Math.min(currentCycAngle, arcEnd), arcStart, true);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(0,230,118,0.04)';
+        ctx.fillStyle = 'rgba(0,230,118,0.35)';
         ctx.fill();
       }
 
@@ -361,10 +362,10 @@ canvas { display:block; border-radius:16px; }
         }
 
         if (cyc.declining && splitIdx < pts.length) {
-          drawRibbon(0, splitIdx + 1, 'rgba(0,230,118,0.06)');
-          drawRibbon(splitIdx, pts.length, 'rgba(255,23,68,0.06)');
+          drawRibbon(0, splitIdx + 1, 'rgba(0,230,118,0.15)');
+          drawRibbon(splitIdx, pts.length, 'rgba(255,23,68,0.15)');
         } else {
-          drawRibbon(0, pts.length, 'rgba(0,230,118,0.06)');
+          drawRibbon(0, pts.length, 'rgba(0,230,118,0.15)');
         }
 
         // Close line

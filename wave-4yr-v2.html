@@ -363,14 +363,14 @@ function draw(){
     ctx.beginPath();
     ctx.arc(cx,cy,rBloodHi,0,Math.PI*2);
     ctx.arc(cx,cy,rBloodLo,0,Math.PI*2,true);
-    ctx.fillStyle='rgba(255,23,68,0.04)';
+    ctx.fillStyle='rgba(255,23,68,0.12)';
     ctx.fill();
     ctx.beginPath();ctx.arc(cx,cy,rBloodLo,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,23,68,0.15)';ctx.lineWidth=0.5;ctx.stroke();
+    ctx.strokeStyle='rgba(255,23,68,0.3)';ctx.lineWidth=1;ctx.stroke();
     ctx.beginPath();ctx.arc(cx,cy,rBloodHi,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,23,68,0.15)';ctx.lineWidth=0.5;ctx.stroke();
+    ctx.strokeStyle='rgba(255,23,68,0.3)';ctx.lineWidth=1;ctx.stroke();
     // Label
-    ctx.font='6px monospace';ctx.fillStyle='rgba(255,23,68,0.35)';ctx.textAlign='right';
+    ctx.font='7px monospace';ctx.fillStyle='rgba(255,23,68,0.5)';ctx.textAlign='right';
     ctx.fillText('BLOOD '+fmt(projLow[0])+' — '+fmt(projLow[1]),cx-8,cy+(rBloodLo+rBloodHi)/2+2);
     ctx.textAlign='center';
   }
@@ -381,11 +381,11 @@ function draw(){
     ctx.beginPath();
     ctx.arc(cx,cy,Math.min(rGoldLo+band*0.05,outerR),0,Math.PI*2);
     ctx.arc(cx,cy,rGoldLo,0,Math.PI*2,true);
-    ctx.fillStyle='rgba(255,215,0,0.03)';
+    ctx.fillStyle='rgba(255,215,0,0.08)';
     ctx.fill();
     ctx.beginPath();ctx.arc(cx,cy,rGoldLo,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,215,0,0.2)';ctx.lineWidth=0.5;ctx.setLineDash([4,6]);ctx.stroke();ctx.setLineDash([]);
-    ctx.font='6px monospace';ctx.fillStyle='rgba(255,215,0,0.3)';ctx.textAlign='right';
+    ctx.strokeStyle='rgba(255,215,0,0.35)';ctx.lineWidth=1;ctx.setLineDash([4,6]);ctx.stroke();ctx.setLineDash([]);
+    ctx.font='7px monospace';ctx.fillStyle='rgba(255,215,0,0.45)';ctx.textAlign='right';
     ctx.fillText('GOLDEN '+fmt(projHigh[0])+'+',cx-8,cy-rGoldLo+4);
     ctx.textAlign='center';
   }
@@ -462,22 +462,22 @@ function draw(){
 
     if(seg.declining){
       ctx.beginPath();ctx.arc(cx,cy,rHi,aStart,aPeak);ctx.arc(cx,cy,rLo,aPeak,aStart,true);ctx.closePath();
-      ctx.fillStyle='rgba(0,230,118,0.06)';ctx.fill();
+      ctx.fillStyle='rgba(0,230,118,0.35)';ctx.fill();
       ctx.beginPath();ctx.arc(cx,cy,rHi,aPeak,aEnd);ctx.arc(cx,cy,rLo,aEnd,aPeak,true);ctx.closePath();
-      ctx.fillStyle='rgba(255,23,68,0.06)';ctx.fill();
+      ctx.fillStyle='rgba(255,23,68,0.35)';ctx.fill();
     }else{
       ctx.beginPath();ctx.arc(cx,cy,rHi,aStart,aEnd);ctx.arc(cx,cy,rLo,aEnd,aStart,true);ctx.closePath();
-      ctx.fillStyle='rgba(0,230,118,0.06)';ctx.fill();
+      ctx.fillStyle='rgba(0,230,118,0.35)';ctx.fill();
     }
 
     // Outline
     ctx.beginPath();ctx.arc(cx,cy,rHi,aStart,aEnd);ctx.arc(cx,cy,rLo,aEnd,aStart,true);ctx.closePath();
-    ctx.strokeStyle=seg.declining?'rgba(255,23,68,0.12)':'rgba(0,230,118,0.12)';ctx.lineWidth=0.7;ctx.stroke();
+    ctx.strokeStyle=seg.declining?'rgba(255,23,68,0.25)':'rgba(0,230,118,0.25)';ctx.lineWidth=1;ctx.stroke();
 
     // Divider
     ctx.beginPath();ctx.moveTo(cx+Math.cos(aStart)*rLo,cy+Math.sin(aStart)*rLo);
     ctx.lineTo(cx+Math.cos(aStart)*rHi,cy+Math.sin(aStart)*rHi);
-    ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=0.5;ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=0.8;ctx.stroke();
 
     // Wave line
     const pts=seg.wave;
@@ -492,12 +492,12 @@ function draw(){
         const la=dayToAngle(totalDaysElapsed);const lr=priceToR(livePrice);
         ctx.lineTo(cx+Math.cos(la)*lr,cy+Math.sin(la)*lr);
       }
-      ctx.strokeStyle='rgba(255,255,255,0.55)';ctx.lineWidth=0.8;ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=1.2;ctx.stroke();
     }
 
     // Trough dot
     const tR=priceToR(seg.troughPrice);
-    ctx.beginPath();ctx.arc(cx+Math.cos(aStart)*tR,cy+Math.sin(aStart)*tR,1.5,0,Math.PI*2);
+    ctx.beginPath();ctx.arc(cx+Math.cos(aStart)*tR,cy+Math.sin(aStart)*tR,2.5,0,Math.PI*2);
     ctx.fillStyle=CYAN;ctx.fill();
   });
 
@@ -508,15 +508,15 @@ function draw(){
     const nx=cx+Math.cos(nowA)*nowR;
     const ny=cy+Math.sin(nowA)*nowR;
 
-    ctx.beginPath();ctx.arc(nx,ny,8,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,230,118,0.1)';ctx.fill();
-    ctx.beginPath();ctx.arc(nx,ny,3.5,0,Math.PI*2);
-    ctx.fillStyle=G;ctx.shadowColor=G;ctx.shadowBlur=12;ctx.fill();ctx.shadowBlur=0;
+    ctx.beginPath();ctx.arc(nx,ny,12,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,230,118,0.15)';ctx.fill();
+    ctx.beginPath();ctx.arc(nx,ny,5,0,Math.PI*2);
+    ctx.fillStyle=G;ctx.shadowColor=G;ctx.shadowBlur=18;ctx.fill();ctx.shadowBlur=0;
 
     // Live price label near dot
-    const plx=nx+Math.cos(nowA)*16;
-    const ply=ny+Math.sin(nowA)*16;
-    ctx.font='bold 9px monospace';ctx.fillStyle=G;
+    const plx=nx+Math.cos(nowA)*22;
+    const ply=ny+Math.sin(nowA)*22;
+    ctx.font='bold 11px monospace';ctx.fillStyle=G;
     ctx.fillText(fmt(livePrice),plx,ply);
   }
 

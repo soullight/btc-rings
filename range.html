@@ -380,9 +380,11 @@ canvas { border-radius:12px; display:block; }
     // Track which day (relative to trough) the cycle high was set
     const cHiIdx = highsSinceTrough.indexOf(S.cHi);
     S.cHiDay = cHiIdx; // day within cycle that peak occurred
-    const daysAfterPeak = (highsSinceTrough.length - 1) - cHiIdx;
-    // Declining = peak was set 3+ days ago AND price is below the peak
-    S.declining = daysAfterPeak >= 3 && S.closes[n - 1] < S.cHi * 0.995;
+    const daysPastPeak = (highsSinceTrough.length - 1) - cHiIdx;
+    const daysInCycle = highsSinceTrough.length;
+    const drop = (S.cHi - S.closes[n - 1]) / S.cHi;
+    // Conservative: 10% immediate, 6% after 5 days, 5% after day 40
+    S.declining = (drop >= 0.10) || (drop >= 0.06 && daysPastPeak >= 5) || (daysInCycle >= 40 && drop >= 0.05);
 
     // MOMENTUM
     if (n > 60) {
