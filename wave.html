@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — The Wave</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0f; color:#fff;
+  font-family:'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100vh; padding:16px;
+}
+canvas { display:block; border-radius:16px; }
+.info {
+  display:flex; gap:16px; margin-top:14px; flex-wrap:wrap; justify-content:center;
+}
+.info-card {
+  padding:10px 14px; border-radius:8px; text-align:center;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+}
+.info-card .lbl { font-size:9px; letter-spacing:2px; color:rgba(255,255,255,0.5); margin-bottom:4px; }
+.info-card .val { font-size:14px; font-weight:700; }
+.loading {
+  display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh;
+}
+.loading-text { font-size:14px; color:rgba(255,255,255,0.4); letter-spacing:3px; }
+.pulse-ring {
+  width:50px; height:50px; border-radius:50%; margin-top:24px;
+  border:2px solid rgba(0,230,118,0.3); animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+.hidden { display:none!important; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading">
+  <div class="loading-text">TRACING THE WAVE<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" class="hidden" style="display:flex;flex-direction:column;align-items:center;">
+  <canvas id="canvas"></canvas>
+  <div id="info" class="info"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const GREEN = '#00E676', RED = '#FF1744', GOLD = '#FFD700', CYAN = '#4FC3F7', BG = '#0a0a0f';
+  const NOMINAL = 60; // nominal cycle length in days
+
+  const S = {
+    dailyCloses: [], dailyHighs: [], dailyLows: [], dailyTimes: [],
+    wavePoints: [],   // {day, price, high, low} — 4h granularity since trough
+    troughIdx: 0, troughTime: 0, troughPrice: 0,
+    cHi: 0, cLo: 0, cDays: 0, cPct: 0,
+    livePrice: 0,
+    momentum: 0,
+    _animAngle: 0,
+    ready: false
+  };
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+
+  let dotCount = 0;
+  const dotTimer = setInterval(() => {
+    dotCount = (dotCount + 1) % 4;
+    const d = $('dots');
+    if (d) d.textContent = '.'.repeat(dotCount);
+  }, 400);
+
+  function fmt(n) {
+    if (!n || isNaN(n)) return '—';
+    return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+  // ═══════════════════════════════════════════════
+  // DATA
+  // ═══════════════════════════════════════════════
+  async function fetchJSON(url, timeout = 15000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeout);
+    try {
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch (e) { clearTimeout(t); throw e; }
+  }
+
+  async function fetchDailyOHLC() {
+    const d = await fetchJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200');
+    return d.map(k => ({
+      t: Number(k[0]), h: Number(k[2]), l: Number(k[3]), c: Number(k[4])
+    }));
+  }
+
+  async function fetch4hSinceTrough(troughTime) {
+    // Fetch 4h candles from trough to now
+    // Binance limit is 1000; 60 days × 6 candles/day = 360, well within limit
+    const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=${troughTime}&limit=1000`;
+    const d = await fetchJSON(url);
+    return d.map(k => ({
+      t: Number(k[0]), h: Number(k[2]), l: Number(k[3]), c: Number(k[4])
+    }));
+  }
+
+  // ═══════════════════════════════════════════════
+  // TROUGH DETECTION
+  // ═══════════════════════════════════════════════
+  function findTroughs(closes, hw) {
+    const t = [];
+    for (let i = hw; i < closes.length - hw; i++) {
+      let ok = true;
+      for (let j = 1; j <= hw; j++) {
+        if (closes[i] > closes[i - j] || closes[i] > closes[i + j]) { ok = false; break; }
+      }
+      if (ok) t.push(i);
+    }
+    return t;
+  }
+
+  function filterTroughs(troughs, closes, nom, ratio) {
+    if (!troughs.length) return troughs;
+    const gap = Math.round(nom * ratio);
+    const f = [troughs[0]];
+    for (let i = 1; i < troughs.length; i++) {
+      if (troughs[i] - f[f.length - 1] >= gap) f.push(troughs[i]);
+      else if (closes[troughs[i]] < closes[f[f.length - 1]]) f[f.length - 1] = troughs[i];
+    }
+    return f;
+  }
+
+  // ═══════════════════════════════════════════════
+  // COMPUTE
+  // ═══════════════════════════════════════════════
+  function compute(daily, wave4h) {
+    const closes = daily.map(k => k.c);
+    const highs = daily.map(k => k.h);
+    const lows = daily.map(k => k.l);
+    const n = daily.length;
+
+    // Trough detection
+    let troughs = findTroughs(closes, 12);
+    troughs = filterTroughs(troughs, closes, 60, 0.5);
+    if (troughs.length < 1) {
+      troughs = findTroughs(closes, 8);
+      troughs = filterTroughs(troughs, closes, 60, 0.6);
+    }
+
+    const last = troughs.length ? troughs[troughs.length - 1] : 0;
+    S.troughIdx = last;
+    S.troughTime = daily[last].t;
+    S.troughPrice = closes[last];
+    S.cDays = n - 1 - last;
+
+    // Cycle range from actual highs/lows
+    S.cHi = Math.max(...highs.slice(last));
+    S.cLo = Math.min(...lows.slice(last));
+
+    // Build wave points from 4h data
+    const msPerDay = 24 * 60 * 60 * 1000;
+    S.wavePoints = wave4h.map(k => ({
+      day: (k.t - S.troughTime) / msPerDay,
+      price: k.c,
+      high: k.h,
+      low: k.l
+    }));
+
+    // Momentum
+    if (n >= 66) {
+      let bull = 0, bear = 0;
+      for (let d = 0; d < 5; d++) {
+        const i = n - 1 - d;
+        const r20 = ((closes[i] / closes[i - 20]) - 1) * 100;
+        const r60 = ((closes[i] / closes[i - 60]) - 1) * 100;
+        if (r20 > 0 && r60 > 0) bull++;
+        if (r20 < 0 && r60 < 0) bear++;
+      }
+      S.momentum = bull >= 5 ? 1 : bear >= 5 ? -1 : 0;
+    }
+  }
+
+  function updatePosition() {
+    const p = S.livePrice || (S.wavePoints.length ? S.wavePoints[S.wavePoints.length - 1].price : 0);
+    if (p > S.cHi) S.cHi = p;
+    if (p < S.cLo) S.cLo = p;
+    const range = S.cHi - S.cLo;
+    S.cPct = range > 0 ? Math.max(0, Math.min(100, ((p - S.cLo) / range) * 100)) : 50;
+
+    // Update days
+    if (S.troughTime) {
+      S.cDays = (Date.now() - S.troughTime) / (24 * 60 * 60 * 1000);
+    }
+  }
+
+  // ═══════════════════════════════════════════════
+  // WEBSOCKET
+  // ═══════════════════════════════════════════════
+  let ws = null, wsRetry = 1000, pollTimer = null;
+  function connectWS() {
+    try {
+      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+      ws.onmessage = (e) => { try { S.livePrice = parseFloat(JSON.parse(e.data).p); updatePosition(); } catch (err) {} };
+      ws.onclose = () => { setTimeout(connectWS, wsRetry); wsRetry = Math.min(wsRetry * 2, 30000); startPoll(); };
+      ws.onerror = () => { ws.close(); };
+    } catch (e) { startPoll(); }
+  }
+  function startPoll() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
+      try { const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000); S.livePrice = parseFloat(d.price); updatePosition(); } catch (e) {}
+    }, 3000);
+  }
+
+  // ═══════════════════════════════════════════════
+  // CANVAS
+  // ═══════════════════════════════════════════════
+  function resize() {
+    const sz = Math.min(window.innerWidth - 32, window.innerHeight - 120, 720);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = sz * dpr;
+    canvas.height = sz * dpr;
+    canvas.style.width = sz + 'px';
+    canvas.style.height = sz + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Map cycle day to angle (0 = top/12 o'clock, clockwise)
+  function dayToAngle(day) {
+    return (day / NOMINAL) * Math.PI * 2 - Math.PI / 2;
+  }
+
+  function drawWave() {
+    const w = parseInt(canvas.style.width);
+    const h = parseInt(canvas.style.height);
+    const cx = w / 2, cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, w, h);
+    if (!S.ready) return;
+
+    const p = S.livePrice || (S.wavePoints.length ? S.wavePoints[S.wavePoints.length - 1].price : 0);
+
+    // Geometry
+    const outerR = Math.min(cx, cy) - 44;   // cycle high radius
+    const innerR = outerR * 0.32;            // cycle low radius
+    const bandW = outerR - innerR;
+
+    function priceToR(price) {
+      const pct = (price - S.cLo) / (S.cHi - S.cLo);
+      return innerR + Math.max(0, Math.min(1, pct)) * bandW;
+    }
+
+    // ── Background: subtle radial glow ──
+    const bgGlow = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR * 1.1);
+    bgGlow.addColorStop(0, 'rgba(0,230,118,0.015)');
+    bgGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = bgGlow;
+    ctx.fillRect(0, 0, w, h);
+
+    // ── CLOCK FACE: day markers ──
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let d = 0; d < NOMINAL; d += 5) {
+      const angle = dayToAngle(d);
+      const isMajor = d % 10 === 0;
+      const tickInner = outerR + 4;
+      const tickOuter = outerR + (isMajor ? 16 : 10);
+
+      // Tick mark
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * tickInner, cy + Math.sin(angle) * tickInner);
+      ctx.lineTo(cx + Math.cos(angle) * tickOuter, cy + Math.sin(angle) * tickOuter);
+      ctx.strokeStyle = isMajor ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = isMajor ? 1.5 : 1;
+      ctx.stroke();
+
+      // Day label
+      if (isMajor) {
+        const labelR = outerR + 28;
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = d === 0 ? GREEN : 'rgba(255,255,255,0.4)';
+        ctx.fillText(d === 0 ? 'T' : '' + d, cx + Math.cos(angle) * labelR, cy + Math.sin(angle) * labelR);
+      }
+    }
+
+    // Small ticks every day (very subtle)
+    for (let d = 0; d < NOMINAL; d++) {
+      if (d % 5 === 0) continue;
+      const angle = dayToAngle(d);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * (outerR + 4), cy + Math.sin(angle) * (outerR + 4));
+      ctx.lineTo(cx + Math.cos(angle) * (outerR + 7), cy + Math.sin(angle) * (outerR + 7));
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // ── RANGE BAND: the ring between inner and outer ──
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+    ctx.fillStyle = 'rgba(0,230,118,0.02)';
+    ctx.fill();
+
+    // Boundary rings
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,230,118,0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,230,118,0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // 50% midline
+    const midR = innerR + bandW * 0.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, midR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 25% and 75% subtle rings
+    [0.25, 0.75].forEach(q => {
+      const r = innerR + bandW * q;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([2, 8]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // ── PRICE RANGE LABELS on the ring ──
+    ctx.font = '9px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.textAlign = 'right';
+    const labelAngle = Math.PI * -0.02; // just left of 3 o'clock
+    ctx.fillText(fmt(S.cHi), cx + Math.cos(labelAngle) * (outerR - 6) - 2, cy + Math.sin(labelAngle) * (outerR - 6));
+    ctx.fillText(fmt(S.cLo), cx + Math.cos(labelAngle) * (innerR + 6) - 2, cy + Math.sin(labelAngle) * (innerR + 6));
+    const midPrice = S.cLo + (S.cHi - S.cLo) * 0.5;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillText(fmt(midPrice), cx + Math.cos(labelAngle) * (midR - 2) - 2, cy + Math.sin(labelAngle) * (midR - 2));
+    ctx.textAlign = 'center';
+
+    // ── THE WAVE: price ribbon plotted around the clock ──
+    const pts = S.wavePoints;
+    if (pts.length > 1) {
+
+      // Draw the high/low ribbon (filled area between high and low wave)
+      ctx.beginPath();
+      // Forward pass: highs
+      for (let i = 0; i < pts.length; i++) {
+        const angle = dayToAngle(pts[i].day);
+        const r = priceToR(pts[i].high);
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      // Reverse pass: lows
+      for (let i = pts.length - 1; i >= 0; i--) {
+        const angle = dayToAngle(pts[i].day);
+        const r = priceToR(pts[i].low);
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,230,118,0.06)';
+      ctx.fill();
+
+      // Draw the close price line (the main wave)
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const angle = dayToAngle(pts[i].day);
+        const r = priceToR(pts[i].price);
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+
+      // Extend to live price
+      if (S.livePrice) {
+        const liveDay = S.cDays;
+        const liveAngle = dayToAngle(liveDay);
+        const liveR = priceToR(S.livePrice);
+        ctx.lineTo(cx + Math.cos(liveAngle) * liveR, cy + Math.sin(liveAngle) * liveR);
+      }
+
+      ctx.strokeStyle = GREEN;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = GREEN;
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // ── CURRENT POSITION DOT (bright, glowing) ──
+      const currentDay = S.cDays;
+      const currentAngle = dayToAngle(currentDay);
+      const currentR = priceToR(p);
+
+      const dotX = cx + Math.cos(currentAngle) * currentR;
+      const dotY = cy + Math.sin(currentAngle) * currentR;
+
+      // Glow
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 12, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,230,118,0.15)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,230,118,0.3)';
+      ctx.fill();
+
+      // Bright dot
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = GREEN;
+      ctx.shadowColor = GREEN;
+      ctx.shadowBlur = 15;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Price label near dot
+      const labelDist = 22;
+      const lx = dotX + Math.cos(currentAngle) * labelDist;
+      const ly = dotY + Math.sin(currentAngle) * labelDist;
+
+      ctx.font = 'bold 11px monospace';
+      ctx.fillStyle = GREEN;
+      ctx.textAlign = 'center';
+      ctx.fillText(fmt(p), lx, ly - 6);
+      ctx.font = '8px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText('DAY ' + Math.round(currentDay), lx, ly + 6);
+
+      // ── "Now" marker line from center to dot ──
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(currentAngle) * (innerR - 8), cy + Math.sin(currentAngle) * (innerR - 8));
+      ctx.lineTo(cx + Math.cos(currentAngle) * innerR, cy + Math.sin(currentAngle) * innerR);
+      ctx.strokeStyle = GREEN;
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // ── FUTURE ARC: faint dashed line showing remaining cycle ──
+    if (S.cDays < NOMINAL) {
+      const startAngle = dayToAngle(S.cDays);
+      const endAngle = dayToAngle(NOMINAL);
+      ctx.beginPath();
+      ctx.arc(cx, cy, midR, startAngle, endAngle);
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 8]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // ── CENTER: status ──
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Position %
+    const pctRound = Math.round(S.cPct);
+    const pctColor = pctRound > 80 ? GOLD : pctRound < 20 ? CYAN : GREEN;
+    ctx.font = 'bold 36px monospace';
+    ctx.fillStyle = pctColor;
+    ctx.fillText(pctRound + '%', cx, cy - 16);
+
+    ctx.font = '9px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText('OF CYCLE RANGE', cx, cy + 8);
+
+    // Zone
+    let zone, zoneCol;
+    if (pctRound >= 85) { zone = 'NEAR HIGH — EXIT TERRITORY'; zoneCol = GOLD; }
+    else if (pctRound >= 65) { zone = 'UPPER RANGE — WATCH FOR CREST'; zoneCol = 'rgba(255,215,0,0.6)'; }
+    else if (pctRound >= 35) { zone = 'MID RANGE — RIDE'; zoneCol = GREEN; }
+    else if (pctRound >= 15) { zone = 'LOWER RANGE — SUPPORT ZONE'; zoneCol = CYAN; }
+    else { zone = 'NEAR LOW — DEPLOY TERRITORY'; zoneCol = CYAN; }
+
+    ctx.font = '8px monospace';
+    ctx.fillStyle = zoneCol;
+    ctx.fillText(zone, cx, cy + 26);
+
+    // Momentum
+    const momText = S.momentum === 1 ? '▲ BULL' : S.momentum === -1 ? '▼ BEAR' : '◆ NEUTRAL';
+    const momCol = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : 'rgba(255,255,255,0.3)';
+    ctx.font = '8px monospace';
+    ctx.fillStyle = momCol;
+    ctx.fillText(momText, cx, cy + 42);
+
+    // Trough label at 12 o'clock
+    ctx.font = '8px monospace';
+    ctx.fillStyle = 'rgba(0,230,118,0.4)';
+    ctx.fillText('TROUGH', cx, cy - innerR + 14);
+    ctx.fillText(fmt(S.troughPrice), cx, cy - innerR + 26);
+  }
+
+  function updateInfo() {
+    const p = S.livePrice || 0;
+    const range = S.cHi - S.cLo;
+    const momLabel = S.momentum === 1 ? 'BULL' : S.momentum === -1 ? 'BEAR' : 'NEUTRAL';
+    const momColor = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : 'rgba(255,255,255,0.5)';
+
+    $('info').innerHTML = `
+      <div class="info-card">
+        <div class="lbl">CYCLE DAY</div>
+        <div class="val" style="color:${GREEN}">${Math.round(S.cDays)} <span style="font-size:10px;color:rgba(255,255,255,0.3)">/ ${NOMINAL}</span></div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">RANGE</div>
+        <div class="val" style="color:rgba(255,255,255,0.7)">${fmt(S.cLo)} — ${fmt(S.cHi)}</div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">WIDTH</div>
+        <div class="val" style="color:${GREEN}">${fmt(range)} <span style="font-size:10px;color:rgba(255,255,255,0.3)">(${fmtPct((range / S.cLo) * 100)})</span></div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">MOMENTUM</div>
+        <div class="val" style="color:${momColor}">${momLabel}</div>
+      </div>
+    `;
+  }
+
+  function loop() {
+    drawWave();
+    updateInfo();
+    requestAnimationFrame(loop);
+  }
+
+  // ═══════════════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════════════
+  async function init() {
+    try {
+      // Step 1: Daily data for trough detection
+      const daily = await fetchDailyOHLC();
+      const closes = daily.map(k => k.c);
+
+      // Find trough
+      let troughs = findTroughs(closes, 12);
+      troughs = filterTroughs(troughs, closes, 60, 0.5);
+      if (troughs.length < 1) {
+        troughs = findTroughs(closes, 8);
+        troughs = filterTroughs(troughs, closes, 60, 0.6);
+      }
+      const lastTroughIdx = troughs.length ? troughs[troughs.length - 1] : 0;
+      const troughTime = daily[lastTroughIdx].t;
+
+      // Step 2: 4h data from trough to now (the wave)
+      const wave4h = await fetch4hSinceTrough(troughTime);
+
+      // Compute everything
+      compute(daily, wave4h);
+
+      if (!S.livePrice) S.livePrice = closes[closes.length - 1];
+      updatePosition();
+      S.ready = true;
+
+      clearInterval(dotTimer);
+      $('loading').classList.add('hidden');
+      const app = $('app');
+      app.classList.remove('hidden');
+      app.style.display = 'flex';
+
+      resize();
+      loop();
+      connectWS();
+      window.addEventListener('resize', resize);
+
+    } catch (e) {
+      console.error(e);
+      $('dots').textContent = '';
+      document.querySelector('.loading-text').textContent = 'ERROR: ' + e.message;
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
