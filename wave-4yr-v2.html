@@ -134,6 +134,9 @@ let globalHi=0,globalLo=Infinity;
 let livePrice=0,totalDaysElapsed=0;
 let ath=0,athDay=0;
 let bloodLo=0,bloodHi=0; // projected bottom range (20-30% of ATH)
+let goldenLo=0,goldenHi=0; // projected next cycle top (200-350% of ATH = new ATH territory)
+let deployLo=0,deployHi=0; // heavy accumulation zone (30-50% of ATH)
+let remainingCycles=0;
 
 async function buildSegments(){
   const [daily,athVal]=await Promise.all([fetchAllDaily(),fetchATH()]);
@@ -152,6 +155,14 @@ async function buildSegments(){
   // Projected bottom range: 20-30% of ATH
   bloodLo=ath*0.20;
   bloodHi=ath*0.30;
+
+  // Golden zone: next cycle's projected top (200-350% of current ATH)
+  goldenLo=ath*2.0;
+  goldenHi=ath*3.5;
+
+  // Deployment zone: where to accumulate aggressively (30-50% of ATH)
+  deployLo=ath*0.30;
+  deployHi=ath*0.50;
 
   // Trough detection
   let troughs=detectTroughs(closes,12);
@@ -203,6 +214,10 @@ async function buildSegments(){
   }
 
   livePrice=closes[n-1];
+
+  // How many 60-day swings remain before projected bottom
+  const daysRemaining=CYCLE_DAYS-totalDaysElapsed;
+  remainingCycles=Math.max(0,Math.round(daysRemaining/NOM));
 }
 
 /* ── WEBSOCKET ── */
@@ -282,6 +297,43 @@ function draw(){
   ctx.font='bold 8px monospace';ctx.fillStyle='rgba(255,23,68,0.8)';ctx.textAlign='right';
   ctx.fillText('BLOOD ZONE '+fmt(bloodLo)+' — '+fmt(bloodHi),cx-8,cy+(rBloodLo+rBloodHi)/2+3);
   ctx.textAlign='center';
+
+  /* ── DEPLOYMENT ZONE — where to accumulate aggressively (30-50% of ATH) ── */
+  const rDeployLo=priceToR(deployLo);
+  const rDeployHi=priceToR(deployHi);
+  if(rDeployHi>innerR){
+    ctx.beginPath();
+    ctx.arc(cx,cy,Math.min(rDeployHi,outerR),0,Math.PI*2);
+    ctx.arc(cx,cy,Math.max(rDeployLo,innerR),0,Math.PI*2,true);
+    ctx.closePath();
+    ctx.fillStyle='rgba(0,230,118,0.12)';
+    ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,Math.min(rDeployHi,outerR),0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,230,118,0.35)';ctx.lineWidth=1;ctx.setLineDash([4,6]);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(cx,cy,Math.max(rDeployLo,innerR),0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,230,118,0.35)';ctx.lineWidth=1;ctx.setLineDash([4,6]);ctx.stroke();ctx.setLineDash([]);
+    ctx.font='bold 7px monospace';ctx.fillStyle='rgba(0,230,118,0.7)';ctx.textAlign='left';
+    ctx.fillText('DEPLOY ZONE '+fmt(deployLo)+' — '+fmt(deployHi),cx+8,cy+(rDeployLo+rDeployHi)/2+3);
+    ctx.textAlign='center';
+  }
+
+  /* ── GOLDEN ZONE — next cycle exit target, shown at outer edge ── */
+  // This is beyond current scale (next bull's territory) — render as a band outside outerR
+  const goldenBandInner=outerR+8;
+  const goldenBandOuter=outerR+18;
+  ctx.beginPath();
+  ctx.arc(cx,cy,goldenBandOuter,0,Math.PI*2);
+  ctx.arc(cx,cy,goldenBandInner,0,Math.PI*2,true);
+  ctx.closePath();
+  ctx.fillStyle='rgba(255,215,0,0.25)';
+  ctx.fill();
+  ctx.beginPath();ctx.arc(cx,cy,goldenBandInner,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,215,0,0.4)';ctx.lineWidth=1;ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,goldenBandOuter,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,215,0,0.4)';ctx.lineWidth=1;ctx.stroke();
+  // Label at ~3 o'clock
+  ctx.font='bold 7px monospace';ctx.fillStyle='rgba(255,215,0,0.8)';
+  ctx.fillText('GOLDEN ZONE '+fmt(goldenLo)+' — '+fmt(goldenHi),cx,(cy-(goldenBandInner+goldenBandOuter)/2));
 
   /* ── YEAR MARKERS ── */
   ctx.textAlign='center';ctx.textBaseline='middle';
@@ -455,6 +507,12 @@ function draw(){
   ctx.font='7px monospace';ctx.fillStyle='rgba(255,255,255,0.18)';
   ctx.fillText('OF 4-YEAR CYCLE',cx,cy+30);
 
+  // Remaining swings to deploy
+  if(remainingCycles>0){
+    ctx.font='bold 8px monospace';ctx.fillStyle=CYAN;
+    ctx.fillText(remainingCycles+' SWINGS TO BOTTOM',cx,cy+44);
+  }
+
 
   requestAnimationFrame(draw);
 }
@@ -473,8 +531,10 @@ function updateHUD(){
     <div class="hud-card"><div class="lbl">CYCLES</div><div class="val" style="color:${PURPLE}">${segments.length}</div></div>
     <div class="hud-card"><div class="lbl">RISING</div><div class="val" style="color:${G}">${rising}</div></div>
     <div class="hud-card"><div class="lbl">DECLINING</div><div class="val" style="color:${R}">${declining}</div></div>
+    <div class="hud-card"><div class="lbl">SWINGS LEFT</div><div class="val" style="color:${CYAN}">${remainingCycles}</div></div>
     <div class="hud-card"><div class="lbl">CYCLE LOW</div><div class="val" style="color:${CYAN}">${fmt(globalLo)}</div></div>
     <div class="hud-card"><div class="lbl">CYCLE HIGH</div><div class="val" style="color:${GOLD}">${fmt(globalHi)}</div></div>
+    <div class="hud-card"><div class="lbl">GOLDEN TARGET</div><div class="val" style="color:${GOLD}">${fmt(goldenLo)}+</div></div>
     <div class="hud-card"><div class="lbl">CURRENT</div><div class="val" style="color:${phaseColor}">${phase}</div></div>
   `;
 }
