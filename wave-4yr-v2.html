@@ -262,9 +262,9 @@ function draw(){
   const outerR=Math.min(cx,cy)-44;
   const innerR=outerR*0.18; // tight inner = maximum radial band for segments
 
-  // SCALE: blood zone floor to golden zone ceiling — the full picture
+  // SCALE: blood zone floor to just above ATH — keep segments readable
   const scaleMin=bloodLo*0.9;
-  const scaleMax=goldenHi*1.05;
+  const scaleMax=globalHi*1.02;
 
   function priceToR(p){
     const t=(p-scaleMin)/(scaleMax-scaleMin||1);
@@ -294,23 +294,11 @@ function draw(){
   ctx.fillText('BLOOD ZONE '+fmt(bloodLo)+' — '+fmt(bloodHi),cx-8,cy+(rBloodLo+rBloodHi)/2+3);
   ctx.textAlign='center';
 
-  /* ── GOLDEN ZONE — next cycle exit target, real scale ── */
-  const rGoldenLo=priceToR(goldenLo);
-  const rGoldenHi=priceToR(goldenHi);
-  ctx.beginPath();
-  ctx.arc(cx,cy,Math.min(rGoldenHi,outerR),0,Math.PI*2);
-  ctx.arc(cx,cy,rGoldenLo,0,Math.PI*2,true);
-  ctx.closePath();
-  ctx.fillStyle='rgba(255,215,0,0.25)';
-  ctx.fill();
-  ctx.beginPath();ctx.arc(cx,cy,rGoldenLo,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,215,0,0.5)';ctx.lineWidth=1.5;ctx.stroke();
-  ctx.beginPath();ctx.arc(cx,cy,Math.min(rGoldenHi,outerR),0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,215,0,0.5)';ctx.lineWidth=1.5;ctx.stroke();
-  // Label
-  ctx.font='bold 8px monospace';ctx.fillStyle='rgba(255,215,0,0.8)';ctx.textAlign='left';
-  ctx.fillText('GOLDEN ZONE '+fmt(goldenLo)+' — '+fmt(goldenHi),cx+8,cy-(rGoldenLo+rGoldenHi)/2+3);
-  ctx.textAlign='center';
+  /* ── GOLDEN ZONE — just the entry line at outer edge ── */
+  ctx.beginPath();ctx.arc(cx,cy,outerR,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,215,0,0.5)';ctx.lineWidth=2;ctx.stroke();
+  ctx.font='bold 8px monospace';ctx.fillStyle='rgba(255,215,0,0.8)';
+  ctx.fillText('GOLDEN '+fmt(goldenLo)+'+',cx,cy-outerR-10);
 
   /* ── YEAR MARKERS ── */
   ctx.textAlign='center';ctx.textBaseline='middle';
