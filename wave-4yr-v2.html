@@ -132,7 +132,7 @@ async function fetchATH(){
 let segments=[];
 let globalHi=0,globalLo=Infinity;
 let livePrice=0,totalDaysElapsed=0;
-let ath=0;
+let ath=0,athDay=0;
 
 async function buildSegments(){
   const [daily,athVal]=await Promise.all([fetchAllDaily(),fetchATH()]);
@@ -143,6 +143,10 @@ async function buildSegments(){
 
   ath=athVal||Math.max(...highs);
   if(Math.max(...highs)>ath)ath=Math.max(...highs);
+
+  // Find ATH day for reference marker
+  const maxH=Math.max(...highs);
+  athDay=highs.indexOf(maxH);
 
   // Trough detection
   let troughs=detectTroughs(closes,12);
@@ -168,10 +172,10 @@ async function buildSegments(){
     if(cHi>globalHi)globalHi=cHi;
     if(cLo<globalLo)globalLo=cLo;
 
-    // Conservative phase detection
+    // Per-cycle phase: did this cycle build or destroy wealth?
+    // Completed cycles: compare close to open. Current cycle: conservative detection.
     let declining=false;
     if(!isLast){
-      // Completed cycle: did it close lower than it started?
       declining=segC[segC.length-1]<segC[0]*0.95;
     }else{
       const drop=(cHi-segC[segC.length-1])/cHi;
@@ -276,51 +280,63 @@ function draw(){
     ctx.fillText(m.label,cx+Math.cos(a)*lr,cy+Math.sin(a)*lr);
   });
 
-  /* ── HALVING ── */
+  /* ── HALVING — the catalyst ── */
   const halvA=dayToAngle(516);
   ctx.beginPath();
-  ctx.moveTo(cx+Math.cos(halvA)*(outerR+2),cy+Math.sin(halvA)*(outerR+2));
-  ctx.lineTo(cx+Math.cos(halvA)*(outerR+14),cy+Math.sin(halvA)*(outerR+14));
-  ctx.strokeStyle=GOLD;ctx.lineWidth=1.5;ctx.stroke();
-  ctx.font='bold 7px monospace';ctx.fillStyle=GOLD;
-  ctx.fillText('HALVING',cx+Math.cos(halvA)*(outerR+26),cy+Math.sin(halvA)*(outerR+26));
+  ctx.moveTo(cx+Math.cos(halvA)*(innerR-8),cy+Math.sin(halvA)*(innerR-8));
+  ctx.lineTo(cx+Math.cos(halvA)*(outerR+6),cy+Math.sin(halvA)*(outerR+6));
+  ctx.strokeStyle=PURPLE;ctx.lineWidth=2;ctx.stroke();
+  ctx.font='bold 9px monospace';ctx.fillStyle=PURPLE;
+  ctx.fillText('HALVING',cx+Math.cos(halvA)*(outerR+22),cy+Math.sin(halvA)*(outerR+22));
 
-  /* ── PROJECTED BOTTOM ── */
+  /* ── PROJECTED BOTTOM — the floor of the wealth cycle ── */
   const bottomDay=Math.min(516+912,CYCLE_DAYS);
   const bA=dayToAngle(bottomDay);
+  // Bold radial line
   ctx.beginPath();
-  ctx.moveTo(cx+Math.cos(bA)*(outerR+2),cy+Math.sin(bA)*(outerR+2));
-  ctx.lineTo(cx+Math.cos(bA)*(outerR+14),cy+Math.sin(bA)*(outerR+14));
-  ctx.strokeStyle=R;ctx.lineWidth=1.5;ctx.stroke();
-  ctx.font='bold 7px monospace';ctx.fillStyle=R;
-  ctx.fillText('EST. BOTTOM',cx+Math.cos(bA)*(outerR+26),cy+Math.sin(bA)*(outerR+26));
+  ctx.moveTo(cx+Math.cos(bA)*(innerR-8),cy+Math.sin(bA)*(innerR-8));
+  ctx.lineTo(cx+Math.cos(bA)*(outerR+6),cy+Math.sin(bA)*(outerR+6));
+  ctx.strokeStyle=R;ctx.lineWidth=2;ctx.stroke();
+  // Label
+  ctx.font='bold 9px monospace';ctx.fillStyle=R;
+  ctx.fillText('EST. BOTTOM',cx+Math.cos(bA)*(outerR+22),cy+Math.sin(bA)*(outerR+22));
+
+  /* ── ATH MARKER — the ceiling of the wealth cycle ── */
+  const athAngle=dayToAngle(athDay);
+  // Bold radial line
+  ctx.beginPath();
+  ctx.moveTo(cx+Math.cos(athAngle)*(innerR-8),cy+Math.sin(athAngle)*(innerR-8));
+  ctx.lineTo(cx+Math.cos(athAngle)*(outerR+6),cy+Math.sin(athAngle)*(outerR+6));
+  ctx.strokeStyle=GOLD;ctx.lineWidth=2;ctx.stroke();
+  // ATH price ring
+  const rATH=priceToR(ath);
+  if(rATH>innerR&&rATH<=outerR){
+    ctx.beginPath();ctx.arc(cx,cy,rATH,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,215,0,0.35)';ctx.lineWidth=1.5;ctx.stroke();
+  }
+  // Label
+  ctx.font='bold 9px monospace';ctx.fillStyle=GOLD;
+  const athLblR=outerR+22;
+  ctx.fillText('ATH '+fmt(ath),cx+Math.cos(athAngle)*athLblR,cy+Math.sin(athAngle)*athLblR);
 
   /* ── 60-DAY SEGMENTS — THE MAIN EVENT ── */
+  /* Each cycle colored by its own performance: green = built wealth, red = destroyed wealth */
+  /* Relief rallies in the contraction show up green — that's the edge */
   segments.forEach(seg=>{
     const aStart=dayToAngle(seg.startDay);
     const aEnd=dayToAngle(seg.endDay);
-    const aPeak=dayToAngle(seg.peakDay);
     const rHi=priceToR(seg.cHi);
     const rLo=priceToR(seg.cLo);
 
-    // BOLD FILLED BLOCKS — this is what makes it pop
+    // Per-cycle: green if it built wealth, red if it destroyed it
     if(seg.declining){
-      // Green block: trough → peak
       ctx.beginPath();
-      ctx.arc(cx,cy,rHi,aStart,aPeak);
-      ctx.arc(cx,cy,rLo,aPeak,aStart,true);
-      ctx.closePath();
-      ctx.fillStyle='rgba(0,230,118,0.45)';
-      ctx.fill();
-      // Red block: peak → end
-      ctx.beginPath();
-      ctx.arc(cx,cy,rHi,aPeak,aEnd);
-      ctx.arc(cx,cy,rLo,aEnd,aPeak,true);
+      ctx.arc(cx,cy,rHi,aStart,aEnd);
+      ctx.arc(cx,cy,rLo,aEnd,aStart,true);
       ctx.closePath();
       ctx.fillStyle='rgba(255,23,68,0.45)';
       ctx.fill();
     }else{
-      // All green
       ctx.beginPath();
       ctx.arc(cx,cy,rHi,aStart,aEnd);
       ctx.arc(cx,cy,rLo,aEnd,aStart,true);
@@ -409,6 +425,7 @@ function draw(){
 
   ctx.font='7px monospace';ctx.fillStyle='rgba(255,255,255,0.18)';
   ctx.fillText('OF 4-YEAR CYCLE',cx,cy+30);
+
 
   requestAnimationFrame(draw);
 }
