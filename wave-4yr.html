@@ -3,549 +3,187 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bitcoin Rings — The 4-Year Wave</title>
+<title>THE 4-YEAR MAP — Quanta Jumps</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  background:#0a0a0f; color:#fff;
-  font-family:'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  min-height:100vh; padding:12px;
-}
-canvas { display:block; border-radius:16px; }
-.cards {
-  display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; justify-content:center;
-}
-.card {
-  padding:6px 12px; border-radius:8px; text-align:center;
-  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
-}
-.card .lbl { font-size:7px; letter-spacing:2px; color:rgba(255,255,255,0.4); margin-bottom:2px; }
-.card .val { font-size:11px; font-weight:700; }
-.loading {
-  display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh;
-}
-.loading-text { font-size:13px; color:rgba(255,255,255,0.35); letter-spacing:3px; }
-.ring {
-  width:44px; height:44px; border-radius:50%; margin-top:20px;
-  border:2px solid rgba(224,64,251,0.3); animation:pulse 1.4s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
-.hide { display:none!important; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #fff; font-family: 'SF Mono', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+  #ui { position: absolute; top: 30px; width: 100%; text-align: center; pointer-events: none; z-index: 10;}
+  h1 { font-size: 16px; letter-spacing: 8px; font-weight: 700; color: #fff; }
+  .sub { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 4px; margin-top: 6px; }
+  canvas { position: absolute; z-index: 1; }
 </style>
 </head>
 <body>
 
-<div id="load" class="loading">
-  <div class="loading-text">MAPPING THE 4-YEAR CYCLE<span id="dots"></span></div>
-  <div class="ring"></div>
+<div id="ui">
+  <h1>THE 4-YEAR MAP</h1>
+  <div class="sub">NOV 2022 — NOV 2026 (QUANTA JUMPS)</div>
 </div>
 
-<div id="app" class="hide" style="display:flex;flex-direction:column;align-items:center;">
-  <canvas id="c"></canvas>
-  <div id="cards" class="cards"></div>
-</div>
+<canvas id="canvas"></canvas>
 
 <script>
-(function(){
-'use strict';
+const GREEN = "rgba(0, 230, 118, 0.4)";
+const RED = "rgba(255, 23, 68, 0.4)";
 
-const G = '#00E676', R = '#FF1744', GOLD = '#FFD700', CYAN = '#4FC3F7', BG = '#0a0a0f';
-const PURPLE = '#E040FB';
-const NOM = 60;
+let quantaBlocks =[];
+let globalMax = 0;
 
-// Nov 21, 2022 — the FTX cycle bottom
-const CYCLE_START = 1669046400000;
-// ~4 years = 1461 days. Target end ~Nov 2026
-const CYCLE_DAYS = 1461;
-
-const $ = id => document.getElementById(id);
-const canvas = $('c');
-const ctx = canvas.getContext('2d');
-
-let dc = 0;
-const dt = setInterval(() => { dc=(dc+1)%4; const d=$('dots'); if(d) d.textContent='.'.repeat(dc); }, 400);
-
-function fmt(n) {
-  if (!n || isNaN(n)) return '—';
-  return '$' + Number(n).toLocaleString('en-US', {maximumFractionDigits:0});
-}
-
-async function api(url) {
-  const c = new AbortController();
-  const t = setTimeout(() => c.abort(), 20000);
+async function fetchHistory() {
+  const NOV_2022_SEC = 1668988800;
+  // CryptoCompare: free, allows up to 2000 days of daily data
   try {
-    const r = await fetch(url, {signal:c.signal});
-    clearTimeout(t);
-    if (!r.ok) throw new Error(r.status);
-    return r.json();
-  } catch(e) { clearTimeout(t); throw e; }
+    const r = await fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=1400");
+    if (!r.ok) throw new Error("cc " + r.status);
+    const j = await r.json();
+    const rows = j.Data && j.Data.Data;
+    if (!rows || rows.length < 365) throw new Error("cc empty");
+    return rows.filter(d => d.time >= NOV_2022_SEC).map(d => d.close).filter(p => p > 0);
+  } catch (e) { console.warn("CryptoCompare failed:", e.message); }
+
+  // Binance fallback: chain two calls (limit 1000 each) to cover ~1250 days
+  try {
+    const startMs = NOV_2022_SEC * 1000;
+    const r1 = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${startMs}&limit=1000`);
+    const d1 = await r1.json();
+    if (!Array.isArray(d1) || !d1.length) throw new Error("binance1 empty");
+    const lastMs = d1[d1.length - 1][0] + 86400000;
+    const r2 = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${lastMs}&limit=1000`);
+    const d2 = await r2.json();
+    const all = d1.concat(Array.isArray(d2) ? d2 : []);
+    return all.map(k => Number(k[4])).filter(p => p > 0);
+  } catch (e) { console.warn("Binance failed:", e.message); }
+
+  throw new Error("All data sources failed");
 }
 
-/* ── TROUGH DETECTION ── */
-function detectTroughs(closes, hw) {
-  const t = [];
-  for (let i = hw; i < closes.length - hw; i++) {
-    let ok = true;
-    for (let j = 1; j <= hw; j++) {
-      if (closes[i] > closes[i-j] || closes[i] > closes[i+j]) { ok = false; break; }
-    }
-    if (ok) t.push(i);
+function showError(msg) {
+  const ui = document.getElementById("ui");
+  ui.innerHTML += `<div style="margin-top:14px;font-size:11px;color:#FF1744;letter-spacing:2px;">DATA ERROR · ${msg}</div>`;
+}
+
+async function buildMap() {
+  let prices;
+  try {
+    prices = await fetchHistory();
+  } catch (e) {
+    showError(e.message);
+    return;
   }
-  return t;
-}
-
-function filterTroughs(raw, closes, minGap) {
-  if (!raw.length) return raw;
-  const f = [raw[0]];
-  for (let i = 1; i < raw.length; i++) {
-    if (raw[i] - f[f.length-1] >= minGap) f.push(raw[i]);
-    else if (closes[raw[i]] < closes[f[f.length-1]]) f[f.length-1] = raw[i];
-  }
-  return f;
-}
-
-/* ── DATA: paginated Binance daily OHLC from cycle start ── */
-async function fetchAllDaily() {
-  const all = [];
-  let startTime = CYCLE_START;
-  const now = Date.now();
-
-  while (startTime < now) {
-    const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${startTime}&limit=1000`;
-    const batch = await api(url);
-    if (!batch.length) break;
-
-    for (const k of batch) {
-      all.push({ t:+k[0], h:+k[2], l:+k[3], c:+k[4] });
-    }
-
-    // Next batch starts after last candle
-    startTime = +batch[batch.length-1][0] + 86400000;
-    if (batch.length < 1000) break;
+  if (!prices || prices.length < 60) {
+    showError("insufficient history (" + (prices ? prices.length : 0) + " days)");
+    return;
   }
 
-  return all;
-}
+  // Find dynamic 60-day cycles
+  const troughs =[];
+  const halfWin = 12;
+  for (let i = halfWin; i < prices.length - halfWin; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= halfWin; j++) { if (prices[i] > prices[i-j] || prices[i] > prices[i+j]) isTrough = false; }
+    if (isTrough) troughs.push({ idx: i, price: prices[i] });
+  }
 
-/* ── FETCH 4H FOR A CYCLE SEGMENT ── */
-async function fetch4h(startTime, endTime) {
-  let url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=${startTime}&limit=1000`;
-  if (endTime) url += `&endTime=${endTime}`;
-  const d = await api(url);
-  return d.map(k => ({ t:+k[0], h:+k[2], l:+k[3], c:+k[4] }));
-}
-
-/* ���─ BUILD CYCLE SEGMENTS ── */
-let segments = [];
-let globalHi = 0, globalLo = Infinity;
-let livePrice = 0;
-let totalDaysElapsed = 0;
-
-async function buildSegments() {
-  const daily = await fetchAllDaily();
-  const closes = daily.map(k => k.c);
-  const highs  = daily.map(k => k.h);
-  const lows   = daily.map(k => k.l);
-  const n = daily.length;
-
-  // Trough detection
-  let troughs = detectTroughs(closes, 12);
-  troughs = filterTroughs(troughs, closes, 30);
   if (troughs.length < 2) {
-    troughs = detectTroughs(closes, 8);
-    troughs = filterTroughs(troughs, closes, 36);
+    showError("only " + troughs.length + " trough(s) found — try a wider window");
+    return;
   }
 
-  // Include day 0 as first trough if detection missed it
-  if (troughs.length && troughs[0] > 15) troughs.unshift(0);
+  // Filter 40 day minimum gap
+  const filtered = [troughs[0]];
+  for (let i = 1; i < troughs.length; i++) {
+    if (troughs[i].idx - filtered[filtered.length-1].idx >= 40) filtered.push(troughs[i]);
+    else if (troughs[i].price < filtered[filtered.length-1].price) filtered[filtered.length-1] = troughs[i];
+  }
 
-  totalDaysElapsed = n;
+  // Create the Quanta Blocks
+  for (let i = 0; i < filtered.length - 1; i++) {
+    const startIdx = filtered[i].idx;
+    const endIdx = filtered[i+1].idx;
+    const slice = prices.slice(startIdx, endIdx);
 
-  // Build each segment
-  for (let i = 0; i < troughs.length; i++) {
-    const si = troughs[i];
-    const ei = (i < troughs.length - 1) ? troughs[i+1] : n - 1;
-    const isLast = i === troughs.length - 1;
+    const cycleMin = Math.min(...slice);
+    const cycleMax = Math.max(...slice);
+    if (cycleMax > globalMax) globalMax = cycleMax;
 
-    const segH = highs.slice(si, ei+1);
-    const segL = lows.slice(si, ei+1);
-    const segC = closes.slice(si, ei+1);
-    const cHi = Math.max(...segH);
-    const cLo = Math.min(...segL);
-    const peakIdx = segH.indexOf(cHi);
-    const daysInCycle = ei - si;
+    // Macro declining means the cycle closed significantly lower than it opened
+    const isDeclining = slice[slice.length-1] < slice[0] * 0.95;
 
-    if (cHi > globalHi) globalHi = cHi;
-    if (cLo < globalLo) globalLo = cLo;
-
-    // Phase: for completed cycles, structural decline = closed lower than opened
-    // For last cycle, conservative detection (same thresholds as wave.html)
-    let declining = false;
-    if (!isLast) {
-      declining = segC[segC.length-1] < segC[0] * 0.95;
-    } else {
-      const drop = (cHi - segC[segC.length-1]) / cHi;
-      const daysPastPeak = daysInCycle - peakIdx;
-      declining = (drop >= 0.10) || (drop >= 0.06 && daysPastPeak >= 5) || (daysInCycle >= 40 && drop >= 0.05);
-    }
-
-    // Fetch 4h wave data
-    let wave = [];
-    try {
-      const startT = daily[si].t;
-      const endT = isLast ? undefined : daily[ei].t;
-      const h4 = await fetch4h(startT, endT);
-      const msDay = 864e5;
-      wave = h4.map(k => ({
-        day: si + (+k[0] - startT) / msDay,
-        close: +k[4], high: +k[2], low: +k[3]
-      }));
-    } catch(e) {
-      // Fallback: use daily data as wave
-      wave = segC.map((c, j) => ({ day: si+j, close: c, high: segH[j], low: segL[j] }));
-    }
-
-    segments.push({
-      startDay: si, endDay: ei,
-      cHi, cLo, peakDay: si + peakIdx,
-      declining, wave, isLast,
-      troughPrice: closes[si],
-      days: daysInCycle
+    quantaBlocks.push({
+      startDay: startIdx,
+      endDay: endIdx,
+      low: cycleMin,
+      high: cycleMax,
+      color: isDeclining ? RED : GREEN,
+      path: slice
     });
   }
 
-  livePrice = closes[n-1];
+  render();
 }
 
-/* ── WEBSOCKET ── */
-let ws = null, wsRetry = 1000, poll = null;
-function connectWS() {
-  try {
-    ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-    ws.onopen = () => { wsRetry=1000; if(poll){clearInterval(poll);poll=null;} };
-    ws.onmessage = e => {
-      try { livePrice = parseFloat(JSON.parse(e.data).p); } catch(e){}
-    };
-    ws.onclose = () => { setTimeout(connectWS,wsRetry); wsRetry=Math.min(wsRetry*2,30000); startPoll(); };
-    ws.onerror = () => ws.close();
-  } catch(e) { startPoll(); }
-}
-function startPoll() {
-  if (poll) return;
-  poll = setInterval(async () => {
-    try { const d = await api('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT'); livePrice=parseFloat(d.price); } catch(e){}
-  }, 3000);
-}
+function render() {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const cx = canvas.width / 2, cy = canvas.height / 2;
 
-/* ── CANVAS ── */
-function resize() {
-  const sz = Math.min(window.innerWidth - 24, window.innerHeight - 100, 720);
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = sz*dpr; canvas.height = sz*dpr;
-  canvas.style.width = sz+'px'; canvas.style.height = sz+'px';
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-}
+  const outerR = Math.min(cx, cy) - 50;
+  const innerR = 40; // Starts small at the center (Nov 2022)
 
-function dayToAngle(day) {
-  return (day / CYCLE_DAYS) * Math.PI * 2 - Math.PI / 2;
-}
+  // Radar Grid
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, outerR*0.6, 0, Math.PI*2); ctx.stroke();
 
-function draw() {
-  const w = parseInt(canvas.style.width);
-  const h = parseInt(canvas.style.height);
-  const cx = w/2, cy = h/2;
+  // 4 Years = 1461 Days.
+  // Angle 0 (12 o'clock) is Nov 2022. Angle 360 is Nov 2026.
+  const TOTAL_DAYS = 1461;
 
-  ctx.clearRect(0,0,w,h);
-  ctx.fillStyle = BG;
-  ctx.fillRect(0,0,w,h);
-  if (!segments.length) { requestAnimationFrame(draw); return; }
+  function getA(day) { return (day / TOTAL_DAYS) * Math.PI * 2 - Math.PI/2; }
+  function getR(price) { return innerR + (price / globalMax) * (outerR - innerR); }
 
-  const outerR = Math.min(cx,cy) - 48;
-  const innerR = outerR * 0.18;
-  const band = outerR - innerR;
+  // Draw 4-Year Clock Hash Marks
+  ctx.font = "10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.textAlign = "center";
+  ctx.fillText("NOV '22 / NOV '26", cx, cy - outerR - 15);
+  ctx.fillText("NOV '23", cx + outerR + 25, cy + 4);
+  ctx.fillText("NOV '24", cx, cy + outerR + 15);
+  ctx.fillText("NOV '25", cx - outerR - 25, cy + 4);
 
-  // Price to radius: global scale — this is what creates the staircase
-  const gHi = Math.max(globalHi, livePrice || 0);
-  const gLo = globalLo;
+  // DRAW THE QUANTA BLOCKS
+  quantaBlocks.forEach((block, idx) => {
+    const aStart = getA(block.startDay);
+    const aEnd = getA(block.endDay);
+    const rLow = getR(block.low);
+    const rHigh = getR(block.high);
 
-  function priceToR(p) {
-    const t = (p - gLo) / (gHi - gLo || 1);
-    return innerR + Math.max(0, Math.min(1, t)) * band;
-  }
-
-  /* ── YEAR MARKERS ── */
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  const yearMarks = [
-    { label: "NOV '22", day: 0 },
-    { label: "MAY '23", day: 182 },
-    { label: "NOV '23", day: 365 },
-    { label: "MAY '24", day: 548 },
-    { label: "NOV '24", day: 730 },
-    { label: "MAY '25", day: 913 },
-    { label: "NOV '25", day: 1096 },
-    { label: "MAY '26", day: 1278 },
-    { label: "NOV '26", day: 1461 }
-  ];
-
-  yearMarks.forEach(m => {
-    const a = dayToAngle(m.day);
-    const t1 = outerR + 4, t2 = outerR + 16;
-
+    // Draw the Geometric Range Block
     ctx.beginPath();
-    ctx.moveTo(cx+Math.cos(a)*t1, cy+Math.sin(a)*t1);
-    ctx.lineTo(cx+Math.cos(a)*t2, cy+Math.sin(a)*t2);
-    ctx.strokeStyle = m.label.startsWith('NOV') ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = m.label.startsWith('NOV') ? 1.5 : 0.8;
-    ctx.stroke();
-
-    const lr = outerR + 30;
-    ctx.font = m.label.startsWith('NOV') ? 'bold 8px monospace' : '7px monospace';
-    ctx.fillStyle = m.label.startsWith('NOV') ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)';
-    ctx.fillText(m.label, cx+Math.cos(a)*lr, cy+Math.sin(a)*lr);
-  });
-
-  /* ── HALVING MARKER ── */
-  const halvingDay = 516;
-  const halvA = dayToAngle(halvingDay);
-  ctx.beginPath();
-  ctx.moveTo(cx+Math.cos(halvA)*(outerR+4), cy+Math.sin(halvA)*(outerR+4));
-  ctx.lineTo(cx+Math.cos(halvA)*(outerR+20), cy+Math.sin(halvA)*(outerR+20));
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.font = 'bold 7px monospace';
-  ctx.fillStyle = GOLD;
-  ctx.fillText('HALVING', cx+Math.cos(halvA)*(outerR+32), cy+Math.sin(halvA)*(outerR+32));
-
-  /* ── PRICE GRID RINGS ── */
-  const priceLevels = [20000, 40000, 60000, 80000, 100000, 120000, 150000];
-  priceLevels.forEach(p => {
-    if (p < gLo || p > gHi) return;
-    const r = priceToR(p);
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI*2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([3,8]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.font = '6px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.textAlign = 'right';
-    ctx.fillText(fmt(p), cx-6, cy-r+4);
-    ctx.textAlign = 'center';
-  });
-
-  /* ── DRAW EACH 60-DAY SEGMENT ── */
-  segments.forEach((seg) => {
-    const aStart = dayToAngle(seg.startDay);
-    const aEnd = dayToAngle(seg.endDay);
-    const aPeak = dayToAngle(seg.peakDay);
-
-    const rHi = priceToR(seg.cHi);
-    const rLo = priceToR(seg.cLo);
-
-    // Phase-colored range block
-    if (seg.declining) {
-      // Green: start → peak
-      ctx.beginPath();
-      ctx.arc(cx, cy, rHi, aStart, aPeak);
-      ctx.arc(cx, cy, rLo, aPeak, aStart, true);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(0,230,118,0.06)';
-      ctx.fill();
-
-      // Red: peak → end
-      ctx.beginPath();
-      ctx.arc(cx, cy, rHi, aPeak, aEnd);
-      ctx.arc(cx, cy, rLo, aEnd, aPeak, true);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(255,23,68,0.06)';
-      ctx.fill();
-    } else {
-      // All green
-      ctx.beginPath();
-      ctx.arc(cx, cy, rHi, aStart, aEnd);
-      ctx.arc(cx, cy, rLo, aEnd, aStart, true);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(0,230,118,0.06)';
-      ctx.fill();
-    }
-
-    // Block outline
-    ctx.beginPath();
-    ctx.arc(cx, cy, rHi, aStart, aEnd);
-    ctx.arc(cx, cy, rLo, aEnd, aStart, true);
+    ctx.arc(cx, cy, rHigh, aStart, aEnd);
+    ctx.arc(cx, cy, rLow, aEnd, aStart, true);
     ctx.closePath();
-    ctx.strokeStyle = seg.declining ? 'rgba(255,23,68,0.12)' : 'rgba(0,230,118,0.12)';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-
-    // Radial divider at segment start
-    ctx.beginPath();
-    ctx.moveTo(cx+Math.cos(aStart)*rLo, cy+Math.sin(aStart)*rLo);
-    ctx.lineTo(cx+Math.cos(aStart)*rHi, cy+Math.sin(aStart)*rHi);
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 0.6;
-    ctx.stroke();
-
-    // Wave line inside the block
-    const pts = seg.wave;
-    if (pts.length > 1) {
-      ctx.beginPath();
-      pts.forEach((p, i) => {
-        const a = dayToAngle(p.day);
-        const r = priceToR(p.close);
-        if (i===0) ctx.moveTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
-        else ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
-      });
-
-      // Extend last segment with live price
-      if (seg.isLast && livePrice) {
-        const liveA = dayToAngle(totalDaysElapsed);
-        const liveR = priceToR(livePrice);
-        ctx.lineTo(cx+Math.cos(liveA)*liveR, cy+Math.sin(liveA)*liveR);
-      }
-
-      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-
-    // Trough dot
-    const tR = priceToR(seg.troughPrice);
-    ctx.beginPath(); ctx.arc(cx+Math.cos(aStart)*tR, cy+Math.sin(aStart)*tR, 2, 0, Math.PI*2);
-    ctx.fillStyle = CYAN;
+    ctx.fillStyle = block.color;
     ctx.fill();
-  });
 
-  /* ── LIVE DOT ── */
-  if (livePrice && segments.length) {
-    const nowA = dayToAngle(totalDaysElapsed);
-    const nowR = priceToR(livePrice);
-    const nx = cx+Math.cos(nowA)*nowR;
-    const ny = cy+Math.sin(nowA)*nowR;
-
-    ctx.beginPath(); ctx.arc(nx, ny, 8, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(0,230,118,0.12)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(nx, ny, 3.5, 0, Math.PI*2);
-    ctx.fillStyle = G;
-    ctx.shadowColor = G; ctx.shadowBlur = 12;
-    ctx.fill(); ctx.shadowBlur = 0;
-
-    const plx = nx + Math.cos(nowA)*18;
-    const ply = ny + Math.sin(nowA)*18;
-    ctx.font = 'bold 9px monospace';
-    ctx.fillStyle = G;
-    ctx.fillText(fmt(livePrice), plx, ply);
-  }
-
-  /* ── FUTURE ARC ── */
-  if (totalDaysElapsed < CYCLE_DAYS) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, outerR * 0.5, dayToAngle(totalDaysElapsed), dayToAngle(CYCLE_DAYS));
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    // Outline the block
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
     ctx.lineWidth = 1;
-    ctx.setLineDash([4, 10]);
     ctx.stroke();
-    ctx.setLineDash([]);
-  }
 
-  /* ── OUTER + INNER RINGS ── */
-  ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5; ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx, cy, innerR, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 0.5; ctx.stroke();
-
-  /* ── CENTER ── */
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-
-  ctx.font = 'bold 10px monospace';
-  ctx.fillStyle = PURPLE;
-  ctx.fillText('4-YEAR WAVE', cx, cy - 24);
-
-  ctx.font = '8px monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillText(segments.length + ' CYCLES · NOV 22 → NOV 26', cx, cy - 10);
-
-  const pct4yr = Math.round((totalDaysElapsed / CYCLE_DAYS) * 100);
-  ctx.font = 'bold 26px monospace';
-  ctx.fillStyle = pct4yr > 75 ? R : pct4yr > 50 ? GOLD : G;
-  ctx.fillText(pct4yr + '%', cx, cy + 12);
-
-  ctx.font = '7px monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.2)';
-  ctx.fillText('OF 4-YEAR CYCLE', cx, cy + 30);
-
-  requestAnimationFrame(draw);
+    // Draw the price path strictly inside the block
+    ctx.beginPath();
+    block.path.forEach((p, i) => {
+      const a = getA(block.startDay + i);
+      const r = getR(p);
+      if (i===0) ctx.moveTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+      else ctx.lineTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+    });
+    ctx.strokeStyle = "rgba(255,255,255,0.8)";
+    ctx.stroke();
+  });
 }
 
-/* ── INFO CARDS ── */
-function updateCards() {
-  if (!segments.length) return;
-  const last = segments[segments.length-1];
-  const rising = segments.filter(s => !s.declining).length;
-  const falling = segments.filter(s => s.declining).length;
-
-  $('cards').innerHTML = `
-    <div class="card">
-      <div class="lbl">CYCLES</div>
-      <div class="val" style="color:${PURPLE}">${segments.length}</div>
-    </div>
-    <div class="card">
-      <div class="lbl">RISING</div>
-      <div class="val" style="color:${G}">${rising}</div>
-    </div>
-    <div class="card">
-      <div class="lbl">DECLINING</div>
-      <div class="val" style="color:${R}">${falling}</div>
-    </div>
-    <div class="card">
-      <div class="lbl">CYCLE LOW</div>
-      <div class="val" style="color:${CYAN}">${fmt(globalLo)}</div>
-    </div>
-    <div class="card">
-      <div class="lbl">CYCLE HIGH</div>
-      <div class="val" style="color:${GOLD}">${fmt(globalHi)}</div>
-    </div>
-    <div class="card">
-      <div class="lbl">CURRENT</div>
-      <div class="val" style="color:${last.declining ? R : G}">${last.declining ? 'DECLINE' : 'RISING'}</div>
-    </div>
-  `;
-}
-
-/* ── INIT ── */
-async function init() {
-  try {
-    await buildSegments();
-
-    clearInterval(dt);
-    $('load').classList.add('hide');
-    const app = $('app');
-    app.classList.remove('hide');
-    app.style.display = 'flex';
-
-    resize();
-    draw();
-    updateCards();
-    setInterval(updateCards, 3000);
-    connectWS();
-    window.addEventListener('resize', resize);
-
-  } catch(e) {
-    console.error(e);
-    $('dots').textContent = '';
-    document.querySelector('.loading-text').textContent = 'ERROR: ' + e.message;
-  }
-}
-
-init();
-})();
+buildMap();
 </script>
 </body>
 </html>
