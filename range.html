@@ -170,7 +170,7 @@ canvas { border-radius:12px; display:block; }
     ath: 0, athDate: '',
     livePrice: 0,
     r20hi: 0, r20lo: 0, r20pct: 0,
-    cHi: 0, cLo: 0, cPct: 0, cTroughIdx: 0, cTroughPrice: 0, cDays: 0,
+    cHi: 0, cLo: 0, cPct: 0, cTroughIdx: 0, cTroughPrice: 0, cDays: 0, cHiDay: 0, declining: false,
     roc20: 0, roc60: 0, momentum: 0,
     projLow: [0, 0], projHigh: [0, 0],
     daysSinceHalving: 0,
@@ -377,6 +377,13 @@ canvas { border-radius:12px; display:block; }
     S.cHi = Math.max(...highsSinceTrough);
     S.cLo = Math.min(...lowsSinceTrough);
 
+    // Track which day (relative to trough) the cycle high was set
+    const cHiIdx = highsSinceTrough.indexOf(S.cHi);
+    S.cHiDay = cHiIdx; // day within cycle that peak occurred
+    const daysAfterPeak = (highsSinceTrough.length - 1) - cHiIdx;
+    // Declining = peak was set 3+ days ago AND price is below the peak
+    S.declining = daysAfterPeak >= 3 && S.closes[n - 1] < S.cHi * 0.995;
+
     // MOMENTUM
     if (n > 60) {
       S.roc20 = ((S.closes[n - 1] / S.closes[n - 21]) - 1) * 100;
@@ -409,7 +416,7 @@ canvas { border-radius:12px; display:block; }
     if (p > S.r20hi) S.r20hi = p;
     if (p < S.r20lo) S.r20lo = p;
     // Extend cycle range too
-    if (p > S.cHi) S.cHi = p;
+    if (p > S.cHi) { S.cHi = p; S.declining = false; } // new high = not declining
     if (p < S.cLo) S.cLo = p;
 
     const r20range = S.r20hi - S.r20lo;
@@ -493,8 +500,8 @@ canvas { border-radius:12px; display:block; }
     $('rCmarker').style.cssText = `position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px;transform:translateX(-1.5px);z-index:2;left:${Math.max(1,Math.min(99,S.cPct))}%;background:${cCol};box-shadow:0 0 8px ${cCol}`;
     $('rCpct').textContent = Math.round(S.cPct) + '%';
     $('rCpct').style.color = cCol;
-    $('rCdays').textContent = S.cDays + ' days';
-    $('rCdays').style.color = S.cDays > 50 ? GOLD : GREEN;
+    $('rCdays').textContent = S.cDays + ' days' + (S.declining ? ' · DECLINING' : ' · RISING');
+    $('rCdays').style.color = S.declining ? RED : (S.cDays > 50 ? GOLD : GREEN);
     $('rCtrough').textContent = fmt(S.cTroughPrice, 0);
 
     // 4-year cycle
@@ -590,15 +597,18 @@ canvas { border-radius:12px; display:block; }
     ctx.setLineDash([]);
     drawLabel(cx + rATH * 0.55, cy - rATH * 0.55 - 8, 'ATH ' + fmt(S.ath, 0), 'rgba(255,215,0,0.45)', 7);
 
-    // ── CYCLE RANGE BAND (desaturated green) ──
+    // ── CYCLE RANGE BAND (green rising, red declining) ──
     const rCycLo = pToR(S.cLo);
     const rCycHi = pToR(S.cHi);
-    drawZone(cx, cy, rCycLo, rCycHi, 'rgba(0,230,118,0.025)', 'rgba(0,230,118,0.1)');
+    const cycFill = S.declining ? 'rgba(255,23,68,0.04)' : 'rgba(0,230,118,0.025)';
+    const cycStroke = S.declining ? 'rgba(255,23,68,0.2)' : 'rgba(0,230,118,0.1)';
+    drawZone(cx, cy, rCycLo, rCycHi, cycFill, cycStroke);
 
     // Cycle range labels at angles
     const angC = Math.PI * 0.25;
-    drawLabelAngled(cx, cy, rCycLo + 8, angC + 0.3, 'CYCLE LOW ' + fmt(S.cLo, 0), 'rgba(0,230,118,0.18)', 7);
-    drawLabelAngled(cx, cy, rCycHi - 8, -angC - 0.1, 'CYCLE HIGH ' + fmt(S.cHi, 0), 'rgba(0,230,118,0.18)', 7);
+    const cycLabelColor = S.declining ? 'rgba(255,23,68,0.25)' : 'rgba(0,230,118,0.18)';
+    drawLabelAngled(cx, cy, rCycLo + 8, angC + 0.3, 'CYCLE LOW ' + fmt(S.cLo, 0), cycLabelColor, 7);
+    drawLabelAngled(cx, cy, rCycHi - 8, -angC - 0.1, 'CYCLE HIGH ' + fmt(S.cHi, 0), cycLabelColor, 7);
 
     // ── 20-DAY RANGE BAND (brighter green) ──
     const r20Lo = pToR(S.r20lo);
