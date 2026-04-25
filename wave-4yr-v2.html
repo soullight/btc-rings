@@ -9,33 +9,22 @@
 body {
   background:#0a0a0f; color:#fff;
   font-family:'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
-  min-height:100vh; overflow-x:hidden;
-}
-.wrap { display:flex; width:100%; min-height:100vh; }
-.left { flex:0 0 70%; display:flex; align-items:center; justify-content:center; padding:12px; }
-.right {
-  flex:0 0 30%; display:flex; flex-direction:column; padding:14px 12px; gap:8px;
-  background:rgba(255,255,255,0.02); border-left:1px solid rgba(255,255,255,0.08);
-  overflow-y:auto;
-}
-@media(max-width:860px){
-  .wrap { flex-direction:column; }
-  .left,.right { flex:none; width:100%; }
-  .right { border-left:none; border-top:1px solid rgba(255,255,255,0.06); }
+  min-height:100vh; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; padding:12px;
 }
 canvas { display:block; border-radius:12px; }
-.sec {
-  padding:10px 12px; border-radius:8px;
+.hud {
+  display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; justify-content:center;
+  max-width:900px;
+}
+.hud-card {
+  padding:6px 10px; border-radius:6px; text-align:center; min-width:80px;
   background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
 }
-.sec-lbl { font-size:8px; letter-spacing:2.5px; color:rgba(255,255,255,0.5); margin-bottom:5px; font-weight:600; }
-.sec-val { font-size:20px; font-weight:700; }
-.sec-sm { font-size:12px; font-weight:700; }
-.sec-sub { font-size:9px; color:rgba(255,255,255,0.4); margin-top:3px; }
-.row { display:flex; justify-content:space-between; align-items:center; margin:3px 0; }
-.row .lbl { font-size:9px; color:rgba(255,255,255,0.45); letter-spacing:1px; }
-.row .val { font-size:11px; font-weight:700; }
-.divider { height:1px; background:rgba(255,255,255,0.06); margin:4px 0; }
+.hud-card .lbl { font-size:7px; letter-spacing:2px; color:rgba(255,255,255,0.35); margin-bottom:2px; }
+.hud-card .val { font-size:12px; font-weight:700; }
+.title { font-size:22px; font-weight:700; letter-spacing:10px; margin-bottom:2px; }
+.sub { font-size:9px; color:rgba(255,255,255,0.25); letter-spacing:3px; margin-bottom:10px; }
 .loading {
   position:fixed; inset:0; background:#0a0a0f; z-index:999;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -47,7 +36,6 @@ canvas { display:block; border-radius:12px; }
 }
 @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
 .hide { display:none!important; }
-.footer { margin-top:auto; text-align:center; font-size:7px; color:rgba(255,255,255,0.15); letter-spacing:1px; padding-top:8px; }
 </style>
 </head>
 <body>
@@ -57,52 +45,11 @@ canvas { display:block; border-radius:12px; }
   <div class="ring"></div>
 </div>
 
-<div id="app" class="wrap hide">
-  <div class="left">
-    <canvas id="c"></canvas>
-  </div>
-  <div class="right">
-    <div class="sec">
-      <div class="sec-lbl">LIVE PRICE</div>
-      <div class="sec-val" id="hLive" style="color:#00E676">—</div>
-      <div class="sec-sub" id="hFromATH"></div>
-    </div>
-    <div class="sec">
-      <div class="sec-lbl">4-YEAR CYCLE POSITION</div>
-      <div class="row"><span class="lbl">PROGRESS</span><span class="val" id="h4pct" style="color:#E040FB">—</span></div>
-      <div class="row"><span class="lbl">DAYS ELAPSED</span><span class="val" id="h4days">—</span></div>
-      <div class="row"><span class="lbl">DAYS REMAINING</span><span class="val" id="h4rem">—</span></div>
-    </div>
-    <div class="sec">
-      <div class="sec-lbl">CURRENT 60-DAY CYCLE</div>
-      <div class="row"><span class="lbl">CYCLE #</span><span class="val" id="hCycNum" style="color:#E040FB">—</span></div>
-      <div class="row"><span class="lbl">DAY</span><span class="val" id="hCycDay" style="color:#00E676">—</span></div>
-      <div class="row"><span class="lbl">PHASE</span><span class="val" id="hCycPhase">—</span></div>
-      <div class="row"><span class="lbl">RANGE</span><span class="val" id="hCycRange" style="color:rgba(255,255,255,0.5)">—</span></div>
-    </div>
-    <div class="sec">
-      <div class="sec-lbl">REFERENCE LEVELS</div>
-      <div class="row"><span class="lbl">ALL-TIME HIGH</span><span class="val" id="hATH" style="color:#FFD700">—</span></div>
-      <div class="row"><span class="lbl">FROM ATH</span><span class="val" id="hATHdist">—</span></div>
-      <div class="divider"></div>
-      <div class="row"><span class="lbl">BLOOD ZONE</span><span class="val" id="hBlood" style="color:#FF1744">—</span></div>
-      <div class="row"><span class="lbl">GOLDEN ZONE</span><span class="val" id="hGold" style="color:#FFD700">—</span></div>
-    </div>
-    <div class="sec">
-      <div class="sec-lbl">PROJECTED BOTTOM</div>
-      <div class="row"><span class="lbl">ESTIMATED</span><span class="val" id="hBottom" style="color:#FF1744">—</span></div>
-      <div class="row"><span class="lbl">DAYS AWAY</span><span class="val" id="hBottomDays" style="color:#FF1744">—</span></div>
-    </div>
-    <div class="sec">
-      <div class="sec-lbl">CYCLE STATS</div>
-      <div class="row"><span class="lbl">TOTAL CYCLES</span><span class="val" id="hTotal" style="color:#E040FB">—</span></div>
-      <div class="row"><span class="lbl">RISING</span><span class="val" id="hRise" style="color:#00E676">—</span></div>
-      <div class="row"><span class="lbl">DECLINING</span><span class="val" id="hDecl" style="color:#FF1744">—</span></div>
-      <div class="row"><span class="lbl">4-YR LOW</span><span class="val" id="hGlo" style="color:#4FC3F7">—</span></div>
-      <div class="row"><span class="lbl">4-YR HIGH</span><span class="val" id="hGhi" style="color:#FFD700">—</span></div>
-    </div>
-    <div class="footer">4-YEAR WAVE v2 · BINANCE OHLC · LIVE</div>
-  </div>
+<div id="app" class="hide" style="display:flex;flex-direction:column;align-items:center;">
+  <div class="title">THE 4-YEAR MAP</div>
+  <div class="sub">NOV 2022 — NOV 2026</div>
+  <canvas id="c"></canvas>
+  <div id="hud" class="hud"></div>
 </div>
 
 <script>
@@ -185,7 +132,7 @@ async function fetchATH(){
 let segments=[];
 let globalHi=0,globalLo=Infinity;
 let livePrice=0,totalDaysElapsed=0;
-let ath=0,projLow=[0,0],projHigh=[0,0];
+let ath=0;
 
 async function buildSegments(){
   const [daily,athVal]=await Promise.all([fetchAllDaily(),fetchATH()]);
@@ -194,11 +141,8 @@ async function buildSegments(){
   const lows=daily.map(k=>k.l);
   const n=daily.length;
 
-  // ATH
   ath=athVal||Math.max(...highs);
   if(Math.max(...highs)>ath)ath=Math.max(...highs);
-  projLow=[ath*0.20,ath*0.30];
-  projHigh=[ath*1.50,ath*2.50];
 
   // Trough detection
   let troughs=detectTroughs(closes,12);
@@ -224,8 +168,10 @@ async function buildSegments(){
     if(cHi>globalHi)globalHi=cHi;
     if(cLo<globalLo)globalLo=cLo;
 
+    // Conservative phase detection
     let declining=false;
     if(!isLast){
+      // Completed cycle: did it close lower than it started?
       declining=segC[segC.length-1]<segC[0]*0.95;
     }else{
       const drop=(cHi-segC[segC.length-1])/cHi;
@@ -256,7 +202,7 @@ function connectWS(){
   try{
     ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
     ws.onopen=()=>{wsRetry=1000;if(poll){clearInterval(poll);poll=null;}};
-    ws.onmessage=e=>{try{livePrice=parseFloat(JSON.parse(e.data).p);updateHUD();}catch(e){}};
+    ws.onmessage=e=>{try{livePrice=parseFloat(JSON.parse(e.data).p);}catch(e){}};
     ws.onclose=()=>{setTimeout(connectWS,wsRetry);wsRetry=Math.min(wsRetry*2,30000);startPoll();};
     ws.onerror=()=>ws.close();
   }catch(e){startPoll();}
@@ -264,65 +210,15 @@ function connectWS(){
 function startPoll(){
   if(poll)return;
   poll=setInterval(async()=>{
-    try{const d=await api('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');livePrice=parseFloat(d.price);updateHUD();}catch(e){}
+    try{const d=await api('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');livePrice=parseFloat(d.price);}catch(e){}
   },3000);
-}
-
-/* ── HUD ── */
-function updateHUD(){
-  const p=livePrice;if(!p)return;
-
-  // Live price
-  $('hLive').textContent=fmt(p,2);
-  $('hFromATH').textContent=fmtPct(((p/ath)-1)*100)+' from ATH';
-
-  // 4-year position
-  const pct4=Math.round((totalDaysElapsed/CYCLE_DAYS)*100);
-  $('h4pct').textContent=pct4+'%';
-  $('h4pct').style.color=pct4>75?R:pct4>50?GOLD:G;
-  $('h4days').textContent=totalDaysElapsed+' days';
-  $('h4rem').textContent=Math.max(0,CYCLE_DAYS-totalDaysElapsed)+' days';
-  $('h4rem').style.color=CYCLE_DAYS-totalDaysElapsed<365?R:'rgba(255,255,255,0.5)';
-
-  // Current cycle
-  if(segments.length){
-    const last=segments[segments.length-1];
-    $('hCycNum').textContent='#'+segments.length+' of ~'+Math.round(CYCLE_DAYS/NOM);
-    const cycDay=last.isLast?Math.round((Date.now()-CYCLE_START)/864e5-last.startDay):last.days;
-    $('hCycDay').textContent=cycDay+' / ~'+NOM;
-    $('hCycPhase').textContent=last.declining?'DECLINING':'RISING';
-    $('hCycPhase').style.color=last.declining?R:G;
-    $('hCycRange').textContent=fmt(last.cLo)+' — '+fmt(last.cHi);
-  }
-
-  // Reference levels
-  $('hATH').textContent=fmt(ath);
-  $('hATHdist').textContent=fmtPct(((p/ath)-1)*100);
-  $('hATHdist').style.color=p>=ath?GOLD:'rgba(255,255,255,0.4)';
-  $('hBlood').textContent=fmt(projLow[0])+' — '+fmt(projLow[1]);
-  $('hGold').textContent=fmt(projHigh[0])+' — '+fmt(projHigh[1]);
-
-  // Projected bottom
-  const estBottom=new Date(HALVING_DATE);
-  estBottom.setDate(estBottom.getDate()+912);
-  const daysToBottom=Math.max(0,Math.floor((estBottom-new Date())/864e5));
-  $('hBottom').textContent='~'+estBottom.toLocaleDateString('en-US',{month:'short',year:'numeric'});
-  $('hBottomDays').textContent=daysToBottom>0?daysToBottom+' days':'NOW';
-
-  // Stats
-  $('hTotal').textContent=segments.length;
-  $('hRise').textContent=segments.filter(s=>!s.declining).length;
-  $('hDecl').textContent=segments.filter(s=>s.declining).length;
-  $('hGlo').textContent=fmt(globalLo);
-  $('hGhi').textContent=fmt(globalHi);
 }
 
 /* ── CANVAS ── */
 function resize(){
-  const lp=document.querySelector('.left');
-  const w=lp.clientWidth-24;
-  const maxH=window.innerHeight-24;
-  const sz=Math.min(w,maxH,720);
+  const maxW=window.innerWidth-24;
+  const maxH=window.innerHeight-120; // leave room for title + HUD bar
+  const sz=Math.min(maxW,maxH,800);
   const dpr=window.devicePixelRatio||1;
   canvas.width=sz*dpr;canvas.height=sz*dpr;
   canvas.style.width=sz+'px';canvas.style.height=sz+'px';
@@ -343,62 +239,21 @@ function draw(){
   ctx.fillRect(0,0,w,h);
   if(!segments.length){requestAnimationFrame(draw);return;}
 
-  const outerR=Math.min(cx,cy)-48;
-  const innerR=outerR*0.15;
-  const band=outerR-innerR;
+  const outerR=Math.min(cx,cy)-44;
+  const innerR=outerR*0.18; // tight inner = maximum radial band for segments
 
-  // Scale includes blood zone floor and golden zone ceiling
-  const scaleMin=Math.min(globalLo,projLow[0]*0.9);
-  const scaleMax=Math.max(globalHi,projHigh[1]*0.5,livePrice||0);
+  // SCALE: just the actual data. No projected zones blowing it out.
+  const scaleMin=globalLo*0.95; // tiny padding
+  const scaleMax=globalHi*1.02;
 
   function priceToR(p){
     const t=(p-scaleMin)/(scaleMax-scaleMin||1);
-    return innerR+Math.max(0,Math.min(1,t))*band;
+    return innerR+Math.max(0,Math.min(1,t))*(outerR-innerR);
   }
 
-  /* ── BLOOD ZONE (projected bottom range) ── */
-  const rBloodLo=priceToR(projLow[0]);
-  const rBloodHi=priceToR(projLow[1]);
-  if(rBloodHi>innerR){
-    ctx.beginPath();
-    ctx.arc(cx,cy,rBloodHi,0,Math.PI*2);
-    ctx.arc(cx,cy,rBloodLo,0,Math.PI*2,true);
-    ctx.fillStyle='rgba(255,23,68,0.12)';
-    ctx.fill();
-    ctx.beginPath();ctx.arc(cx,cy,rBloodLo,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,23,68,0.3)';ctx.lineWidth=1;ctx.stroke();
-    ctx.beginPath();ctx.arc(cx,cy,rBloodHi,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,23,68,0.3)';ctx.lineWidth=1;ctx.stroke();
-    // Label
-    ctx.font='7px monospace';ctx.fillStyle='rgba(255,23,68,0.5)';ctx.textAlign='right';
-    ctx.fillText('BLOOD '+fmt(projLow[0])+' — '+fmt(projLow[1]),cx-8,cy+(rBloodLo+rBloodHi)/2+2);
-    ctx.textAlign='center';
-  }
-
-  /* ── GOLDEN ZONE (projected top range) — only show lower bound ── */
-  const rGoldLo=priceToR(projHigh[0]);
-  if(rGoldLo<outerR){
-    ctx.beginPath();
-    ctx.arc(cx,cy,Math.min(rGoldLo+band*0.05,outerR),0,Math.PI*2);
-    ctx.arc(cx,cy,rGoldLo,0,Math.PI*2,true);
-    ctx.fillStyle='rgba(255,215,0,0.08)';
-    ctx.fill();
-    ctx.beginPath();ctx.arc(cx,cy,rGoldLo,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,215,0,0.35)';ctx.lineWidth=1;ctx.setLineDash([4,6]);ctx.stroke();ctx.setLineDash([]);
-    ctx.font='7px monospace';ctx.fillStyle='rgba(255,215,0,0.45)';ctx.textAlign='right';
-    ctx.fillText('GOLDEN '+fmt(projHigh[0])+'+',cx-8,cy-rGoldLo+4);
-    ctx.textAlign='center';
-  }
-
-  /* ── ATH RING ── */
-  const rATH=priceToR(ath);
-  if(rATH>innerR&&rATH<outerR){
-    ctx.beginPath();ctx.arc(cx,cy,rATH,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,215,0,0.3)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.stroke();ctx.setLineDash([]);
-    ctx.font='6px monospace';ctx.fillStyle='rgba(255,215,0,0.35)';ctx.textAlign='left';
-    ctx.fillText('ATH '+fmt(ath),cx+8,cy-rATH+4);
-    ctx.textAlign='center';
-  }
+  /* ── OUTER RING ── */
+  ctx.beginPath();ctx.arc(cx,cy,outerR,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;ctx.stroke();
 
   /* ── YEAR MARKERS ── */
   ctx.textAlign='center';ctx.textBaseline='middle';
@@ -411,48 +266,36 @@ function draw(){
     const a=dayToAngle(m.day);
     const isNov=m.label.startsWith('NOV');
     ctx.beginPath();
-    ctx.moveTo(cx+Math.cos(a)*(outerR+3),cy+Math.sin(a)*(outerR+3));
-    ctx.lineTo(cx+Math.cos(a)*(outerR+(isNov?16:10)),cy+Math.sin(a)*(outerR+(isNov?16:10)));
-    ctx.strokeStyle=isNov?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.08)';
+    ctx.moveTo(cx+Math.cos(a)*(outerR+2),cy+Math.sin(a)*(outerR+2));
+    ctx.lineTo(cx+Math.cos(a)*(outerR+(isNov?14:8)),cy+Math.sin(a)*(outerR+(isNov?14:8)));
+    ctx.strokeStyle=isNov?'rgba(255,255,255,0.3)':'rgba(255,255,255,0.1)';
     ctx.lineWidth=isNov?1.5:0.8;ctx.stroke();
-    const lr=outerR+(isNov?28:22);
-    ctx.font=isNov?'bold 7px monospace':'6px monospace';
-    ctx.fillStyle=isNov?'rgba(255,255,255,0.4)':'rgba(255,255,255,0.18)';
+    const lr=outerR+(isNov?26:20);
+    ctx.font=isNov?'bold 9px monospace':'7px monospace';
+    ctx.fillStyle=isNov?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.2)';
     ctx.fillText(m.label,cx+Math.cos(a)*lr,cy+Math.sin(a)*lr);
   });
 
   /* ── HALVING ── */
   const halvA=dayToAngle(516);
   ctx.beginPath();
-  ctx.moveTo(cx+Math.cos(halvA)*(outerR+3),cy+Math.sin(halvA)*(outerR+3));
-  ctx.lineTo(cx+Math.cos(halvA)*(outerR+18),cy+Math.sin(halvA)*(outerR+18));
+  ctx.moveTo(cx+Math.cos(halvA)*(outerR+2),cy+Math.sin(halvA)*(outerR+2));
+  ctx.lineTo(cx+Math.cos(halvA)*(outerR+14),cy+Math.sin(halvA)*(outerR+14));
   ctx.strokeStyle=GOLD;ctx.lineWidth=1.5;ctx.stroke();
-  ctx.font='bold 6px monospace';ctx.fillStyle=GOLD;
-  ctx.fillText('HALVING',cx+Math.cos(halvA)*(outerR+28),cy+Math.sin(halvA)*(outerR+28));
+  ctx.font='bold 7px monospace';ctx.fillStyle=GOLD;
+  ctx.fillText('HALVING',cx+Math.cos(halvA)*(outerR+26),cy+Math.sin(halvA)*(outerR+26));
 
-  /* ── PROJECTED BOTTOM MARKER (~day 912 from halving = ~day 1428 from cycle start) ── */
-  const bottomDay=516+912; // halving + ~2.5yr
-  if(bottomDay<=CYCLE_DAYS){
-    const bA=dayToAngle(bottomDay);
-    ctx.beginPath();
-    ctx.moveTo(cx+Math.cos(bA)*(outerR+3),cy+Math.sin(bA)*(outerR+3));
-    ctx.lineTo(cx+Math.cos(bA)*(outerR+18),cy+Math.sin(bA)*(outerR+18));
-    ctx.strokeStyle=R;ctx.lineWidth=1.5;ctx.stroke();
-    ctx.font='bold 6px monospace';ctx.fillStyle=R;
-    ctx.fillText('EST. BOTTOM',cx+Math.cos(bA)*(outerR+28),cy+Math.sin(bA)*(outerR+28));
-  }
+  /* ── PROJECTED BOTTOM ── */
+  const bottomDay=Math.min(516+912,CYCLE_DAYS);
+  const bA=dayToAngle(bottomDay);
+  ctx.beginPath();
+  ctx.moveTo(cx+Math.cos(bA)*(outerR+2),cy+Math.sin(bA)*(outerR+2));
+  ctx.lineTo(cx+Math.cos(bA)*(outerR+14),cy+Math.sin(bA)*(outerR+14));
+  ctx.strokeStyle=R;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.font='bold 7px monospace';ctx.fillStyle=R;
+  ctx.fillText('EST. BOTTOM',cx+Math.cos(bA)*(outerR+26),cy+Math.sin(bA)*(outerR+26));
 
-  /* ── PRICE GRID ── */
-  [20000,40000,60000,80000,100000].forEach(p=>{
-    if(p<scaleMin||p>scaleMax)return;
-    const r=priceToR(p);
-    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,255,255,0.025)';ctx.lineWidth=0.5;ctx.setLineDash([3,8]);ctx.stroke();ctx.setLineDash([]);
-    ctx.font='5px monospace';ctx.fillStyle='rgba(255,255,255,0.1)';ctx.textAlign='right';
-    ctx.fillText(fmt(p),cx-6,cy-r+3);ctx.textAlign='center';
-  });
-
-  /* ── 60-DAY SEGMENTS ── */
+  /* ── 60-DAY SEGMENTS — THE MAIN EVENT ── */
   segments.forEach(seg=>{
     const aStart=dayToAngle(seg.startDay);
     const aEnd=dayToAngle(seg.endDay);
@@ -460,26 +303,47 @@ function draw(){
     const rHi=priceToR(seg.cHi);
     const rLo=priceToR(seg.cLo);
 
+    // BOLD FILLED BLOCKS — this is what makes it pop
     if(seg.declining){
-      ctx.beginPath();ctx.arc(cx,cy,rHi,aStart,aPeak);ctx.arc(cx,cy,rLo,aPeak,aStart,true);ctx.closePath();
-      ctx.fillStyle='rgba(0,230,118,0.35)';ctx.fill();
-      ctx.beginPath();ctx.arc(cx,cy,rHi,aPeak,aEnd);ctx.arc(cx,cy,rLo,aEnd,aPeak,true);ctx.closePath();
-      ctx.fillStyle='rgba(255,23,68,0.35)';ctx.fill();
+      // Green block: trough → peak
+      ctx.beginPath();
+      ctx.arc(cx,cy,rHi,aStart,aPeak);
+      ctx.arc(cx,cy,rLo,aPeak,aStart,true);
+      ctx.closePath();
+      ctx.fillStyle='rgba(0,230,118,0.45)';
+      ctx.fill();
+      // Red block: peak → end
+      ctx.beginPath();
+      ctx.arc(cx,cy,rHi,aPeak,aEnd);
+      ctx.arc(cx,cy,rLo,aEnd,aPeak,true);
+      ctx.closePath();
+      ctx.fillStyle='rgba(255,23,68,0.45)';
+      ctx.fill();
     }else{
-      ctx.beginPath();ctx.arc(cx,cy,rHi,aStart,aEnd);ctx.arc(cx,cy,rLo,aEnd,aStart,true);ctx.closePath();
-      ctx.fillStyle='rgba(0,230,118,0.35)';ctx.fill();
+      // All green
+      ctx.beginPath();
+      ctx.arc(cx,cy,rHi,aStart,aEnd);
+      ctx.arc(cx,cy,rLo,aEnd,aStart,true);
+      ctx.closePath();
+      ctx.fillStyle='rgba(0,230,118,0.45)';
+      ctx.fill();
     }
 
-    // Outline
-    ctx.beginPath();ctx.arc(cx,cy,rHi,aStart,aEnd);ctx.arc(cx,cy,rLo,aEnd,aStart,true);ctx.closePath();
-    ctx.strokeStyle=seg.declining?'rgba(255,23,68,0.25)':'rgba(0,230,118,0.25)';ctx.lineWidth=1;ctx.stroke();
+    // Segment outline
+    ctx.beginPath();
+    ctx.arc(cx,cy,rHi,aStart,aEnd);
+    ctx.arc(cx,cy,rLo,aEnd,aStart,true);
+    ctx.closePath();
+    ctx.strokeStyle=seg.declining?'rgba(255,23,68,0.3)':'rgba(0,230,118,0.3)';
+    ctx.lineWidth=1;ctx.stroke();
 
-    // Divider
-    ctx.beginPath();ctx.moveTo(cx+Math.cos(aStart)*rLo,cy+Math.sin(aStart)*rLo);
+    // Divider line at segment start
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(aStart)*rLo,cy+Math.sin(aStart)*rLo);
     ctx.lineTo(cx+Math.cos(aStart)*rHi,cy+Math.sin(aStart)*rHi);
-    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=0.8;ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=0.8;ctx.stroke();
 
-    // Wave line
+    // Wave line (white, bold)
     const pts=seg.wave;
     if(pts.length>1){
       ctx.beginPath();
@@ -492,12 +356,12 @@ function draw(){
         const la=dayToAngle(totalDaysElapsed);const lr=priceToR(livePrice);
         ctx.lineTo(cx+Math.cos(la)*lr,cy+Math.sin(la)*lr);
       }
-      ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=1.2;ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=1.5;ctx.stroke();
     }
 
     // Trough dot
     const tR=priceToR(seg.troughPrice);
-    ctx.beginPath();ctx.arc(cx+Math.cos(aStart)*tR,cy+Math.sin(aStart)*tR,2.5,0,Math.PI*2);
+    ctx.beginPath();ctx.arc(cx+Math.cos(aStart)*tR,cy+Math.sin(aStart)*tR,3,0,Math.PI*2);
     ctx.fillStyle=CYAN;ctx.fill();
   });
 
@@ -508,43 +372,65 @@ function draw(){
     const nx=cx+Math.cos(nowA)*nowR;
     const ny=cy+Math.sin(nowA)*nowR;
 
-    ctx.beginPath();ctx.arc(nx,ny,12,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,230,118,0.15)';ctx.fill();
-    ctx.beginPath();ctx.arc(nx,ny,5,0,Math.PI*2);
-    ctx.fillStyle=G;ctx.shadowColor=G;ctx.shadowBlur=18;ctx.fill();ctx.shadowBlur=0;
+    // Glow
+    ctx.beginPath();ctx.arc(nx,ny,14,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,230,118,0.2)';ctx.fill();
+    // Dot
+    ctx.beginPath();ctx.arc(nx,ny,5.5,0,Math.PI*2);
+    ctx.fillStyle=G;ctx.shadowColor=G;ctx.shadowBlur=20;ctx.fill();ctx.shadowBlur=0;
 
-    // Live price label near dot
-    const plx=nx+Math.cos(nowA)*22;
-    const ply=ny+Math.sin(nowA)*22;
-    ctx.font='bold 11px monospace';ctx.fillStyle=G;
+    // Price label
+    const plx=nx+Math.cos(nowA)*24;
+    const ply=ny+Math.sin(nowA)*24;
+    ctx.font='bold 13px monospace';ctx.fillStyle=G;
     ctx.fillText(fmt(livePrice),plx,ply);
   }
 
-  /* ── FUTURE ARC ── */
+  /* ── FUTURE ARC (dashed, subtle) ── */
   if(totalDaysElapsed<CYCLE_DAYS){
     ctx.beginPath();
-    ctx.arc(cx,cy,outerR*0.45,dayToAngle(totalDaysElapsed),dayToAngle(CYCLE_DAYS));
-    ctx.strokeStyle='rgba(255,255,255,0.025)';ctx.lineWidth=1;ctx.setLineDash([4,10]);ctx.stroke();ctx.setLineDash([]);
+    ctx.arc(cx,cy,outerR*0.5,dayToAngle(totalDaysElapsed),dayToAngle(CYCLE_DAYS));
+    ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=1;ctx.setLineDash([4,10]);ctx.stroke();ctx.setLineDash([]);
   }
-
-  /* ── RINGS ── */
-  ctx.beginPath();ctx.arc(cx,cy,outerR,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=0.5;ctx.stroke();
-  ctx.beginPath();ctx.arc(cx,cy,innerR,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=0.5;ctx.stroke();
 
   /* ── CENTER ── */
   ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.font='bold 9px monospace';ctx.fillStyle=PURPLE;
-  ctx.fillText('4-YEAR WAVE',cx,cy-16);
   const pct4=Math.round((totalDaysElapsed/CYCLE_DAYS)*100);
-  ctx.font='bold 22px monospace';
+
+  ctx.font='bold 10px monospace';ctx.fillStyle=PURPLE;
+  ctx.fillText('4-YEAR WAVE',cx,cy-20);
+
+  ctx.font='7px monospace';ctx.fillStyle='rgba(255,255,255,0.25)';
+  ctx.fillText(segments.length+' CYCLES · NOV 22 → NOV 26',cx,cy-8);
+
+  ctx.font='bold 28px monospace';
   ctx.fillStyle=pct4>75?R:pct4>50?GOLD:G;
-  ctx.fillText(pct4+'%',cx,cy+6);
-  ctx.font='6px monospace';ctx.fillStyle='rgba(255,255,255,0.18)';
-  ctx.fillText('OF CYCLE',cx,cy+22);
+  ctx.fillText(pct4+'%',cx,cy+14);
+
+  ctx.font='7px monospace';ctx.fillStyle='rgba(255,255,255,0.18)';
+  ctx.fillText('OF 4-YEAR CYCLE',cx,cy+30);
 
   requestAnimationFrame(draw);
+}
+
+/* ── HUD BAR ── */
+function updateHUD(){
+  if(!segments.length)return;
+  const p=livePrice;
+  const last=segments[segments.length-1];
+  const rising=segments.filter(s=>!s.declining).length;
+  const declining=segments.filter(s=>s.declining).length;
+  const phase=last.declining?'DECLINING':'RISING';
+  const phaseColor=last.declining?R:G;
+
+  $('hud').innerHTML=`
+    <div class="hud-card"><div class="lbl">CYCLES</div><div class="val" style="color:${PURPLE}">${segments.length}</div></div>
+    <div class="hud-card"><div class="lbl">RISING</div><div class="val" style="color:${G}">${rising}</div></div>
+    <div class="hud-card"><div class="lbl">DECLINING</div><div class="val" style="color:${R}">${declining}</div></div>
+    <div class="hud-card"><div class="lbl">CYCLE LOW</div><div class="val" style="color:${CYAN}">${fmt(globalLo)}</div></div>
+    <div class="hud-card"><div class="lbl">CYCLE HIGH</div><div class="val" style="color:${GOLD}">${fmt(globalHi)}</div></div>
+    <div class="hud-card"><div class="lbl">CURRENT</div><div class="val" style="color:${phaseColor}">${phase}</div></div>
+  `;
 }
 
 /* ── INIT ── */
@@ -553,13 +439,16 @@ async function init(){
     await buildSegments();
     clearInterval(dt);
     $('load').classList.add('hide');
-    $('app').classList.remove('hide');
+    const app=$('app');
+    app.classList.remove('hide');
+    app.style.display='flex';
 
     resize();
     draw();
     updateHUD();
     connectWS();
     window.addEventListener('resize',resize);
+    setInterval(updateHUD,3000);
   }catch(e){
     console.error(e);$('dots').textContent='';
     document.querySelector('.loading-text').textContent='ERROR: '+e.message;
