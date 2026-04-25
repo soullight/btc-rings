@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — The Pulse</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0f; color:#fff;
+  font-family:'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100vh; padding:16px;
+}
+canvas { display:block; border-radius:16px; }
+.info {
+  display:flex; gap:20px; margin-top:16px; flex-wrap:wrap; justify-content:center;
+}
+.info-card {
+  padding:10px 16px; border-radius:8px; text-align:center;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+}
+.info-card .lbl { font-size:9px; letter-spacing:2px; color:rgba(255,255,255,0.5); margin-bottom:4px; }
+.info-card .val { font-size:15px; font-weight:700; }
+.loading {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:60vh;
+}
+.loading-text { font-size:14px; color:rgba(255,255,255,0.4); letter-spacing:3px; }
+.pulse-ring {
+  width:50px; height:50px; border-radius:50%; margin-top:24px;
+  border:2px solid rgba(0,230,118,0.3); animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+.hidden { display:none!important; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading">
+  <div class="loading-text">READING THE PULSE<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" class="hidden" style="display:flex;flex-direction:column;align-items:center;">
+  <canvas id="canvas"></canvas>
+  <div id="info" class="info"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const GREEN = '#00E676', RED = '#FF1744', GOLD = '#FFD700', CYAN = '#4FC3F7', BG = '#0a0a0f';
+
+  const S = {
+    closes: [], highs: [], lows: [],
+    livePrice: 0,
+    // Cycle range
+    cHi: 0, cLo: 0, cPct: 0, cDays: 0, cTroughPrice: 0,
+    // 20d sub-range
+    r20hi: 0, r20lo: 0,
+    // Momentum
+    roc20: 0, roc60: 0, momentum: 0,
+    _animPct: 0, // smooth animation of position
+    ready: false
+  };
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d');
+
+  let dotCount = 0;
+  const dotTimer = setInterval(() => {
+    dotCount = (dotCount + 1) % 4;
+    const d = $('dots');
+    if (d) d.textContent = '.'.repeat(dotCount);
+  }, 400);
+
+  function fmt(n) {
+    if (!n || isNaN(n)) return '—';
+    return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+  // ═══════════════════════════════════════════════
+  // DATA — Binance OHLC
+  // ═══════════════════════════════════════════════
+  async function fetchJSON(url, timeout = 15000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeout);
+    try {
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch (e) { clearTimeout(t); throw e; }
+  }
+
+  async function getOHLC() {
+    // Try Binance first for actual OHLC
+    try {
+      const d = await fetchJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200');
+      return d.map(k => ({ t: Number(k[0]), h: Number(k[2]), l: Number(k[3]), c: Number(k[4]) }));
+    } catch (e) { console.warn('Binance:', e.message); }
+    // Fallback: CoinGecko (close only)
+    try {
+      const d = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily');
+      return d.prices.map(p => ({ t: p[0], h: p[1], l: p[1], c: p[1] }));
+    } catch (e) { console.warn('CoinGecko:', e.message); }
+    throw new Error('All data sources failed');
+  }
+
+  // ═══════════════════════════════════════════════
+  // TROUGH DETECTION
+  // ═══════════════════════════════════════════════
+  function findTroughs(closes, hw) {
+    const t = [];
+    for (let i = hw; i < closes.length - hw; i++) {
+      let ok = true;
+      for (let j = 1; j <= hw; j++) {
+        if (closes[i] > closes[i - j] || closes[i] > closes[i + j]) { ok = false; break; }
+      }
+      if (ok) t.push(i);
+    }
+    return t;
+  }
+
+  function filterTroughs(troughs, closes, nom, ratio) {
+    if (!troughs.length) return troughs;
+    const gap = Math.round(nom * ratio);
+    const f = [troughs[0]];
+    for (let i = 1; i < troughs.length; i++) {
+      if (troughs[i] - f[f.length - 1] >= gap) f.push(troughs[i]);
+      else if (closes[troughs[i]] < closes[f[f.length - 1]]) f[f.length - 1] = troughs[i];
+    }
+    return f;
+  }
+
+  // ═══════════════════════════════════════════════
+  // COMPUTE
+  // ═══════════════════════════════════════════════
+  function compute(klines) {
+    S.closes = klines.map(k => k.c);
+    S.highs = klines.map(k => k.h);
+    S.lows = klines.map(k => k.l);
+    const n = klines.length;
+
+    // Trough detection
+    let troughs = findTroughs(S.closes, 12);
+    troughs = filterTroughs(troughs, S.closes, 60, 0.5);
+    if (troughs.length < 1) {
+      troughs = findTroughs(S.closes, 8);
+      troughs = filterTroughs(troughs, S.closes, 60, 0.6);
+    }
+
+    const last = troughs.length ? troughs[troughs.length - 1] : 0;
+    S.cTroughPrice = S.closes[last];
+    S.cDays = n - 1 - last;
+
+    // Cycle range from actual OHLC highs/lows since trough
+    S.cHi = Math.max(...S.highs.slice(last));
+    S.cLo = Math.min(...S.lows.slice(last));
+
+    // 20d sub-range
+    S.r20hi = Math.max(...S.highs.slice(-20));
+    S.r20lo = Math.min(...S.lows.slice(-20));
+
+    // Momentum
+    if (n > 60) {
+      S.roc20 = ((S.closes[n - 1] / S.closes[n - 21]) - 1) * 100;
+      S.roc60 = ((S.closes[n - 1] / S.closes[n - 61]) - 1) * 100;
+    }
+    if (n >= 66) {
+      let bull = 0, bear = 0;
+      for (let d = 0; d < 5; d++) {
+        const i = n - 1 - d;
+        const r20 = ((S.closes[i] / S.closes[i - 20]) - 1) * 100;
+        const r60 = ((S.closes[i] / S.closes[i - 60]) - 1) * 100;
+        if (r20 > 0 && r60 > 0) bull++;
+        if (r20 < 0 && r60 < 0) bear++;
+      }
+      S.momentum = bull >= 5 ? 1 : bear >= 5 ? -1 : 0;
+    }
+  }
+
+  function updatePosition() {
+    const p = S.livePrice || S.closes[S.closes.length - 1];
+    if (p > S.cHi) S.cHi = p;
+    if (p < S.cLo) S.cLo = p;
+    const range = S.cHi - S.cLo;
+    S.cPct = range > 0 ? Math.max(0, Math.min(100, ((p - S.cLo) / range) * 100)) : 50;
+  }
+
+  // ═══════════════════════════════════════════════
+  // WEBSOCKET
+  // ═══════════════════════════════════════════════
+  let ws = null, wsRetry = 1000, pollTimer = null;
+
+  function connectWS() {
+    try {
+      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+      ws.onmessage = (e) => {
+        try { S.livePrice = parseFloat(JSON.parse(e.data).p); updatePosition(); } catch (err) {}
+      };
+      ws.onclose = () => { setTimeout(connectWS, wsRetry); wsRetry = Math.min(wsRetry * 2, 30000); startPoll(); };
+      ws.onerror = () => { ws.close(); };
+    } catch (e) { startPoll(); }
+  }
+
+  function startPoll() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
+      try {
+        const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000);
+        S.livePrice = parseFloat(d.price); updatePosition();
+      } catch (e) {}
+    }, 3000);
+  }
+
+  // ═══════════════════════════════════════════════
+  // CANVAS
+  // ═══════════════════════════════════════════════
+  function resize() {
+    const sz = Math.min(window.innerWidth - 32, window.innerHeight - 140, 700);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = sz * dpr;
+    canvas.height = sz * dpr;
+    canvas.style.width = sz + 'px';
+    canvas.style.height = sz + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawPulse() {
+    const w = parseInt(canvas.style.width);
+    const h = parseInt(canvas.style.height);
+    const cx = w / 2, cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, w, h);
+
+    if (!S.ready) return;
+
+    const p = S.livePrice || S.closes[S.closes.length - 1];
+
+    // Smooth the position
+    S._animPct += (S.cPct - S._animPct) * 0.08;
+    const pct = S._animPct;
+
+    // Ring geometry — the band fills most of the screen
+    const outerR = Math.min(cx, cy) - 20;     // cycle high
+    const innerR = outerR * 0.45;              // cycle low
+    const bandWidth = outerR - innerR;
+
+    // Position of current price within the band
+    const priceR = innerR + (pct / 100) * bandWidth;
+
+    // Position of 20d sub-range
+    const r20range = S.cHi - S.cLo;
+    const r20loPct = r20range > 0 ? ((S.r20lo - S.cLo) / r20range) * 100 : 0;
+    const r20hiPct = r20range > 0 ? ((S.r20hi - S.cLo) / r20range) * 100 : 100;
+    const r20loR = innerR + (r20loPct / 100) * bandWidth;
+    const r20hiR = innerR + (r20hiPct / 100) * bandWidth;
+
+    // ── Background glow ──
+    const bgGlow = ctx.createRadialGradient(cx, cy, innerR * 0.5, cx, cy, outerR * 1.2);
+    bgGlow.addColorStop(0, 'rgba(0,230,118,0.02)');
+    bgGlow.addColorStop(0.5, 'rgba(0,230,118,0.01)');
+    bgGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = bgGlow;
+    ctx.fillRect(0, 0, w, h);
+
+    // ── CYCLE RANGE BAND (the big ring) ──
+    // Gradient from cyan (low) through green (mid) to gold (high)
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+    ctx.fillStyle = 'rgba(0,230,118,0.04)';
+    ctx.fill();
+
+    // Zone coloring — three bands within the ring
+    // Lower third: cyan tint (deploy territory)
+    const thirdR = bandWidth / 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR + thirdR, 0, Math.PI * 2);
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+    ctx.fillStyle = 'rgba(79,195,247,0.03)';
+    ctx.fill();
+
+    // Upper third: gold tint (exit territory)
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.arc(cx, cy, outerR - thirdR, 0, Math.PI * 2, true);
+    ctx.fillStyle = 'rgba(255,215,0,0.03)';
+    ctx.fill();
+
+    // ── Range boundary rings ──
+    // Outer = cycle high
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,230,118,0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Inner = cycle low
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,230,118,0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // ── Quartile tick rings (25%, 50%, 75%) ──
+    [25, 50, 75].forEach(q => {
+      const r = innerR + (q / 100) * bandWidth;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = q === 50 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
+      ctx.lineWidth = q === 50 ? 1 : 0.5;
+      ctx.setLineDash(q === 50 ? [] : [3, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // ── 20-DAY SUB-RANGE (brighter band within the cycle band) ──
+    ctx.beginPath();
+    ctx.arc(cx, cy, r20hiR, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r20loR, 0, Math.PI * 2, true);
+    ctx.fillStyle = 'rgba(0,230,118,0.06)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r20hiR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,230,118,0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r20loR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,230,118,0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // ── LIVE PRICE RING (the bright one) ──
+    const isBear = S.momentum === -1;
+    const liveColor = isBear ? RED : GREEN;
+
+    // Glow
+    ctx.beginPath();
+    ctx.arc(cx, cy, priceR, 0, Math.PI * 2);
+    ctx.strokeStyle = liveColor;
+    ctx.lineWidth = 4;
+    ctx.shadowColor = liveColor;
+    ctx.shadowBlur = 25;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Crisp ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, priceR, 0, Math.PI * 2);
+    ctx.strokeStyle = liveColor;
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    // ── Labels on the ring ──
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Cycle high label (top)
+    ctx.font = '10px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText('CYCLE HIGH', cx, cy - outerR - 14);
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(fmt(S.cHi), cx, cy - outerR - 28);
+
+    // Cycle low label (bottom)
+    ctx.font = '10px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText('CYCLE LOW', cx, cy + outerR + 14);
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(fmt(S.cLo), cx, cy + outerR + 28);
+
+    // 20d range labels (angled)
+    ctx.font = '9px monospace';
+    ctx.fillStyle = 'rgba(0,230,118,0.35)';
+    const a20 = Math.PI * -0.28;
+    ctx.fillText('20D HIGH ' + fmt(S.r20hi), cx + Math.cos(a20) * (r20hiR + 14), cy + Math.sin(a20) * (r20hiR + 14));
+    const a20l = Math.PI * 0.28;
+    ctx.fillText('20D LOW ' + fmt(S.r20lo), cx + Math.cos(a20l) * (r20loR - 14), cy + Math.sin(a20l) * (r20loR - 14));
+
+    // Live price label (right side of ring)
+    const labelAng = Math.PI * -0.12;
+    const lx = cx + Math.cos(labelAng) * priceR;
+    const ly = cy + Math.sin(labelAng) * priceR;
+
+    // Connector
+    ctx.beginPath();
+    ctx.moveTo(lx, ly);
+    ctx.lineTo(lx + 24, ly - 6);
+    ctx.lineTo(lx + 130, ly - 6);
+    ctx.strokeStyle = liveColor;
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillStyle = liveColor;
+    ctx.fillText(fmt(p), lx + 28, ly - 18);
+    ctx.font = '9px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText('LIVE PRICE', lx + 28, ly - 4);
+
+    // ── CENTER: position and status ──
+    ctx.textAlign = 'center';
+
+    // Big percentage
+    const pctRound = Math.round(pct);
+    const pctColor = pctRound > 80 ? GOLD : pctRound < 20 ? CYAN : GREEN;
+    ctx.font = 'bold 48px monospace';
+    ctx.fillStyle = pctColor;
+    ctx.fillText(pctRound + '%', cx, cy - 12);
+
+    // Label
+    ctx.font = '10px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText('OF CYCLE RANGE', cx, cy + 14);
+
+    // Zone hint
+    let zone, zoneColor;
+    if (pctRound >= 85) { zone = 'NEAR CYCLE HIGH — EXIT TERRITORY'; zoneColor = GOLD; }
+    else if (pctRound >= 65) { zone = 'UPPER RANGE — WATCH FOR CREST'; zoneColor = 'rgba(255,215,0,0.6)'; }
+    else if (pctRound >= 35) { zone = 'MID RANGE — RIDE'; zoneColor = GREEN; }
+    else if (pctRound >= 15) { zone = 'LOWER RANGE — LOOKING FOR SUPPORT'; zoneColor = CYAN; }
+    else { zone = 'NEAR CYCLE LOW — DEPLOY TERRITORY'; zoneColor = CYAN; }
+
+    ctx.font = '9px monospace';
+    ctx.fillStyle = zoneColor;
+    ctx.fillText(zone, cx, cy + 34);
+
+    // Days into cycle
+    ctx.font = '9px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillText('DAY ' + S.cDays + ' OF 60-DAY CYCLE', cx, cy + 52);
+
+    // Momentum
+    const momText = S.momentum === 1 ? '▲ BULL' : S.momentum === -1 ? '▼ BEAR' : '◆ NEUTRAL';
+    const momColor = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : 'rgba(255,255,255,0.3)';
+    ctx.font = '9px monospace';
+    ctx.fillStyle = momColor;
+    ctx.fillText(momText, cx, cy + 68);
+
+    // ── Quartile price labels (subtle, at 3 o'clock position) ──
+    ctx.textAlign = 'left';
+    ctx.font = '8px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    const range = S.cHi - S.cLo;
+    [25, 50, 75].forEach(q => {
+      const r = innerR + (q / 100) * bandWidth;
+      const price = S.cLo + (q / 100) * range;
+      ctx.fillText(fmt(price), cx + r + 6, cy + 3);
+    });
+  }
+
+  function updateInfo() {
+    const p = S.livePrice || S.closes[S.closes.length - 1];
+    const range = S.cHi - S.cLo;
+    const toHigh = S.cHi - p;
+    const toLow = p - S.cLo;
+    const momLabel = S.momentum === 1 ? 'BULL' : S.momentum === -1 ? 'BEAR' : 'NEUTRAL';
+    const momColor = S.momentum === 1 ? GREEN : S.momentum === -1 ? RED : 'rgba(255,255,255,0.5)';
+
+    $('info').innerHTML = `
+      <div class="info-card">
+        <div class="lbl">RANGE WIDTH</div>
+        <div class="val" style="color:${GREEN}">${fmt(range)} <span style="font-size:10px;color:rgba(255,255,255,0.4)">(${fmtPct((range / S.cLo) * 100)})</span></div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">TO CYCLE HIGH</div>
+        <div class="val" style="color:${GOLD}">${fmt(toHigh)} <span style="font-size:10px;color:rgba(255,255,255,0.4)">(${fmtPct((toHigh / p) * 100)})</span></div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">TO CYCLE LOW</div>
+        <div class="val" style="color:${CYAN}">${fmt(toLow)} <span style="font-size:10px;color:rgba(255,255,255,0.4)">(${fmtPct(-(toLow / p) * 100)})</span></div>
+      </div>
+      <div class="info-card">
+        <div class="lbl">MOMENTUM</div>
+        <div class="val" style="color:${momColor}">${momLabel}</div>
+      </div>
+    `;
+  }
+
+  // ═══════════════════════════════════════════════
+  // LOOP
+  // ═══════════════════════════════════════════════
+  function loop() {
+    drawPulse();
+    updateInfo();
+    requestAnimationFrame(loop);
+  }
+
+  // ═══════════════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════════════
+  async function init() {
+    try {
+      const klines = await getOHLC();
+      compute(klines);
+
+      if (!S.livePrice) S.livePrice = S.closes[S.closes.length - 1];
+      updatePosition();
+      S._animPct = S.cPct;
+      S.ready = true;
+
+      clearInterval(dotTimer);
+      $('loading').classList.add('hidden');
+      const app = $('app');
+      app.classList.remove('hidden');
+      app.style.display = 'flex';
+
+      resize();
+      loop();
+      connectWS();
+      window.addEventListener('resize', () => { resize(); });
+
+    } catch (e) {
+      console.error(e);
+      $('dots').textContent = '';
+      document.querySelector('.loading-text').textContent = 'ERROR: ' + e.message;
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
