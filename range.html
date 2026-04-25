@@ -15,7 +15,7 @@ body {
 .left-panel { flex:0 0 68%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; }
 .right-panel {
   flex:0 0 32%; display:flex; flex-direction:column; padding:18px 16px;
-  background:rgba(255,255,255,0.015); border-left:1px solid rgba(255,255,255,0.06);
+  background:rgba(255,255,255,0.03); border-left:1px solid rgba(255,255,255,0.1);
   overflow-y:auto; gap:8px;
 }
 @media(max-width:860px){
@@ -26,31 +26,31 @@ body {
 canvas { border-radius:12px; display:block; }
 .canvas-header { text-align:center; margin-bottom:6px; }
 .canvas-header h1 { font-size:20px; font-weight:700; letter-spacing:8px; }
-.canvas-header .sub { font-size:9px; color:rgba(255,255,255,0.2); letter-spacing:3px; margin-top:3px; }
+.canvas-header .sub { font-size:9px; color:rgba(255,255,255,0.45); letter-spacing:3px; margin-top:3px; }
 
 .hud-section {
-  padding:12px; border-radius:8px;
-  background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06);
+  padding:14px; border-radius:8px;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
 }
-.hud-label { font-size:8px; letter-spacing:2.5px; color:rgba(255,255,255,0.28); margin-bottom:6px; }
+.hud-label { font-size:9px; letter-spacing:2.5px; color:rgba(255,255,255,0.6); margin-bottom:6px; font-weight:600; }
 .hud-value { font-size:22px; font-weight:700; }
 .hud-value.sm { font-size:14px; }
-.hud-sub { font-size:9px; color:rgba(255,255,255,0.22); margin-top:3px; }
-.hud-row { display:flex; justify-content:space-between; align-items:center; margin:3px 0; }
-.hud-row .lbl { font-size:9px; color:rgba(255,255,255,0.25); letter-spacing:1px; }
-.hud-row .val { font-size:11px; font-weight:700; }
-.divider { height:1px; background:rgba(255,255,255,0.04); margin:4px 0; }
+.hud-sub { font-size:10px; color:rgba(255,255,255,0.5); margin-top:3px; }
+.hud-row { display:flex; justify-content:space-between; align-items:center; margin:4px 0; }
+.hud-row .lbl { font-size:10px; color:rgba(255,255,255,0.55); letter-spacing:1px; }
+.hud-row .val { font-size:12px; font-weight:700; }
+.divider { height:1px; background:rgba(255,255,255,0.08); margin:6px 0; }
 
 .range-bar-wrap { margin:6px 0; }
-.range-bar-label { display:flex; justify-content:space-between; font-size:8px; color:rgba(255,255,255,0.2); letter-spacing:1px; margin-bottom:3px; }
-.range-bar-bg { height:10px; border-radius:5px; position:relative; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); }
+.range-bar-label { display:flex; justify-content:space-between; font-size:10px; color:rgba(255,255,255,0.6); letter-spacing:1px; margin-bottom:4px; font-weight:600; }
+.range-bar-bg { height:12px; border-radius:6px; position:relative; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); }
 .range-bar-fill { position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
 .range-bar-marker { position:absolute; top:-3px; bottom:-3px; width:3px; border-radius:2px; transform:translateX(-1.5px); z-index:2; }
-.range-pct { font-size:11px; font-weight:900; text-align:right; margin-top:3px; }
+.range-pct { font-size:13px; font-weight:900; text-align:right; margin-top:4px; }
 
 .regime-badge {
   display:inline-flex; align-items:center; gap:6px;
-  padding:4px 12px; border-radius:16px; font-size:9px; letter-spacing:2px; font-weight:700;
+  padding:5px 14px; border-radius:16px; font-size:10px; letter-spacing:2px; font-weight:700;
 }
 .regime-badge .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
 
@@ -67,7 +67,7 @@ canvas { border-radius:12px; display:block; }
 @keyframes glowG { 0%,100%{text-shadow:0 0 6px rgba(0,230,118,0.3)} 50%{text-shadow:0 0 16px rgba(0,230,118,0.6)} }
 @keyframes glowR { 0%,100%{text-shadow:0 0 6px rgba(255,23,68,0.3)} 50%{text-shadow:0 0 16px rgba(255,23,68,0.6)} }
 .hidden { display:none!important; }
-.footer-hud { margin-top:auto; text-align:center; font-size:8px; color:rgba(255,255,255,0.08); letter-spacing:1px; padding-top:10px; }
+.footer-hud { margin-top:auto; text-align:center; font-size:8px; color:rgba(255,255,255,0.25); letter-spacing:1px; padding-top:10px; }
 </style>
 </head>
 <body>
