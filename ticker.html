@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Rings — Any Ticker</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0f; color:#fff;
+  font-family:'SF Mono','Fira Code','Cascadia Code','Courier New',monospace;
+  min-height:100vh; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; padding:12px;
+}
+canvas { display:block; border-radius:12px; }
+.hud {
+  display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; justify-content:center;
+  max-width:960px;
+}
+.hud-card {
+  padding:6px 10px; border-radius:6px; text-align:center; min-width:80px;
+  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+}
+.hud-card .lbl { font-size:7px; letter-spacing:2px; color:rgba(255,255,255,0.35); margin-bottom:2px; }
+.hud-card .val { font-size:12px; font-weight:700; }
+.title { font-size:22px; font-weight:700; letter-spacing:10px; margin-bottom:2px; }
+.sub { font-size:9px; color:rgba(255,255,255,0.25); letter-spacing:3px; margin-bottom:10px; }
+.loading {
+  position:fixed; inset:0; background:#0a0a0f; z-index:999;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.loading-text { font-size:13px; color:rgba(255,255,255,0.35); letter-spacing:3px; }
+.ring {
+  width:44px; height:44px; border-radius:50%; margin-top:20px;
+  border:2px solid rgba(224,64,251,0.3); animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+.hide { display:none!important; }
+
+/* Ticker input bar */
+#ticker-bar {
+  display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap;
+  justify-content:center;
+}
+#ticker-input {
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+  color:#FFD700; font-family:inherit; font-size:18px; font-weight:700;
+  letter-spacing:4px; text-align:center; text-transform:uppercase;
+  padding:8px 16px; border-radius:6px; width:180px; outline:none;
+}
+#ticker-input::placeholder { color:rgba(255,255,255,0.15); letter-spacing:2px; font-size:13px; }
+#ticker-input:focus { border-color:#FFD700; box-shadow:0 0 12px rgba(255,215,0,0.15); }
+#range-select {
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+  color:#ccc; font-family:inherit; font-size:11px; padding:8px 12px;
+  border-radius:6px; outline:none; cursor:pointer;
+}
+#cycle-input {
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+  color:#4FC3F7; font-family:inherit; font-size:13px; font-weight:700;
+  text-align:center; padding:8px 10px; border-radius:6px; width:60px; outline:none;
+}
+.bar-label { font-size:8px; letter-spacing:1.5px; color:rgba(255,255,255,0.3); }
+#go-btn {
+  background:#FFD700; color:#0a0a0f; border:none; font-family:inherit;
+  font-size:11px; font-weight:700; letter-spacing:2px; padding:9px 20px;
+  border-radius:6px; cursor:pointer; transition:background .15s;
+}
+#go-btn:hover { background:#fff; }
+#go-btn:disabled { background:#333; color:#666; cursor:wait; }
+#error-msg {
+  color:#FF1744; font-size:10px; letter-spacing:1px; margin-top:4px;
+  text-align:center; min-height:14px;
+}
+</style>
+</head>
+<body>
+
+<div id="load" class="loading hide">
+  <div class="loading-text">LOADING <span id="load-ticker">...</span><span id="dots"></span></div>
+  <div class="ring"></div>
+</div>
+
+<div id="app" style="display:flex;flex-direction:column;align-items:center;">
+  <div class="title">UNIVERSAL RINGS</div>
+  <div class="sub">60-DAY BRESSERT SWING CYCLES — ANY TICKER</div>
+
+  <div id="ticker-bar">
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div class="bar-label">TICKER</div>
+      <input id="ticker-input" type="text" value="BTCUSDT" placeholder="AAPL, QQQ...">
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div class="bar-label">RANGE</div>
+      <select id="range-select">
+        <option value="1y">1 YEAR</option>
+        <option value="2y" selected>2 YEARS</option>
+        <option value="3y">3 YEARS</option>
+        <option value="5y">5 YEARS</option>
+        <option value="max">MAX</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div class="bar-label">CYCLE DAYS</div>
+      <input id="cycle-input" type="number" value="60" min="10" max="200">
+    </div>
+    <button id="go-btn" onclick="go()">MAP IT</button>
+  </div>
+  <div id="error-msg"></div>
+
+  <canvas id="c"></canvas>
+  <div id="hud" class="hud"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+const G='#00E676',R='#FF1744',GOLD='#FFD700',CYAN='#4FC3F7',BG='#0a0a0f',PURPLE='#E040FB';
+
+const $=id=>document.getElementById(id);
+const canvas=$('c');
+const ctx=canvas.getContext('2d');
+
+let dc=0;
+const dt=setInterval(()=>{dc=(dc+1)%4;const d=$('dots');if(d)d.textContent='.'.repeat(dc);},400);
+
+function fmt(n,d=0){
+  if(!n||isNaN(n))return'—';
+  if(n>=1000)return'$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+  if(n>=1)return'$'+Number(n).toFixed(2);
+  return'$'+Number(n).toPrecision(4);
+}
+function fmtPct(n){return(n>=0?'+':'')+n.toFixed(1)+'%';}
+
+async function apiFetch(url,timeout=20000){
+  const c=new AbortController();const t=setTimeout(()=>c.abort(),timeout);
+  try{const r=await fetch(url,{signal:c.signal});clearTimeout(t);if(!r.ok)throw new Error(r.status);return r.json();}
+  catch(e){clearTimeout(t);throw e;}
+}
+
+// ═══════════════════════════════════════════════════════════
+// TROUGH DETECTION (same as BTC rings)
+// ═══════════════════════════════════════════════════════════
+function detectTroughs(closes,hw){
+  const t=[];
+  for(let i=hw;i<closes.length-hw;i++){
+    let ok=true;
+    for(let j=1;j<=hw;j++){if(closes[i]>closes[i-j]||closes[i]>closes[i+j]){ok=false;break;}}
+    if(ok)t.push(i);
+  }
+  return t;
+}
+function filterTroughs(raw,closes,minGap){
+  if(!raw.length)return raw;
+  const f=[raw[0]];
+  for(let i=1;i<raw.length;i++){
+    if(raw[i]-f[f.length-1]>=minGap)f.push(raw[i]);
+    else if(closes[raw[i]]<closes[f[f.length-1]])f[f.length-1]=raw[i];
+  }
+  return f;
+}
+
+// ═══════════════════════════════════════════════════════════
+// DATA SOURCES
+// ═══════════════════════════════════════════════════════════
+
+// Known crypto tickers → use Binance
+const CRYPTO_TICKERS = new Set([
+  'BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT',
+  'AVAXUSDT','DOTUSDT','LINKUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT',
+  'NEARUSDT','APTUSDT','OPUSDT','ARBUSDT','SUIUSDT','PEPEUSDT','SHIBUSDT',
+  'BTCUSD','ETHUSD','BTC-USD','ETH-USD'
+]);
+
+function isCrypto(ticker){
+  const t = ticker.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(CRYPTO_TICKERS.has(t)) return true;
+  if(t.endsWith('USDT')||t.endsWith('USD')||t.endsWith('BUSD')) return true;
+  return false;
+}
+
+function normalizeCryptoTicker(ticker){
+  let t = ticker.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  // Convert BTC-USD → BTCUSDT etc.
+  if(t.endsWith('USD') && !t.endsWith('USDT') && !t.endsWith('BUSD')){
+    t = t.slice(0,-3) + 'USDT';
+  }
+  if(!t.endsWith('USDT') && !t.endsWith('BUSD')){
+    t = t + 'USDT';
+  }
+  return t;
+}
+
+// Range → days
+function rangeToDays(range){
+  if(range==='1y') return 365;
+  if(range==='2y') return 730;
+  if(range==='3y') return 1095;
+  if(range==='5y') return 1825;
+  return 3650; // max
+}
+
+// Fetch from Binance (crypto)
+async function fetchBinance(ticker, rangeDays){
+  const sym = normalizeCryptoTicker(ticker);
+  const all=[];
+  let startTime = Date.now() - rangeDays * 864e5;
+  const now = Date.now();
+  while(startTime < now){
+    const url=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1d&startTime=${startTime}&limit=1000`;
+    const batch = await apiFetch(url);
+    if(!batch.length) break;
+    for(const k of batch) all.push({t:+k[0], o:+k[1], h:+k[2], l:+k[3], c:+k[4]});
+    startTime = +batch[batch.length-1][0] + 86400000;
+    if(batch.length<1000) break;
+  }
+  return all;
+}
+
+// Fetch from Yahoo Finance (stocks/ETFs)
+async function fetchYahoo(ticker, range){
+  const sym = ticker.toUpperCase();
+  // Try direct first
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${range}&interval=1d&includePrePost=false`;
+
+  let data;
+  try {
+    data = await apiFetch(url);
+  } catch(e) {
+    // Try via CORS proxy
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const raw = await fetch(proxyUrl);
+    if(!raw.ok) throw new Error('Yahoo Finance unavailable');
+    data = await raw.json();
+  }
+
+  const result = data?.chart?.result?.[0];
+  if(!result) throw new Error('No data for ' + sym);
+
+  const ts = result.timestamp;
+  const q = result.indicators?.quote?.[0];
+  if(!ts || !q) throw new Error('Invalid data for ' + sym);
+
+  const all = [];
+  for(let i=0; i<ts.length; i++){
+    if(q.close[i] == null) continue;
+    all.push({
+      t: ts[i] * 1000,
+      o: q.open[i] || q.close[i],
+      h: q.high[i] || q.close[i],
+      l: q.low[i] || q.close[i],
+      c: q.close[i]
+    });
+  }
+  return all;
+}
+
+// Unified fetch
+async function fetchData(ticker, range){
+  if(isCrypto(ticker)){
+    return await fetchBinance(ticker, rangeToDays(range));
+  } else {
+    return await fetchYahoo(ticker, range);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUILD SEGMENTS
+// ═══════════════════════════════════════════════════════════
+let segments = [];
+let globalHi=0, globalLo=Infinity;
+let livePrice=0, totalDays=0;
+let ath=0, athDay=0;
+let currentTicker='';
+let NOM=60; // configurable cycle length
+
+async function buildSegments(daily){
+  segments = [];
+  globalHi = 0;
+  globalLo = Infinity;
+
+  const closes = daily.map(k=>k.c);
+  const highs = daily.map(k=>k.h);
+  const lows = daily.map(k=>k.l);
+  const n = daily.length;
+
+  ath = Math.max(...highs);
+  const maxH = Math.max(...highs);
+  athDay = highs.indexOf(maxH);
+
+  // Adaptive trough detection — scale halfWindow to cycle length
+  const hw = Math.max(4, Math.round(NOM * 0.2));
+  const minGap = Math.max(10, Math.round(NOM * 0.5));
+
+  let troughs = detectTroughs(closes, hw);
+  troughs = filterTroughs(troughs, closes, minGap);
+
+  // Fallback with smaller window
+  if(troughs.length < 2){
+    troughs = detectTroughs(closes, Math.max(3, hw-3));
+    troughs = filterTroughs(troughs, closes, minGap);
+  }
+
+  if(troughs.length && troughs[0] > Math.round(NOM*0.25)) troughs.unshift(0);
+
+  totalDays = n;
+
+  for(let i=0; i<troughs.length; i++){
+    const si = troughs[i];
+    const ei = (i < troughs.length-1) ? troughs[i+1] : n-1;
+    const isLast = i === troughs.length-1;
+
+    const segH = highs.slice(si, ei+1);
+    const segL = lows.slice(si, ei+1);
+    const segC = closes.slice(si, ei+1);
+    const cHi = Math.max(...segH);
+    const cLo = Math.min(...segL);
+    const peakIdx = segH.indexOf(cHi);
+    const daysInCycle = ei - si;
+
+    if(cHi > globalHi) globalHi = cHi;
+    if(cLo < globalLo) globalLo = cLo;
+
+    // Per-cycle phase: build or destroy wealth?
+    let declining = false;
+    if(!isLast){
+      declining = segC[segC.length-1] < segC[0] * 0.95;
+    } else {
+      const drop = (cHi - segC[segC.length-1]) / cHi;
+      const daysPastPeak = daysInCycle - peakIdx;
+      declining = (drop >= 0.10) || (drop >= 0.06 && daysPastPeak >= 5) || (daysInCycle >= NOM*0.67 && drop >= 0.05);
+    }
+
+    // Build wave from daily data (no 4h sub-fetch for stocks)
+    const wave = segC.map((c,j) => ({
+      day: si+j, close: c, high: segH[j], low: segL[j]
+    }));
+
+    segments.push({
+      startDay:si, endDay:ei, cHi, cLo,
+      peakDay:si+peakIdx, declining, wave, isLast,
+      troughPrice:closes[si], days:daysInCycle
+    });
+  }
+
+  livePrice = closes[n-1];
+}
+
+// ═══════════════════════════════════════════════════════════
+// LIVE PRICE (WebSocket for crypto, polling for stocks)
+// ═══════════════════════════════════════════════════════════
+let ws=null, wsRetry=1000, poll=null;
+
+function stopLive(){
+  if(ws){try{ws.close();}catch(e){} ws=null;}
+  if(poll){clearInterval(poll); poll=null;}
+}
+
+function startLive(ticker){
+  stopLive();
+  if(isCrypto(ticker)){
+    const sym = normalizeCryptoTicker(ticker).toLowerCase();
+    try{
+      ws = new WebSocket(`wss://stream.binance.com:9443/ws/${sym}@trade`);
+      ws.onopen = ()=>{wsRetry=1000;};
+      ws.onmessage = e=>{try{livePrice=parseFloat(JSON.parse(e.data).p);}catch(e){}};
+      ws.onclose = ()=>{setTimeout(()=>startLive(ticker), wsRetry); wsRetry=Math.min(wsRetry*2,30000);};
+      ws.onerror = ()=>ws.close();
+    }catch(e){startStockPoll(ticker);}
+  } else {
+    startStockPoll(ticker);
+  }
+}
+
+function startStockPoll(ticker){
+  if(poll) return;
+  // Poll Yahoo for live-ish price every 10s (rate limit friendly)
+  poll = setInterval(async()=>{
+    try{
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.toUpperCase())}?range=1d&interval=1m`;
+      let data;
+      try{data=await apiFetch(url,5000);}catch(e){
+        const px=`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        const r=await fetch(px);data=await r.json();
+      }
+      const q=data?.chart?.result?.[0]?.indicators?.quote?.[0];
+      const closes=q?.close;
+      if(closes){
+        for(let i=closes.length-1;i>=0;i--){
+          if(closes[i]!=null){livePrice=closes[i];break;}
+        }
+      }
+    }catch(e){}
+  }, 10000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════════════════
+function resize(){
+  const maxW = window.innerWidth - 24;
+  const maxH = window.innerHeight - 200;
+  const sz = Math.min(maxW, maxH, 800);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = sz*dpr; canvas.height = sz*dpr;
+  canvas.style.width = sz+'px'; canvas.style.height = sz+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function draw(){
+  const w = parseInt(canvas.style.width);
+  const h = parseInt(canvas.style.height);
+  const cx = w/2, cy = h/2;
+
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = BG;
+  ctx.fillRect(0,0,w,h);
+
+  if(!segments.length){requestAnimationFrame(draw);return;}
+
+  const outerR = Math.min(cx,cy) - 44;
+  const innerR = outerR * 0.18;
+
+  const scaleMin = globalLo * 0.95;
+  const scaleMax = globalHi * 1.02;
+
+  function priceToR(p){
+    const t = (p - scaleMin) / (scaleMax - scaleMin || 1);
+    return innerR + Math.max(0, Math.min(1, t)) * (outerR - innerR);
+  }
+
+  function dayToAngle(day){
+    return (day / totalDays) * Math.PI * 2 - Math.PI / 2;
+  }
+
+  // Outer ring
+  ctx.beginPath();ctx.arc(cx,cy,outerR,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;ctx.stroke();
+
+  // ATH reference line — bold gold radial
+  const athAngle = dayToAngle(athDay);
+  ctx.beginPath();
+  ctx.moveTo(cx + Math.cos(athAngle)*(innerR-8), cy + Math.sin(athAngle)*(innerR-8));
+  ctx.lineTo(cx + Math.cos(athAngle)*(outerR+6), cy + Math.sin(athAngle)*(outerR+6));
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.stroke();
+  // ATH label
+  ctx.save();
+  ctx.font='bold 8px "SF Mono",monospace';
+  ctx.fillStyle=GOLD;
+  ctx.textAlign='center';
+  ctx.fillText('ATH '+fmt(ath), cx+Math.cos(athAngle)*(outerR+20), cy+Math.sin(athAngle)*(outerR+20));
+  ctx.restore();
+
+  // Live price radar ring — full green circle
+  if(livePrice > 0){
+    const priceR = priceToR(livePrice);
+    ctx.beginPath();ctx.arc(cx,cy,priceR,0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,230,118,0.5)';ctx.lineWidth=2;ctx.stroke();
+    // Price label at 3 o'clock
+    ctx.save();
+    ctx.font='bold 9px "SF Mono",monospace';
+    ctx.fillStyle=G;
+    ctx.textAlign='left';ctx.textBaseline='middle';
+    ctx.fillText(fmt(livePrice), cx+priceR+6, cy);
+    ctx.restore();
+  }
+
+  // ── SEGMENTS ──
+  segments.forEach((seg,si) => {
+    const col = seg.declining ? R : G;
+    const cr = seg.declining ? 255 : 0;
+    const cg = seg.declining ? 23 : 230;
+    const cb = seg.declining ? 68 : 118;
+
+    // Fill: fat 45% opacity wedge
+    const a0 = dayToAngle(seg.startDay);
+    const a1 = dayToAngle(seg.endDay);
+
+    // Use wave data for detailed rendering
+    const wave = seg.wave;
+    if(wave.length < 2){
+      // Single arc block
+      ctx.beginPath();
+      ctx.arc(cx, cy, priceToR(seg.cHi), a0, a1);
+      ctx.arc(cx, cy, priceToR(seg.cLo), a1, a0, true);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(${cr},${cg},${cb},0.45)`;
+      ctx.fill();
+    } else {
+      // Detailed ribbon from wave data
+      const pts = [];
+      const ptsLo = [];
+      for(let i=0; i<wave.length; i++){
+        const a = dayToAngle(wave[i].day);
+        const rH = priceToR(wave[i].high);
+        const rL = priceToR(wave[i].low);
+        pts.push({a, r:rH});
+        ptsLo.push({a, r:rL});
+      }
+
+      // Filled ribbon
+      ctx.beginPath();
+      for(let i=0;i<pts.length;i++){
+        const x=cx+Math.cos(pts[i].a)*pts[i].r;
+        const y=cy+Math.sin(pts[i].a)*pts[i].r;
+        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      }
+      for(let i=ptsLo.length-1;i>=0;i--){
+        const x=cx+Math.cos(ptsLo[i].a)*ptsLo[i].r;
+        const y=cy+Math.sin(ptsLo[i].a)*ptsLo[i].r;
+        ctx.lineTo(x,y);
+      }
+      ctx.closePath();
+      ctx.fillStyle=`rgba(${cr},${cg},${cb},0.45)`;
+      ctx.fill();
+
+      // Bright close line
+      ctx.beginPath();
+      for(let i=0;i<wave.length;i++){
+        const a=dayToAngle(wave[i].day);
+        const r=priceToR(wave[i].close);
+        const x=cx+Math.cos(a)*r;
+        const y=cy+Math.sin(a)*r;
+        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle=`rgba(${cr},${cg},${cb},0.9)`;
+      ctx.lineWidth=1.5;
+      ctx.stroke();
+    }
+
+    // Cycle boundary tick
+    const bx=cx+Math.cos(a0)*innerR;
+    const by=cy+Math.sin(a0)*innerR;
+    const bx2=cx+Math.cos(a0)*(innerR-10);
+    const by2=cy+Math.sin(a0)*(innerR-10);
+    ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx2,by2);
+    ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;ctx.stroke();
+
+    // Cycle number in center ring
+    ctx.save();
+    const numA=(a0+a1)/2;
+    const numR=innerR*0.7;
+    ctx.font='bold 9px "SF Mono",monospace';
+    ctx.fillStyle=seg.declining?'rgba(255,23,68,0.7)':'rgba(0,230,118,0.7)';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(si+1,cx+Math.cos(numA)*numR,cy+Math.sin(numA)*numR);
+    ctx.restore();
+  });
+
+  // Center info
+  ctx.save();
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font='bold 14px "SF Mono",monospace';
+  ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.fillText(currentTicker, cx, cy-8);
+  ctx.font='9px "SF Mono",monospace';
+  ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.fillText(NOM+'-DAY CYCLES', cx, cy+8);
+  ctx.restore();
+
+  requestAnimationFrame(draw);
+}
+
+// ═══════════════════════════════════════════════════════════
+// HUD
+// ═══════════════════════════════════════════════════════════
+function buildHud(){
+  const rising = segments.filter(s=>!s.declining).length;
+  const declining = segments.filter(s=>s.declining).length;
+  const cycleLow = Math.min(...segments.map(s=>s.cLo));
+  const cycleHigh = Math.max(...segments.map(s=>s.cHi));
+  const fromAth = ath > 0 ? ((livePrice - ath)/ath*100) : 0;
+
+  const cards = [
+    {lbl:'CYCLES',val:segments.length,col:'#fff'},
+    {lbl:'RISING',val:rising,col:G},
+    {lbl:'DECLINING',val:declining,col:R},
+    {lbl:'CYCLE LOW',val:fmt(cycleLow),col:CYAN},
+    {lbl:'CYCLE HIGH',val:fmt(cycleHigh),col:GOLD},
+    {lbl:'ATH',val:fmt(ath),col:GOLD},
+    {lbl:'FROM ATH',val:fmtPct(fromAth),col:fromAth>=0?G:R},
+    {lbl:'CURRENT',val:fmt(livePrice),col:G},
+  ];
+
+  $('hud').innerHTML = cards.map(c =>
+    `<div class="hud-card"><div class="lbl">${c.lbl}</div><div class="val" style="color:${c.col}">${c.val}</div></div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// GO
+// ═══════════════════════════════════════════════════════════
+let running = false;
+
+async function go(){
+  if(running) return;
+  running = true;
+
+  const ticker = $('ticker-input').value.trim();
+  const range = $('range-select').value;
+  NOM = parseInt($('cycle-input').value) || 60;
+
+  if(!ticker){
+    $('error-msg').textContent = 'ENTER A TICKER';
+    running = false;
+    return;
+  }
+
+  $('error-msg').textContent = '';
+  $('go-btn').disabled = true;
+  $('go-btn').textContent = 'LOADING...';
+  $('load').classList.remove('hide');
+  $('load-ticker').textContent = ticker.toUpperCase();
+
+  try {
+    const daily = await fetchData(ticker, range);
+    if(daily.length < 30){
+      throw new Error('Not enough data — need at least 30 days');
+    }
+
+    currentTicker = ticker.toUpperCase();
+
+    // Update URL hash for sharing
+    window.location.hash = `${currentTicker}/${range}/${NOM}`;
+
+    await buildSegments(daily);
+
+    // Update title
+    document.querySelector('.sub').textContent =
+      `${NOM}-DAY BRESSERT CYCLES — ${daily.length} DAYS OF DATA`;
+
+    resize();
+    buildHud();
+
+    // Start live price
+    startLive(ticker);
+
+    $('load').classList.add('hide');
+
+  } catch(e) {
+    $('load').classList.add('hide');
+    $('error-msg').textContent = 'FAILED: ' + (e.message || 'Unknown error') +
+      (isCrypto(ticker) ? '' : ' — Try adding exchange suffix (e.g. TSLA, QQQ, BTC-USD)');
+  }
+
+  $('go-btn').disabled = false;
+  $('go-btn').textContent = 'MAP IT';
+  running = false;
+}
+window.go = go;
+
+// Enter key triggers go
+$('ticker-input').addEventListener('keydown', e => {
+  if(e.key === 'Enter') go();
+});
+
+// Load from URL hash
+function loadFromHash(){
+  const hash = window.location.hash.slice(1);
+  if(!hash) return;
+  const parts = hash.split('/');
+  if(parts[0]) $('ticker-input').value = parts[0];
+  if(parts[1]) $('range-select').value = parts[1];
+  if(parts[2]) $('cycle-input').value = parts[2];
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+resize();
+window.addEventListener('resize', resize);
+requestAnimationFrame(draw);
+
+// Auto-load from hash or default to BTC
+loadFromHash();
+go();
+
+// Update HUD periodically (live price changes)
+setInterval(()=>{if(segments.length)buildHud();}, 2000);
+
+})();
+</script>
+</body>
+</html>
