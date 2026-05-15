@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bitcoin Rings — Clear</title>
+<title>Universal Rings — The Map</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -15,7 +15,7 @@
   h1 { font-size: 24px; font-weight: 700; letter-spacing: 8px; color: rgba(255,255,255,0.9); }
   .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; margin-top: 6px; }
   canvas { border-radius: 12px; margin-top: 16px; }
-  .loading { text-align: center; padding: 100px 0; }
+  .loading { text-align: center; padding: 80px 0; }
   .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
   .pulse-ring {
     width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
@@ -44,17 +44,73 @@
   @media (max-width: 600px) {
     .bottom-bar { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* Ticker input bar */
+  #ticker-bar {
+    display:flex; gap:10px; align-items:flex-end; margin-top:14px; flex-wrap:wrap;
+    justify-content:center;
+  }
+  .bar-group { display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .bar-label { font-size:7px; letter-spacing:1.5px; color:rgba(255,255,255,0.3); }
+  #ticker-input {
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+    color:#FFD700; font-family:inherit; font-size:18px; font-weight:700;
+    letter-spacing:4px; text-align:center; text-transform:uppercase;
+    padding:8px 14px; border-radius:6px; width:160px; outline:none;
+  }
+  #ticker-input:focus { border-color:#FFD700; box-shadow:0 0 12px rgba(255,215,0,0.15); }
+  #ticker-input::placeholder { color:rgba(255,255,255,0.12); letter-spacing:2px; font-size:12px; }
+  #go-btn {
+    background:#FFD700; color:#0a0a0f; border:none; font-family:inherit;
+    font-size:11px; font-weight:700; letter-spacing:2px; padding:9px 20px;
+    border-radius:6px; cursor:pointer; transition:background .15s;
+  }
+  #go-btn:hover { background:#fff; }
+  #go-btn:disabled { background:#333; color:#666; cursor:wait; }
+  #key-bar {
+    display:flex; gap:8px; align-items:center; margin-top:8px;
+    justify-content:center; flex-wrap:wrap;
+  }
+  .key-note { font-size:8px; color:rgba(255,255,255,0.2); letter-spacing:0.5px; }
+  .key-note a { color:#4FC3F7; text-decoration:none; }
+  #api-key-input {
+    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1);
+    color:#888; font-family:inherit; font-size:10px; padding:6px 10px;
+    border-radius:4px; width:260px; outline:none;
+  }
+  #api-key-input:focus { border-color:#4FC3F7; color:#ccc; }
+  #api-key-input::placeholder { color:rgba(255,255,255,0.15); }
+  #key-status { font-size:8px; letter-spacing:1px; }
+  #error-msg {
+    color:#FF1744; font-size:10px; letter-spacing:1px; margin-top:4px;
+    text-align:center; min-height:14px; max-width:500px;
+  }
 </style>
 </head>
 <body>
 
 <div style="text-align:center;">
-  <h1>BITCOIN RINGS</h1>
-  <div class="subtitle">THE MAP · WHERE WE ARE · WHERE WE'RE GOING</div>
+  <h1 id="title">BITCOIN RINGS</h1>
+  <div class="subtitle" id="subtitle">THE MAP · WHERE WE ARE · WHERE WE'RE GOING</div>
 </div>
 
-<div id="loading" class="loading">
-  <div class="loading-text">LOADING<span id="dots"></span></div>
+<!-- Ticker bar -->
+<div id="ticker-bar">
+  <div class="bar-group">
+    <div class="bar-label">TICKER</div>
+    <input id="ticker-input" type="text" value="BTC" placeholder="TSLA, QQQ...">
+  </div>
+  <button id="go-btn">MAP IT</button>
+</div>
+<div id="key-bar">
+  <span class="key-note">STOCKS/ETFs: FREE KEY FROM <a href="https://twelvedata.com/register" target="_blank">TWELVEDATA.COM</a></span>
+  <input id="api-key-input" type="text" placeholder="Paste Twelve Data API key...">
+  <span id="key-status"></span>
+</div>
+<div id="error-msg"></div>
+
+<div id="loading" class="loading" style="display:none;">
+  <div class="loading-text">LOADING <span id="load-ticker">BTC</span><span id="dots"></span></div>
   <div class="pulse-ring"></div>
 </div>
 
@@ -62,155 +118,347 @@
   <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
   <canvas id="canvas"></canvas>
   <div id="bottomBar" class="bottom-bar"></div>
-  <div class="footer">LIVE STREAMING · BINANCE WEBSOCKET · LOG SCALE RADIUS</div>
+  <div id="footer" class="footer">LIVE STREAMING · LOG SCALE RADIUS</div>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════
-// THE ONLY THINGS THAT MATTER
+// UNIVERSAL RINGS — THE MAP
 // ═══════════════════════════════════════════════
+// Four rings. One glance. Any asset.
 //
 // 1. CURRENT PRICE  — where we are right now
 // 2. ALL-TIME HIGH  — the ceiling we came from
-// 3. PROJECTED LOW  — the blood zone (next cycle bottom, ~Sep-Nov)
-// 4. PROJECTED HIGH — the golden zone (next cycle top target)
+// 3. PROJECTED LOW  — the blood zone (buy zone)
+// 4. PROJECTED HIGH — the golden zone (sell zone)
 //
-// That's it. Four rings. One glance.
+// BTC uses hardcoded 4-year cycle projections.
+// Everything else: projections derived from that
+// asset's own historical drawdown & rally patterns.
 // ═══════════════════════════════════════════════
 
-const C4_BOTTOM = 15800;
+const $=id=>document.getElementById(id);
 let allData = [];
 let animProgress = 0;
 let livePrice = 0;
 let wsConnected = false;
+let currentTicker = 'BTC';
+let currentSource = '';
+let projCache = null;
+let projMeta = null; // stores descriptive text for labels
 
 // ═══════════════════════════════════════════════
-// PROJECTIONS — derived from cycle analysis
+// CRYPTO DETECTION
 // ═══════════════════════════════════════════════
-function computeProjections(ath) {
-  // ── PROJECTED CYCLE LOW (Blood Zone) ──
-  // Historical drawdowns from ATH: -84.7% (C1), -83.8% (C2), -77.0% (C3)
-  // Trend: diminishing ~3-7% per cycle
-  // Conservative range: -70% to -80% from ATH
-  // Timeline: ~Sep-Nov 2026 based on 4-year cycle rhythm
-  const lowRange = {
-    optimistic: ath * 0.30,  // -70% dd
-    base:       ath * 0.25,  // -75% dd (most likely)
-    pessimistic: ath * 0.20, // -80% dd
-  };
+const CRYPTO_BASES = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE','AVAX','DOT','LINK',
+  'MATIC','LTC','UNI','ATOM','NEAR','APT','OP','ARB','SUI','PEPE','SHIB',
+  'FIL','HBAR','ICP','VET','ALGO','FTM','SAND','MANA','AXS','AAVE','CRV',
+  'MKR','SNX','COMP','SUSHI','YFI','RUNE','INJ','TIA','SEI','JUP','WIF',
+  'BONK','FLOKI','ONDO','RENDER','FET','TAO','JASMY','KAS','TON'];
 
-  // ── PROJECTED CYCLE HIGH (Golden Zone) ──
-  // This is the Cycle 5 top — IF we get another bull run
-  // Historical top multipliers from bottom: 119x, 22x, 19.6x, ~9.5x (diminishing)
-  // Next cycle: ~4-6x from projected bottom
-  // Bottom-based: $25K base × 5 = $125K (recovery to prior ATH area)
-  // Optimistic: new highs — $200K-$300K range
-  // Conservative model: ATH × 1.5 to ATH × 2.5
-  const highRange = {
-    conservative: ath * 1.5,   // just 50% above current ATH
-    base:         ath * 2.0,   // 2x ATH — solid bull
-    optimistic:   ath * 2.5,   // 2.5x ATH — full mania
-  };
-
-  return { lowRange, highRange, ath };
+function isCrypto(ticker){
+  const t = ticker.toUpperCase().replace(/[-_ ]/g,'');
+  if(t.endsWith('USDT')||t.endsWith('BUSD')) return true;
+  const clean = t.replace(/USD$/,'').replace(/USDT$/,'').replace(/BUSD$/,'');
+  if(CRYPTO_BASES.includes(clean)) return true;
+  if(t.endsWith('USD') && CRYPTO_BASES.includes(t.replace(/USD$/,''))) return true;
+  return false;
 }
+
+function normalizeCryptoTicker(ticker){
+  let t = ticker.toUpperCase().replace(/[-_ ]/g,'');
+  if(t.endsWith('USDT')||t.endsWith('BUSD')) return t;
+  if(t.endsWith('USD')) t = t.slice(0,-3);
+  return t + 'USDT';
+}
+
+function cleanTicker(ticker){
+  const t = ticker.toUpperCase().replace(/[-_ ]/g,'');
+  if(isCrypto(ticker)){
+    return t.replace(/USDT$/,'').replace(/BUSD$/,'').replace(/USD$/,'');
+  }
+  return t;
+}
+
+// ═══════════════════════════════════════════════
+// API KEY MANAGEMENT
+// ═══════════════════════════════════════════════
+function getApiKey(){ return localStorage.getItem('td_api_key') || ''; }
+function saveApiKey(key){ localStorage.setItem('td_api_key', key.trim()); updateKeyStatus(); }
+function updateKeyStatus(){
+  const key = getApiKey();
+  const el = $('key-status');
+  if(key){ el.textContent='✓ SAVED'; el.style.color='#00E676'; $('api-key-input').value=key.slice(0,8)+'••••'; }
+  else { el.textContent='CRYPTO WORKS WITHOUT KEY'; el.style.color='rgba(255,255,255,0.2)'; }
+}
+$('api-key-input').addEventListener('blur', function(){ const v=this.value.trim(); if(v&&!v.includes('••')) saveApiKey(v); });
+$('api-key-input').addEventListener('keydown', function(e){ if(e.key==='Enter') this.blur(); });
+$('api-key-input').addEventListener('focus', function(){ const key=getApiKey(); if(key) this.value=key; });
 
 // ═══════════════════════════════════════════════
 // DATA FETCHING
 // ═══════════════════════════════════════════════
-async function fetchBTCData() {
+async function apiFetch(url, timeout=20000){
+  const c=new AbortController(); const t=setTimeout(()=>c.abort(),timeout);
+  try{ const r=await fetch(url,{signal:c.signal}); clearTimeout(t); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+  catch(e){ clearTimeout(t); throw e; }
+}
+
+// BTC: CoinGecko → Binance → CryptoCompare fallback (full history)
+async function fetchBTCData(){
   try {
-    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
-    if (!r.ok) throw new Error(r.status);
-    const j = await r.json();
-    const d = j.prices.map(([ts,p]) => ({date:new Date(ts),price:p}));
-    if (d.length > 100) return {data:d, source:"CoinGecko"};
-  } catch(e) { console.warn("CoinGecko:",e); }
-  try {
-    const all = [];
-    let end = Date.now();
-    for (let i=0;i<8;i++) {
-      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
-      if (!r.ok) break;
-      const k = await r.json();
-      if (!k.length) break;
-      all.unshift(...k); end = k[0][0]-1;
+    const r=await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    if(!r.ok) throw new Error(r.status);
+    const j=await r.json();
+    const d=j.prices.map(([ts,p])=>({date:new Date(ts),price:p}));
+    if(d.length>100) return {data:d, source:"CoinGecko"};
+  } catch(e){ console.warn("CoinGecko:",e); }
+  return await fetchBinanceCrypto('BTCUSDT');
+}
+
+// Other crypto via Binance (paginated daily klines)
+async function fetchBinanceCrypto(ticker){
+  const sym = normalizeCryptoTicker(ticker);
+  const all=[];
+  let end = Date.now();
+  for(let i=0;i<8;i++){
+    try{
+      const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1d&limit=1000&endTime=${end}`);
+      if(!r.ok) break;
+      const k=await r.json();
+      if(!k.length) break;
+      all.unshift(...k); end=k[0][0]-1;
+    } catch(e){ break; }
+  }
+  if(all.length>30){
+    const seen=new Set();
+    const d=all.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;})
+      .map(k=>({date:new Date(k[0]),price:+k[4]})).sort((a,b)=>a.date-b.date);
+    return {data:d, source:"Binance"};
+  }
+  return {data:[], source:"NO DATA"};
+}
+
+// Stocks/ETFs via Twelve Data (free key, full history)
+async function fetchStockData(ticker){
+  const key = getApiKey();
+  if(!key) throw new Error('API key required for stocks — get a free one at twelvedata.com/register');
+  const sym = ticker.toUpperCase();
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=5000&order=ASC&apikey=${key}`;
+  const data = await apiFetch(url);
+  if(data.status==='error'){
+    if(data.message&&data.message.includes('api_key')) throw new Error('Invalid API key');
+    throw new Error(data.message||'Twelve Data error');
+  }
+  const values = data.values;
+  if(!values||!values.length) throw new Error('No data for '+sym);
+  return {
+    data: values.map(v=>({date:new Date(v.datetime), price:parseFloat(v.close)})),
+    source: "Twelve Data"
+  };
+}
+
+// Unified fetch
+async function fetchData(ticker){
+  const clean = cleanTicker(ticker);
+  if(clean === 'BTC') return await fetchBTCData();
+  if(isCrypto(ticker)) return await fetchBinanceCrypto(ticker);
+  return await fetchStockData(ticker);
+}
+
+// ═══════════════════════════════════════════════
+// ADAPTIVE PROJECTION ENGINE
+// ═══════════════════════════════════════════════
+// Analyzes an asset's own history to derive:
+//   - Blood zone: based on historical drawdowns
+//   - Golden zone: based on historical rallies from bottoms
+// BTC gets its own hardcoded 4-year cycle projections.
+
+function analyzeDrawdowns(data){
+  // Walk through price history, find all significant drawdowns (>15% from peak)
+  let runMax = 0, ddStart = 0;
+  let inDD = false, ddLow = Infinity;
+  const drawdowns = [];
+
+  for(let i=0; i<data.length; i++){
+    const p = data[i].price;
+    if(p >= runMax){
+      if(inDD && runMax > 0){
+        const pct = (runMax - ddLow) / runMax;
+        if(pct > 0.15) drawdowns.push(pct);
+      }
+      runMax = p; ddStart = i; inDD = false; ddLow = p;
+    } else {
+      if(p < ddLow) ddLow = p;
+      const dd = (runMax - p) / runMax;
+      if(dd > 0.15) inDD = true;
     }
-    if (all.length>100) {
-      const seen=new Set();
-      const d=all.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;})
-        .map(k=>({date:new Date(k[0]),price:+k[4]})).sort((a,b)=>a.date-b.date);
-      return {data:d, source:"Binance"};
+  }
+  // Capture any ongoing drawdown
+  if(inDD && runMax > 0){
+    const pct = (runMax - ddLow) / runMax;
+    if(pct > 0.15) drawdowns.push(pct);
+  }
+  return drawdowns.sort((a,b)=>b-a); // deepest first
+}
+
+function analyzeRallies(data){
+  // Find rally magnitudes from troughs to subsequent peaks
+  let runMin = Infinity, runMax = 0, inRally = false;
+  const rallies = [];
+
+  // Simple approach: find local bottoms (>15% drops), then measure rally to next peak
+  let troughs = [];
+  let runHi = 0;
+  for(let i=0; i<data.length; i++){
+    const p = data[i].price;
+    if(p > runHi) runHi = p;
+    const dd = runHi > 0 ? (runHi - p)/runHi : 0;
+    if(dd > 0.15){
+      // In a drawdown — track trough
+      if(!troughs.length || data[troughs[troughs.length-1]].price > p){
+        troughs.push(i);
+      }
     }
-  } catch(e) { console.warn("Binance:",e); }
-  try {
-    const all=[];
-    let toTs=Math.floor(Date.now()/1000);
-    for(let i=0;i<3;i++){
-      const r=await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
-      if(!r.ok)break;
-      const j=await r.json();
-      if(!j.Data?.Data?.length)break;
-      all.unshift(...j.Data.Data); toTs=j.Data.Data[0].time-1;
+    if(dd < 0.05 && troughs.length){
+      // Recovered — find rally from last trough
+      const tIdx = troughs[troughs.length-1];
+      const tPrice = data[tIdx].price;
+      // Find peak between trough and now
+      let peak = 0;
+      for(let j=tIdx; j<=i; j++) if(data[j].price > peak) peak = data[j].price;
+      if(peak > tPrice) rallies.push(peak / tPrice);
+      troughs = [];
+      runHi = p;
     }
-    if(all.length>100){
-      const seen=new Set();
-      const d=all.filter(x=>{if(seen.has(x.time))return false;seen.add(x.time);return true;})
-        .map(x=>({date:new Date(x.time*1000),price:x.close}))
-        .filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
-      return {data:d, source:"CryptoCompare"};
+  }
+  return rallies.sort((a,b)=>b-a); // biggest first
+}
+
+function computeProjectionsBTC(ath){
+  // Original hardcoded BTC 4-year cycle projections
+  return {
+    lowRange: {
+      optimistic: ath * 0.30,   // -70% dd
+      base:       ath * 0.25,   // -75% dd
+      pessimistic: ath * 0.20,  // -80% dd
+    },
+    highRange: {
+      conservative: ath * 1.5,
+      base:         ath * 2.0,
+      optimistic:   ath * 2.5,
+    },
+    ath,
+    meta: {
+      lowLabel: "~SEP–NOV 2026 · 70–80% DRAWDOWN",
+      highLabel: "NEXT CYCLE TOP · 1.5–2.5× ATH",
+      lowSub: "−75% from ATH · Buy target",
+      highSub: "2× ATH · Sell target",
     }
-  } catch(e) { console.warn("CryptoCompare:",e); }
-  return {data:[], source:"ERROR"};
+  };
+}
+
+function computeProjectionsAdaptive(ath, data){
+  const dds = analyzeDrawdowns(data);
+  const rallies = analyzeRallies(data);
+
+  // Drawdown-based low projection
+  let ddPessimistic, ddBase, ddOptimistic;
+  if(dds.length >= 3){
+    ddPessimistic = dds[0];                           // deepest
+    ddBase = dds[Math.floor(dds.length/2)];           // median
+    ddOptimistic = dds[Math.min(2, dds.length-1)];    // 3rd deepest or shallower
+  } else if(dds.length >= 1){
+    ddPessimistic = dds[0];
+    ddBase = dds[0] * 0.85;
+    ddOptimistic = dds[0] * 0.70;
+  } else {
+    // Not enough history — use conservative defaults
+    ddPessimistic = 0.40;
+    ddBase = 0.30;
+    ddOptimistic = 0.20;
+  }
+
+  // Ensure ordering: pessimistic is deepest, optimistic is shallowest
+  const sorted = [ddPessimistic, ddBase, ddOptimistic].sort((a,b)=>b-a);
+  ddPessimistic = sorted[0];
+  ddBase = sorted[1];
+  ddOptimistic = sorted[2];
+
+  const lowRange = {
+    pessimistic: ath * (1 - ddPessimistic),
+    base:        ath * (1 - ddBase),
+    optimistic:  ath * (1 - ddOptimistic),
+  };
+
+  // Rally-based high projection
+  let hiCons, hiBase, hiOpt;
+  if(rallies.length >= 2){
+    // Use rally multipliers to project from ATH
+    const medianRally = rallies[Math.floor(rallies.length/2)];
+    const bigRally = rallies[0];
+    // Map rally multipliers to ATH-relative projections
+    // Conservative: ATH grows by half the median rally rate
+    hiCons = ath * (1 + (medianRally - 1) * 0.3);
+    hiBase = ath * (1 + (medianRally - 1) * 0.6);
+    hiOpt  = ath * (1 + (bigRally - 1) * 0.5);
+  } else {
+    // Minimal history — conservative defaults
+    hiCons = ath * 1.20;
+    hiBase = ath * 1.40;
+    hiOpt  = ath * 1.60;
+  }
+
+  // Ensure ordering
+  const hSorted = [hiCons, hiBase, hiOpt].sort((a,b)=>a-b);
+
+  // Ensure golden zone is above ATH
+  const highRange = {
+    conservative: Math.max(ath * 1.10, hSorted[0]),
+    base:         Math.max(ath * 1.20, hSorted[1]),
+    optimistic:   Math.max(ath * 1.30, hSorted[2]),
+  };
+
+  const ddPctLo = Math.round(ddOptimistic * 100);
+  const ddPctHi = Math.round(ddPessimistic * 100);
+  const hiMultLo = (highRange.conservative / ath).toFixed(1);
+  const hiMultHi = (highRange.optimistic / ath).toFixed(1);
+
+  return {
+    lowRange, highRange, ath,
+    meta: {
+      lowLabel: `HISTORICAL DD: ${ddPctLo}–${ddPctHi}% · ${dds.length} CYCLES`,
+      highLabel: `PROJECTED: ${hiMultLo}–${hiMultHi}× ATH`,
+      lowSub: `−${Math.round(ddBase*100)}% from ATH · Buy target`,
+      highSub: `${(highRange.base/ath).toFixed(1)}× ATH · Sell target`,
+    }
+  };
+}
+
+function computeProjections(ath, data){
+  const clean = cleanTicker(currentTicker);
+  if(clean === 'BTC') return computeProjectionsBTC(ath);
+  return computeProjectionsAdaptive(ath, data);
 }
 
 // ═══════════════════════════════════════════════
 // DUAL MOMENTUM ENGINE — 20d/60d ROC, 5-day confirm
 // ═══════════════════════════════════════════════
-// Rules:
-//   m20 = (price - price_20d_ago) / price_20d_ago
-//   m60 = (price - price_60d_ago) / price_60d_ago
-//   Both positive for 5 consecutive days → BULL (green)
-//   Either negative for 5 consecutive days → BEAR (red)
-//   Signal carries forward between confirmations
-// ═══════════════════════════════════════════════
 function computeDualMomentum(data) {
-  if (data.length < 61) return { signal: 0, label: "NO DATA", m20: 0, m60: 0, bullDays: 0, bearDays: 0 };
-
-  let signal = 0; // 0 = no signal yet, 1 = bull, -1 = bear
-  let bullStreak = 0, bearStreak = 0;
-  let lastM20 = 0, lastM60 = 0;
-
+  if (data.length < 61) return { signal: 0, label: "NO DATA", m20: 0, m60: 0 };
+  let signal = 0, bullStreak = 0, bearStreak = 0, lastM20 = 0, lastM60 = 0;
   for (let i = 60; i < data.length; i++) {
     const price = data[i].price;
-    const p20 = data[i - 20].price;
-    const p60 = data[i - 60].price;
-    const m20 = (price - p20) / p20;
-    const m60 = (price - p60) / p60;
-
-    const bothPositive = m20 > 0 && m60 > 0;
-    const eitherNegative = m20 < 0 || m60 < 0;
-
-    if (bothPositive) {
-      bullStreak++;
-      bearStreak = 0;
-    } else if (eitherNegative) {
-      bearStreak++;
-      bullStreak = 0;
-    } else {
-      bullStreak = 0;
-      bearStreak = 0;
-    }
-
+    const m20 = (price - data[i-20].price) / data[i-20].price;
+    const m60 = (price - data[i-60].price) / data[i-60].price;
+    if (m20 > 0 && m60 > 0) { bullStreak++; bearStreak = 0; }
+    else if (m20 < 0 || m60 < 0) { bearStreak++; bullStreak = 0; }
+    else { bullStreak = 0; bearStreak = 0; }
     if (bullStreak >= 5) signal = 1;
     if (bearStreak >= 5) signal = -1;
-
-    lastM20 = m20;
-    lastM60 = m60;
+    lastM20 = m20; lastM60 = m60;
   }
-
-  const label = signal === 1 ? "BULL" : signal === -1 ? "BEAR" : "NEUTRAL";
-  return { signal, label, m20: lastM20, m60: lastM60, bullDays: bullStreak, bearDays: bearStreak };
+  return { signal, label: signal===1?"BULL":signal===-1?"BEAR":"NEUTRAL", m20:lastM20, m60:lastM60 };
 }
 
 // ═══════════════════════════════════════════════
@@ -218,11 +466,12 @@ function computeDualMomentum(data) {
 // ═══════════════════════════════════════════════
 function fmtP(p) {
   if (p >= 1000) return p.toLocaleString("en", {maximumFractionDigits:0});
-  return p.toFixed(2);
+  if (p >= 1) return p.toFixed(2);
+  return p.toPrecision(4);
 }
 
 function draw() {
-  const canvas = document.getElementById("canvas");
+  const canvas = $("canvas");
   const container = canvas.parentElement;
   const size = Math.min(container.clientWidth - 20, 700);
   const dpr = window.devicePixelRatio || 1;
@@ -232,30 +481,26 @@ function draw() {
   ctx.scale(dpr, dpr);
   const cx = size/2, cy = size/2;
 
-  if (!allData.length) return;
+  if (!allData.length || !projCache) return;
 
-  // Get current price and ATH
   const currentPrice = livePrice || allData[allData.length - 1].price;
-  const ath = Math.max(...allData.map(d => d.price));
-  const proj = computeProjections(ath);
+  const proj = projCache;
+  const meta = proj.meta;
 
-  // ── SCALE ──
-  // Log scale from pessimistic low to optimistic high
-  // Everything maps into this range
+  // Log scale
   const scaleMin = proj.lowRange.pessimistic * 0.7;
   const scaleMax = proj.highRange.optimistic * 1.15;
-  const logMin = Math.log(scaleMin);
-  const logMax = Math.log(scaleMax);
+  const logMin = Math.log(Math.max(0.001, scaleMin));
+  const logMax = Math.log(Math.max(0.002, scaleMax));
   const maxR = (size/2) * 0.90;
   const minR = 40;
 
   function p2r(price) {
-    const t = (Math.log(price) - logMin) / (logMax - logMin);
-    const clamped = Math.max(0, Math.min(1, t));
-    return minR + clamped * (maxR - minR) * animProgress;
+    const t = (Math.log(Math.max(0.001,price)) - logMin) / (logMax - logMin || 1);
+    return minR + Math.max(0, Math.min(1, t)) * (maxR - minR) * animProgress;
   }
 
-  // ── BACKGROUND ──
+  // Background
   ctx.fillStyle = "#0a0a0f";
   ctx.fillRect(0, 0, size, size);
   const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size/2);
@@ -266,46 +511,35 @@ function draw() {
 
   // ═════════════════════════════════════════════
   // RING 1: PROJECTED LOW — THE BLOOD ZONE
-  // Inner ring cluster. Red. Where we want to BUY.
   // ═════════════════════════════════════════════
-  const rLowOpt = p2r(proj.lowRange.optimistic);    // -70%
-  const rLowBase = p2r(proj.lowRange.base);          // -75%
-  const rLowPess = p2r(proj.lowRange.pessimistic);   // -80%
+  const rLowOpt = p2r(proj.lowRange.optimistic);
+  const rLowBase = p2r(proj.lowRange.base);
+  const rLowPess = p2r(proj.lowRange.pessimistic);
 
-  // Blood zone fill (between optimistic and pessimistic)
-  const bloodGrad = ctx.createRadialGradient(cx, cy, rLowPess * 0.9, cx, cy, rLowOpt * 1.1);
+  const bloodGrad = ctx.createRadialGradient(cx, cy, rLowPess*0.9, cx, cy, rLowOpt*1.1);
   bloodGrad.addColorStop(0, "rgba(255,23,68,0.0)");
   bloodGrad.addColorStop(0.2, "rgba(255,23,68,0.12)");
   bloodGrad.addColorStop(0.5, "rgba(255,23,68,0.18)");
   bloodGrad.addColorStop(0.8, "rgba(255,23,68,0.12)");
   bloodGrad.addColorStop(1, "rgba(255,23,68,0.0)");
   ctx.beginPath();
-  ctx.arc(cx, cy, rLowOpt * 1.08, 0, Math.PI*2);
-  ctx.arc(cx, cy, Math.max(rLowPess * 0.92, minR * 0.5), 0, Math.PI*2, true);
+  ctx.arc(cx, cy, rLowOpt*1.08, 0, Math.PI*2);
+  ctx.arc(cx, cy, Math.max(rLowPess*0.92, minR*0.5), 0, Math.PI*2, true);
   ctx.closePath();
   ctx.fillStyle = bloodGrad;
   ctx.fill();
 
-  // Outer edge of blood zone (-70%)
-  ctx.beginPath(); ctx.arc(cx, cy, rLowOpt, 0, Math.PI*2);
-  ctx.strokeStyle = "#FF1744"; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.5;
-  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,rLowOpt,0,Math.PI*2);
+  ctx.strokeStyle="#FF1744"; ctx.globalAlpha=0.5; ctx.lineWidth=1.5; ctx.stroke(); ctx.globalAlpha=1;
 
-  // Base line (-75%) — the most likely bottom
-  ctx.beginPath(); ctx.arc(cx, cy, rLowBase, 0, Math.PI*2);
-  ctx.strokeStyle = "#FF1744"; ctx.globalAlpha = 0.8; ctx.lineWidth = 2.5;
-  ctx.stroke(); ctx.globalAlpha = 1;
-  // Glow on base
-  ctx.beginPath(); ctx.arc(cx, cy, rLowBase, 0, Math.PI*2);
-  ctx.strokeStyle = "#FF1744"; ctx.globalAlpha = 0.12; ctx.lineWidth = 18;
-  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,rLowBase,0,Math.PI*2);
+  ctx.strokeStyle="#FF1744"; ctx.globalAlpha=0.8; ctx.lineWidth=2.5; ctx.stroke(); ctx.globalAlpha=1;
+  ctx.beginPath(); ctx.arc(cx,cy,rLowBase,0,Math.PI*2);
+  ctx.strokeStyle="#FF1744"; ctx.globalAlpha=0.12; ctx.lineWidth=18; ctx.stroke(); ctx.globalAlpha=1;
 
-  // Inner edge (-80%)
-  ctx.beginPath(); ctx.arc(cx, cy, rLowPess, 0, Math.PI*2);
-  ctx.strokeStyle = "#FF1744"; ctx.globalAlpha = 0.4; ctx.lineWidth = 1;
-  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,rLowPess,0,Math.PI*2);
+  ctx.strokeStyle="#FF1744"; ctx.globalAlpha=0.4; ctx.lineWidth=1; ctx.stroke(); ctx.globalAlpha=1;
 
-  // Blood zone labels
   ctx.textAlign = "center";
   ctx.font = "bold 12px monospace";
   ctx.fillStyle = "#FF1744"; ctx.globalAlpha = 0.9;
@@ -313,117 +547,93 @@ function draw() {
   ctx.font = "10px monospace"; ctx.globalAlpha = 0.5;
   ctx.fillText(`$${fmtP(proj.lowRange.pessimistic)} — $${fmtP(proj.lowRange.optimistic)}`, cx, cy + rLowBase + 34);
   ctx.font = "9px monospace"; ctx.globalAlpha = 0.3;
-  ctx.fillText("~SEP–NOV 2026 · 70–80% DRAWDOWN", cx, cy + rLowBase + 48);
+  ctx.fillText(meta.lowLabel, cx, cy + rLowBase + 48);
   ctx.globalAlpha = 1;
 
-  // Price ticks inside the zone
-  ctx.font = "8px monospace"; ctx.globalAlpha = 0.35;
-  ctx.fillStyle = "#FF1744";
+  ctx.font = "8px monospace"; ctx.globalAlpha = 0.35; ctx.fillStyle = "#FF1744";
   const tickAngle = -Math.PI * 0.35;
-  ctx.fillText(`$${fmtP(proj.lowRange.optimistic)}`, cx + rLowOpt * Math.cos(tickAngle) + 8, cy + rLowOpt * Math.sin(tickAngle));
-  ctx.fillText(`$${fmtP(proj.lowRange.base)}`, cx + rLowBase * Math.cos(tickAngle) + 8, cy + rLowBase * Math.sin(tickAngle));
-  ctx.fillText(`$${fmtP(proj.lowRange.pessimistic)}`, cx + rLowPess * Math.cos(tickAngle) + 8, cy + rLowPess * Math.sin(tickAngle));
+  ctx.fillText(`$${fmtP(proj.lowRange.optimistic)}`, cx+rLowOpt*Math.cos(tickAngle)+8, cy+rLowOpt*Math.sin(tickAngle));
+  ctx.fillText(`$${fmtP(proj.lowRange.base)}`, cx+rLowBase*Math.cos(tickAngle)+8, cy+rLowBase*Math.sin(tickAngle));
+  ctx.fillText(`$${fmtP(proj.lowRange.pessimistic)}`, cx+rLowPess*Math.cos(tickAngle)+8, cy+rLowPess*Math.sin(tickAngle));
   ctx.globalAlpha = 1;
 
   // ═════════════════════════════════════════════
   // RING 2: ALL-TIME HIGH — THE CEILING
-  // White/silver. Reference point. Where we came from.
   // ═════════════════════════════════════════════
+  const ath = proj.ath;
   const rATH = p2r(ath);
 
-  ctx.beginPath(); ctx.arc(cx, cy, rATH, 0, Math.PI*2);
-  ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 2;
-  ctx.stroke();
-  // Subtle glow
-  ctx.beginPath(); ctx.arc(cx, cy, rATH, 0, Math.PI*2);
-  ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 14;
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,rATH,0,Math.PI*2);
+  ctx.strokeStyle="rgba(255,255,255,0.5)"; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,rATH,0,Math.PI*2);
+  ctx.strokeStyle="rgba(255,255,255,0.06)"; ctx.lineWidth=14; ctx.stroke();
 
-  // ATH label
   ctx.textAlign = "center";
   ctx.font = "bold 11px monospace"; ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.fillText(`ATH  $${fmtP(ath)}`, cx, cy - rATH - 8);
   ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.25)";
-  ctx.fillText("CURRENT CYCLE HIGH", cx, cy - rATH + 6);
+  ctx.fillText("ALL-TIME HIGH", cx, cy - rATH + 6);
 
   // ═════════════════════════════════════════════
   // RING 3: PROJECTED HIGH — THE GOLDEN ZONE
-  // Gold. Where we're going (next cycle top).
   // ═════════════════════════════════════════════
   const rHighCons = p2r(proj.highRange.conservative);
   const rHighBase = p2r(proj.highRange.base);
   const rHighOpt = p2r(proj.highRange.optimistic);
 
-  // Golden zone fill
-  const goldGrad = ctx.createRadialGradient(cx, cy, rHighCons * 0.97, cx, cy, rHighOpt * 1.03);
+  const goldGrad = ctx.createRadialGradient(cx,cy,rHighCons*0.97, cx,cy,rHighOpt*1.03);
   goldGrad.addColorStop(0, "rgba(255,215,0,0.0)");
   goldGrad.addColorStop(0.2, "rgba(255,215,0,0.06)");
   goldGrad.addColorStop(0.5, "rgba(255,215,0,0.10)");
   goldGrad.addColorStop(0.8, "rgba(255,215,0,0.06)");
   goldGrad.addColorStop(1, "rgba(255,215,0,0.0)");
   ctx.beginPath();
-  ctx.arc(cx, cy, rHighOpt * 1.02, 0, Math.PI*2);
-  ctx.arc(cx, cy, rHighCons * 0.98, 0, Math.PI*2, true);
+  ctx.arc(cx,cy,rHighOpt*1.02,0,Math.PI*2);
+  ctx.arc(cx,cy,rHighCons*0.98,0,Math.PI*2,true);
   ctx.closePath();
   ctx.fillStyle = goldGrad;
   ctx.fill();
 
-  // Conservative edge
-  ctx.beginPath(); ctx.arc(cx, cy, rHighCons, 0, Math.PI*2);
-  ctx.strokeStyle = "#FFD700"; ctx.globalAlpha = 0.4; ctx.lineWidth = 1.5;
-  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,rHighCons,0,Math.PI*2);
+  ctx.strokeStyle="#FFD700"; ctx.globalAlpha=0.4; ctx.lineWidth=1.5; ctx.stroke(); ctx.globalAlpha=1;
 
-  // Base line — most likely top
-  ctx.beginPath(); ctx.arc(cx, cy, rHighBase, 0, Math.PI*2);
-  ctx.strokeStyle = "#FFD700"; ctx.globalAlpha = 0.8; ctx.lineWidth = 2.5;
-  ctx.stroke(); ctx.globalAlpha = 1;
-  // Glow
-  ctx.beginPath(); ctx.arc(cx, cy, rHighBase, 0, Math.PI*2);
-  ctx.strokeStyle = "#FFD700"; ctx.globalAlpha = 0.1; ctx.lineWidth = 20;
-  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,rHighBase,0,Math.PI*2);
+  ctx.strokeStyle="#FFD700"; ctx.globalAlpha=0.8; ctx.lineWidth=2.5; ctx.stroke(); ctx.globalAlpha=1;
+  ctx.beginPath(); ctx.arc(cx,cy,rHighBase,0,Math.PI*2);
+  ctx.strokeStyle="#FFD700"; ctx.globalAlpha=0.1; ctx.lineWidth=20; ctx.stroke(); ctx.globalAlpha=1;
 
-  // Optimistic edge
-  ctx.beginPath(); ctx.arc(cx, cy, rHighOpt, 0, Math.PI*2);
-  ctx.strokeStyle = "#FFD700"; ctx.globalAlpha = 0.35; ctx.lineWidth = 1;
-  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,rHighOpt,0,Math.PI*2);
+  ctx.strokeStyle="#FFD700"; ctx.globalAlpha=0.35; ctx.lineWidth=1; ctx.stroke(); ctx.globalAlpha=1;
 
-  // Golden zone labels
   ctx.textAlign = "center";
   ctx.font = "bold 12px monospace"; ctx.fillStyle = "#FFD700"; ctx.globalAlpha = 0.9;
   ctx.fillText("SELL ZONE", cx, cy - rHighBase - 18);
   ctx.font = "10px monospace"; ctx.globalAlpha = 0.5;
   ctx.fillText(`$${fmtP(proj.highRange.conservative)} — $${fmtP(proj.highRange.optimistic)}`, cx, cy - rHighBase - 32);
   ctx.font = "9px monospace"; ctx.globalAlpha = 0.3;
-  ctx.fillText("NEXT CYCLE TOP · 1.5–2.5× ATH", cx, cy - rHighBase - 44);
+  ctx.fillText(meta.highLabel, cx, cy - rHighBase - 44);
   ctx.globalAlpha = 1;
 
-  // Price ticks
-  ctx.font = "8px monospace"; ctx.globalAlpha = 0.3;
-  ctx.fillStyle = "#FFD700";
+  ctx.font = "8px monospace"; ctx.globalAlpha = 0.3; ctx.fillStyle = "#FFD700";
   const gTickAngle = Math.PI * 0.35;
-  ctx.fillText(`$${fmtP(proj.highRange.conservative)}`, cx + rHighCons * Math.cos(gTickAngle) + 8, cy + rHighCons * Math.sin(gTickAngle));
-  ctx.fillText(`$${fmtP(proj.highRange.base)}`, cx + rHighBase * Math.cos(gTickAngle) + 8, cy + rHighBase * Math.sin(gTickAngle));
-  ctx.fillText(`$${fmtP(proj.highRange.optimistic)}`, cx + rHighOpt * Math.cos(gTickAngle) + 8, cy + rHighOpt * Math.sin(gTickAngle));
+  ctx.fillText(`$${fmtP(proj.highRange.conservative)}`, cx+rHighCons*Math.cos(gTickAngle)+8, cy+rHighCons*Math.sin(gTickAngle));
+  ctx.fillText(`$${fmtP(proj.highRange.base)}`, cx+rHighBase*Math.cos(gTickAngle)+8, cy+rHighBase*Math.sin(gTickAngle));
+  ctx.fillText(`$${fmtP(proj.highRange.optimistic)}`, cx+rHighOpt*Math.cos(gTickAngle)+8, cy+rHighOpt*Math.sin(gTickAngle));
   ctx.globalAlpha = 1;
 
   // ═════════════════════════════════════════════
   // RING 4: CURRENT PRICE — YOU ARE HERE
-  // Bold. Glowing. The one that matters most.
   // ═════════════════════════════════════════════
   const rCur = p2r(currentPrice);
-
-  // Dual momentum: 20d/60d ROC with 5-day confirmation
   const momentum = computeDualMomentum(allData);
-  const curColor = momentum.signal >= 0 ? "#00E676" : "#FF1744"; // green if bull or neutral, red if confirmed bear
+  const curColor = momentum.signal >= 0 ? "#00E676" : "#FF1744";
 
-  // The ring itself — bold and unmistakable
-  ctx.beginPath(); ctx.arc(cx, cy, rCur, 0, Math.PI*2);
-  ctx.strokeStyle = curColor; ctx.lineWidth = 5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,rCur,0,Math.PI*2);
+  ctx.strokeStyle=curColor; ctx.lineWidth=5; ctx.stroke();
 
-  // Bright glow layers
   [[16, 0.35], [32, 0.12], [50, 0.04]].forEach(([w, a]) => {
-    ctx.beginPath(); ctx.arc(cx, cy, rCur, 0, Math.PI*2);
-    ctx.strokeStyle = curColor; ctx.globalAlpha = a; ctx.lineWidth = w; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,rCur,0,Math.PI*2);
+    ctx.strokeStyle=curColor; ctx.globalAlpha=a; ctx.lineWidth=w; ctx.stroke();
   });
   ctx.globalAlpha = 1;
 
@@ -431,70 +641,59 @@ function draw() {
   const labelAngle = -Math.PI / 6;
   const lx = cx + rCur * Math.cos(labelAngle);
   const ly = cy + rCur * Math.sin(labelAngle);
-
-  // Connector line from ring to label
   const labelOffX = 20, labelOffY = -8;
   ctx.beginPath();
   ctx.moveTo(lx, ly);
-  ctx.lineTo(lx + labelOffX, ly + labelOffY);
-  ctx.lineTo(lx + labelOffX + 120, ly + labelOffY);
-  ctx.strokeStyle = curColor; ctx.globalAlpha = 0.4; ctx.lineWidth = 1;
-  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.lineTo(lx+labelOffX, ly+labelOffY);
+  ctx.lineTo(lx+labelOffX+120, ly+labelOffY);
+  ctx.strokeStyle=curColor; ctx.globalAlpha=0.4; ctx.lineWidth=1; ctx.stroke(); ctx.globalAlpha=1;
 
   ctx.textAlign = "left";
   ctx.font = "bold 18px monospace"; ctx.fillStyle = curColor;
-  ctx.fillText(`$${fmtP(currentPrice)}`, lx + labelOffX + 4, ly + labelOffY - 10);
+  ctx.fillText(`$${fmtP(currentPrice)}`, lx+labelOffX+4, ly+labelOffY-10);
 
   ctx.font = "bold 9px monospace"; ctx.fillStyle = curColor; ctx.globalAlpha = 0.7;
-  ctx.fillText("YOU ARE HERE", lx + labelOffX + 4, ly + labelOffY - 24);
+  ctx.fillText("YOU ARE HERE", lx+labelOffX+4, ly+labelOffY-24);
   ctx.globalAlpha = 1;
 
-  // Momentum state label on the ring
-  const momStateLabel = momentum.signal === 1 ? "DUAL MOMENTUM: BULL" : momentum.signal === -1 ? "DUAL MOMENTUM: BEAR" : "DUAL MOMENTUM: NEUTRAL";
+  const momStateLabel = momentum.signal===1?"DUAL MOMENTUM: BULL":momentum.signal===-1?"DUAL MOMENTUM: BEAR":"DUAL MOMENTUM: NEUTRAL";
   ctx.font = "8px monospace"; ctx.fillStyle = curColor; ctx.globalAlpha = 0.5;
-  ctx.fillText(momStateLabel, lx + labelOffX + 4, ly + labelOffY + 6);
+  ctx.fillText(momStateLabel, lx+labelOffX+4, ly+labelOffY+6);
   ctx.globalAlpha = 1;
 
-  // Distance annotations
-  ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
-  const pctFromATH = ((1 - currentPrice / ath) * 100).toFixed(0);
-  const pctToBase = ((proj.lowRange.base / currentPrice - 1) * 100).toFixed(0);
+  const pctFromATH = ((1 - currentPrice/ath)*100).toFixed(0);
+  const pctToBase = ((proj.lowRange.base/currentPrice - 1)*100).toFixed(0);
   const multiplierToHigh = (proj.highRange.base / proj.lowRange.base).toFixed(1);
-  ctx.fillText(`${pctFromATH}% below ATH`, lx + labelOffX + 4, ly + labelOffY + 20);
-  ctx.textAlign = "left";
+  ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText(`${pctFromATH}% below ATH`, lx+labelOffX+4, ly+labelOffY+20);
 
   // ═════════════════════════════════════════════
   // PULL LINES — visual gravity between zones
   // ═════════════════════════════════════════════
-
-  // Dashed line from current to blood zone
   ctx.setLineDash([4, 6]);
-  ctx.beginPath();
-  const pullAngle1 = Math.PI * 0.55;
-  ctx.moveTo(cx + rCur * Math.cos(pullAngle1), cy + rCur * Math.sin(pullAngle1));
-  ctx.lineTo(cx + rLowBase * Math.cos(pullAngle1), cy + rLowBase * Math.sin(pullAngle1));
-  ctx.strokeStyle = "#FF1744"; ctx.globalAlpha = 0.2; ctx.lineWidth = 1.5;
-  ctx.stroke(); ctx.globalAlpha = 1;
 
-  // Arrow label on pull line
+  const pullAngle1 = Math.PI * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(cx+rCur*Math.cos(pullAngle1), cy+rCur*Math.sin(pullAngle1));
+  ctx.lineTo(cx+rLowBase*Math.cos(pullAngle1), cy+rLowBase*Math.sin(pullAngle1));
+  ctx.strokeStyle="#FF1744"; ctx.globalAlpha=0.2; ctx.lineWidth=1.5; ctx.stroke(); ctx.globalAlpha=1;
+
   const midR1 = (rCur + rLowBase) / 2;
   ctx.font = "8px monospace"; ctx.fillStyle = "#FF1744"; ctx.globalAlpha = 0.4;
   ctx.textAlign = "center";
-  ctx.fillText(`↓ ${Math.abs(Number(pctToBase))}%`, cx + midR1 * Math.cos(pullAngle1), cy + midR1 * Math.sin(pullAngle1));
+  ctx.fillText(`↓ ${Math.abs(Number(pctToBase))}%`, cx+midR1*Math.cos(pullAngle1), cy+midR1*Math.sin(pullAngle1));
 
-  // Dashed line from ATH to golden zone
   const pullAngle2 = -Math.PI * 0.45;
   ctx.beginPath();
-  ctx.moveTo(cx + rATH * Math.cos(pullAngle2), cy + rATH * Math.sin(pullAngle2));
-  ctx.lineTo(cx + rHighBase * Math.cos(pullAngle2), cy + rHighBase * Math.sin(pullAngle2));
-  ctx.strokeStyle = "#FFD700"; ctx.globalAlpha = 0.2; ctx.lineWidth = 1.5;
-  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.moveTo(cx+rATH*Math.cos(pullAngle2), cy+rATH*Math.sin(pullAngle2));
+  ctx.lineTo(cx+rHighBase*Math.cos(pullAngle2), cy+rHighBase*Math.sin(pullAngle2));
+  ctx.strokeStyle="#FFD700"; ctx.globalAlpha=0.2; ctx.lineWidth=1.5; ctx.stroke(); ctx.globalAlpha=1;
 
-  const pctATHtoHigh = ((proj.highRange.base / ath - 1) * 100).toFixed(0);
+  const pctATHtoHigh = ((proj.highRange.base/ath - 1)*100).toFixed(0);
   const midR2 = (rATH + rHighBase) / 2;
   ctx.font = "8px monospace"; ctx.fillStyle = "#FFD700"; ctx.globalAlpha = 0.4;
   ctx.textAlign = "center";
-  ctx.fillText(`↑ ${pctATHtoHigh}%`, cx + midR2 * Math.cos(pullAngle2), cy + midR2 * Math.sin(pullAngle2));
+  ctx.fillText(`↑ ${pctATHtoHigh}%`, cx+midR2*Math.cos(pullAngle2), cy+midR2*Math.sin(pullAngle2));
 
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
@@ -512,14 +711,10 @@ function draw() {
   // ═════════════════════════════════════════════
   // BOTTOM INFO CARDS
   // ═════════════════════════════════════════════
-  const fromLow = ((currentPrice / proj.lowRange.base - 1) * 100).toFixed(0);
-  const fromHigh = ((proj.highRange.base / currentPrice - 1) * 100).toFixed(0);
-
-  // Momentum label for display
-  const momIcon = momentum.signal === 1 ? "▲ BULL" : momentum.signal === -1 ? "▼ BEAR" : "● NEUTRAL";
+  const momIcon = momentum.signal===1?"▲ BULL":momentum.signal===-1?"▼ BEAR":"● NEUTRAL";
   const momDetail = `20d: ${(momentum.m20*100).toFixed(1)}% · 60d: ${(momentum.m60*100).toFixed(1)}%`;
 
-  document.getElementById("bottomBar").innerHTML = `
+  $("bottomBar").innerHTML = `
     <div class="bottom-card">
       <div class="lbl">CURRENT PRICE</div>
       <div class="val" style="color:${curColor}">$${fmtP(currentPrice)}</div>
@@ -533,12 +728,12 @@ function draw() {
     <div class="bottom-card">
       <div class="lbl">PROJECTED LOW</div>
       <div class="val" style="color:#FF1744">$${fmtP(proj.lowRange.base)}</div>
-      <div class="sub">−75% from ATH · Buy target</div>
+      <div class="sub">${meta.lowSub}</div>
     </div>
     <div class="bottom-card">
       <div class="lbl">PROJECTED HIGH</div>
       <div class="val" style="color:#FFD700">$${fmtP(proj.highRange.base)}</div>
-      <div class="sub">2× ATH · Sell target</div>
+      <div class="sub">${meta.highSub}</div>
     </div>
   `;
 }
@@ -546,94 +741,144 @@ function draw() {
 // ═══════════════════════════════════════════════
 // ANIMATION
 // ═══════════════════════════════════════════════
+let animRunning = false;
 function animate() {
   if (animProgress < 1) {
     animProgress += 0.02;
     if (animProgress > 1) animProgress = 1;
   }
   draw();
-  requestAnimationFrame(animate);
+  if(animRunning) requestAnimationFrame(animate);
 }
 
 // ═══════════════════════════════════════════════
-// BINANCE WEBSOCKET — LIVE PRICE STREAMING
+// LIVE PRICE — WebSocket (crypto) or Polling (stocks)
 // ═══════════════════════════════════════════════
-let ws = null;
-let wsRetryDelay = 1000;
-let pollingTimer = null;
+let ws = null, wsRetryDelay = 1000, pollingTimer = null;
 
-function connectWS() {
-  try {
-    ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-    ws.onopen = () => {
-      wsConnected = true;
-      wsRetryDelay = 1000;
-      if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
-      document.getElementById("badgeText").textContent = 'STREAMING · Binance WebSocket';
-    };
-    ws.onmessage = (e) => {
-      try {
-        livePrice = parseFloat(JSON.parse(e.data).p);
-      } catch (err) {}
-    };
-    ws.onclose = () => {
-      wsConnected = false;
-      setTimeout(connectWS, wsRetryDelay);
-      wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
-      startPollingFallback();
-    };
-    ws.onerror = () => { ws.close(); };
-  } catch (e) {
-    startPollingFallback();
+function stopLive(){
+  if(ws){ try{ws.close();}catch(e){} ws=null; }
+  if(pollingTimer){ clearInterval(pollingTimer); pollingTimer=null; }
+  wsConnected = false;
+}
+
+function startLive(ticker){
+  stopLive();
+  if(isCrypto(ticker)){
+    const sym = normalizeCryptoTicker(ticker).toLowerCase();
+    try{
+      ws = new WebSocket(`wss://stream.binance.com:9443/ws/${sym}@trade`);
+      ws.onopen = ()=>{ wsConnected=true; wsRetryDelay=1000; $("badgeText").textContent='STREAMING · Binance WebSocket'; };
+      ws.onmessage = e=>{ try{livePrice=parseFloat(JSON.parse(e.data).p);}catch(e){} };
+      ws.onclose = ()=>{ wsConnected=false; setTimeout(()=>startLive(ticker),wsRetryDelay); wsRetryDelay=Math.min(wsRetryDelay*2,30000); startCryptoPoll(ticker); };
+      ws.onerror = ()=>ws.close();
+    } catch(e){ startCryptoPoll(ticker); }
+  } else {
+    startStockPoll(ticker);
   }
 }
 
-function startPollingFallback() {
-  if (pollingTimer) return;
-  pollingTimer = setInterval(async () => {
-    try {
-      const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
-      if (r.ok) {
-        const d = await r.json();
-        livePrice = parseFloat(d.price);
-        document.getElementById("badgeText").textContent = 'LIVE · Binance (polling)';
-      }
-    } catch (e) {}
-  }, 3000);
+function startCryptoPoll(ticker){
+  if(pollingTimer) return;
+  const sym = normalizeCryptoTicker(ticker);
+  pollingTimer = setInterval(async()=>{
+    try{
+      const d=await apiFetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`,5000);
+      livePrice=parseFloat(d.price);
+      $("badgeText").textContent='LIVE · Binance (polling)';
+    }catch(e){}
+  },3000);
+}
+
+function startStockPoll(ticker){
+  if(pollingTimer) return;
+  const key=getApiKey(); if(!key) return;
+  const sym=ticker.toUpperCase();
+  (async()=>{try{const d=await apiFetch(`https://api.twelvedata.com/price?symbol=${encodeURIComponent(sym)}&apikey=${key}`,5000);if(d.price)livePrice=parseFloat(d.price);}catch(e){}})();
+  pollingTimer = setInterval(async()=>{
+    try{
+      const d=await apiFetch(`https://api.twelvedata.com/price?symbol=${encodeURIComponent(sym)}&apikey=${key}`,5000);
+      if(d.price){livePrice=parseFloat(d.price); $("badgeText").textContent=`LIVE · Twelve Data`;}
+    }catch(e){}
+  },15000);
 }
 
 // ═══════════════════════════════════════════════
-// MAIN
+// GO — load a ticker
+// ═══════════════════════════════════════════════
+let running = false;
+
+async function go(ticker){
+  if(running) return;
+  running = true;
+
+  ticker = (ticker || $('ticker-input').value).trim().toUpperCase();
+  if(!ticker){ $('error-msg').textContent='ENTER A TICKER'; running=false; return; }
+
+  $('error-msg').textContent='';
+  $('go-btn').disabled=true;
+  $('go-btn').textContent='LOADING...';
+  $('loading').style.display='block';
+  $('load-ticker').textContent=ticker;
+  $('app').style.display='none';
+
+  try {
+    const result = await fetchData(ticker);
+    if(!result.data.length) throw new Error('No data returned');
+
+    allData = result.data;
+    currentTicker = ticker;
+    currentSource = result.source;
+
+    const ath = Math.max(...allData.map(d=>d.price));
+    projCache = computeProjections(ath, allData);
+
+    const display = cleanTicker(ticker);
+    $('title').textContent = display + ' RINGS';
+    $('subtitle').textContent = 'THE MAP · WHERE WE ARE · WHERE WE\'RE GOING';
+    $('footer').textContent = `LIVE · ${result.source} · ${allData.length} DAYS · LOG SCALE`;
+
+    livePrice = allData[allData.length-1].price;
+    animProgress = 0;
+    animRunning = true;
+
+    $('loading').style.display='none';
+    $('app').style.display='flex';
+    $('badgeText').textContent = `LIVE · ${result.source} · connecting...`;
+
+    animate();
+    startLive(ticker);
+
+  } catch(e){
+    $('loading').style.display='none';
+    let msg = e.message || 'Unknown error';
+    if(!isCrypto(ticker) && !getApiKey()){
+      msg = 'STOCKS NEED AN API KEY — get one free at twelvedata.com/register';
+    }
+    $('error-msg').textContent = msg;
+  }
+
+  $('go-btn').disabled=false;
+  $('go-btn').textContent='MAP IT';
+  running=false;
+}
+
+// ═══════════════════════════════════════════════
+// INIT
 // ═══════════════════════════════════════════════
 let dotCount = 0;
-const dotTimer = setInterval(() => {
-  dotCount = (dotCount + 1) % 4;
-  const el = document.getElementById("dots");
-  if (el) el.textContent = ".".repeat(dotCount);
-}, 400);
+setInterval(()=>{
+  dotCount=(dotCount+1)%4;
+  const el=$("dots"); if(el) el.textContent=".".repeat(dotCount);
+},400);
 
-async function main() {
-  const result = await fetchBTCData();
-  clearInterval(dotTimer);
+$('go-btn').addEventListener('click', ()=>go());
+$('ticker-input').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+window.addEventListener("resize", ()=>{ if(animProgress>=1 && allData.length) draw(); });
+updateKeyStatus();
 
-  if (!result.data.length) {
-    document.getElementById("loading").innerHTML = '<div class="loading-text" style="color:#FF1744">NO DATA</div>';
-    return;
-  }
-
-  allData = result.data;
-  document.getElementById("loading").style.display = "none";
-  document.getElementById("app").style.display = "flex";
-  document.getElementById("badgeText").textContent = `LIVE · ${result.source} · connecting...`;
-
-  animate();
-  connectWS();
-
-  // Redraw on resize
-  window.addEventListener("resize", () => { if (animProgress >= 1) draw(); });
-}
-
-main();
+// Auto-load BTC on start
+go('BTC');
 </script>
 </body>
 </html>
