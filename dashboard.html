@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC — Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    min-height: 100vh; padding: 18px 14px 40px;
+  }
+  header { text-align: center; margin-bottom: 16px; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 8px; }
+  .sub { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; margin-top: 4px; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  /* ── CONSENSUS PANEL ── */
+  .consensus {
+    margin: 18px auto 0;
+    padding: 28px 24px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.08);
+    text-align: center;
+    transition: border-color .3s ease;
+  }
+  .big-state {
+    font-size: 56px; font-weight: 700; letter-spacing: 10px;
+    line-height: 1.05;
+  }
+  .consensus-detail {
+    font-size: 11px; color: rgba(255,255,255,0.5);
+    margin-top: 10px; letter-spacing: 1px;
+  }
+  .price-row {
+    margin-top: 14px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 1px;
+  }
+  .price-row .price { font-weight: 700; color: #fff; }
+  .delta-pos { color: #00E676; }
+  .delta-neg { color: #FF1744; }
+
+  /* ── 5 CARDS ROW ── */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-top: 18px;
+  }
+  @media (max-width: 980px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .cards { grid-template-columns: 1fr; } }
+
+  .card {
+    padding: 16px 14px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column; min-height: 180px;
+  }
+  .card-title {
+    font-size: 9px; letter-spacing: 2.5px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 10px;
+  }
+  .card-state {
+    font-size: 22px; font-weight: 700; letter-spacing: 2px;
+    margin-bottom: 8px; line-height: 1.1;
+  }
+  .card-desc {
+    font-size: 10px; color: rgba(255,255,255,0.5);
+    line-height: 1.4; margin-bottom: 10px;
+  }
+  .card-rows { margin-top: auto; }
+  .card-row {
+    display: flex; justify-content: space-between;
+    font-size: 10px; padding: 3px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  .card-row:first-child { border-top: none; }
+  .card-row .lbl { color: rgba(255,255,255,0.35); }
+  .card-row .val { color: rgba(255,255,255,0.85); font-weight: 600; }
+
+  /* ── SECTIONS ── */
+  .section {
+    margin-top: 22px;
+    padding: 18px 20px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .section h2 {
+    font-size: 10px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 12px;
+  }
+  .change-row, .setup-row, .conflict-row {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .change-row:last-child, .setup-row:last-child, .conflict-row:last-child { border-bottom: none; }
+  .change-row .label {
+    display: inline-block; width: 72px;
+    font-size: 9px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.45);
+  }
+  .flip {
+    color: #FFD700; font-weight: 700;
+  }
+  .nothing {
+    font-size: 11px; color: rgba(255,255,255,0.3);
+    font-style: italic;
+  }
+  .arrow { color: rgba(255,255,255,0.4); margin: 0 6px; }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    font-weight: 700;
+  }
+
+  /* ── LOADING / FOOTER ── */
+  .loading {
+    text-align: center; padding: 80px 0;
+    color: rgba(255,255,255,0.5); font-size: 13px;
+    letter-spacing: 3px;
+  }
+  .pulse-ring {
+    width: 50px; height: 50px; border-radius: 50%; margin: 20px auto 0;
+    border: 2px solid rgba(0,230,118,0.3);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  footer {
+    margin-top: 30px;
+    text-align: center;
+    font-size: 9px; color: rgba(255,255,255,0.25);
+    letter-spacing: 1.5px;
+  }
+  footer a { color: rgba(79,195,247,0.6); text-decoration: none; }
+  footer a:hover { color: #4FC3F7; }
+  .stale {
+    display: inline-block; padding: 2px 8px; margin-left: 8px;
+    border-radius: 4px; background: rgba(255,215,0,0.15);
+    border: 1px solid rgba(255,215,0,0.3);
+    color: #FFD700; font-size: 9px;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <h1>BTC RINGS · DASHBOARD</h1>
+    <div class="sub">ONE PAGE · FIVE INDICATORS · YOUR CALL</div>
+  </header>
+
+  <div id="loading" class="loading">
+    READING THE TAPE<span id="dots"></span>
+    <div class="pulse-ring"></div>
+  </div>
+
+  <div id="app" style="display:none;">
+
+    <section class="consensus" id="consensus">
+      <div class="big-state" id="bigState">—</div>
+      <div class="consensus-detail" id="consensusDetail">—</div>
+      <div class="price-row" id="priceRow">—</div>
+    </section>
+
+    <section class="cards" id="cards"></section>
+
+    <section class="section">
+      <h2>WHAT CHANGED TODAY</h2>
+      <div id="changes"></div>
+    </section>
+
+    <section class="section">
+      <h2>SETUPS</h2>
+      <div id="setups"></div>
+    </section>
+
+    <section class="section">
+      <h2>DISAGREEMENTS</h2>
+      <div id="conflicts"></div>
+    </section>
+
+    <footer>
+      <span id="footer">—</span>
+      &nbsp;·&nbsp;
+      <a href="nav.html">all indicators</a>
+    </footer>
+
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// PALETTE — match existing pages
+// ═══════════════════════════════════════════════
+const GREEN  = "#00E676";
+const RED    = "#FF1744";
+const GOLD   = "#FFD700";
+const CYAN   = "#4FC3F7";
+const PURPLE = "#E040FB";
+const ORANGE = "#FF9800";
+
+// ═══════════════════════════════════════════════
+// HARD-CODED CYCLE LANDMARKS (from four-year.html)
+// ═══════════════════════════════════════════════
+const CYCLES = [
+  { id: 1, label: "CYCLE 1",
+    low:  { date: new Date("2011-11-18"), price: 2.01 },
+    top:  { date: new Date("2013-11-29"), price: 1163 },
+    halving: new Date("2012-11-28"),
+    nextLow: { date: new Date("2015-01-14"), price: 172 } },
+  { id: 2, label: "CYCLE 2",
+    low:  { date: new Date("2015-01-14"), price: 172 },
+    top:  { date: new Date("2017-12-17"), price: 19783 },
+    halving: new Date("2016-07-09"),
+    nextLow: { date: new Date("2018-12-15"), price: 3148 } },
+  { id: 3, label: "CYCLE 3",
+    low:  { date: new Date("2018-12-15"), price: 3148 },
+    top:  { date: new Date("2021-11-10"), price: 69000 },
+    halving: new Date("2020-05-11"),
+    nextLow: { date: new Date("2022-11-21"), price: 15800 } },
+  { id: 4, label: "CYCLE 4",
+    low:  { date: new Date("2022-11-21"), price: 15800 },
+    top:  null,
+    halving: new Date("2024-04-20"),
+    nextLow: null },
+];
+
+// ═══════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════
+function mean(arr) { if (!arr || !arr.length) return 0; return arr.reduce((a,b)=>a+b,0)/arr.length; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function pctChange(a, b) { if (!Number.isFinite(a)||!Number.isFinite(b)||a===0) return 0; return (b-a)/a; }
+function daysBetween(a, b) { return Math.round((b.getTime() - a.getTime()) / 86400000); }
+function rollingMedian(values, window) {
+  const out = [];
+  for (let i = 0; i < values.length; i++) {
+    const start = Math.max(0, i - Math.floor(window / 2));
+    const end = Math.min(values.length, i + Math.ceil(window / 2));
+    const slice = values.slice(start, end).sort((a, b) => a - b);
+    out.push(slice[Math.floor(slice.length / 2)]);
+  }
+  return out;
+}
+function quantile(sorted, q) {
+  if (!sorted.length) return 0;
+  const idx = (sorted.length - 1) * q;
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+function fmtP(p) { return p >= 1000 ? p.toLocaleString("en",{maximumFractionDigits:0}) : p.toFixed(2); }
+function fmtD(d) { return d instanceof Date ? d.toISOString().slice(0,10) : "—"; }
+function fmtMonth(d) { return d instanceof Date ? d.toLocaleDateString("en",{month:"short",year:"numeric"}) : "—"; }
+
+// ═══════════════════════════════════════════════
+// TROUGH / CREST DETECTION — Vibe's proven algorithm
+// (used by vibe, signal, cycles)
+// ═══════════════════════════════════════════════
+function findTroughs(prices, halfWindow) {
+  const troughs = [];
+  for (let i = halfWindow; i < prices.length - halfWindow; i++) {
+    let isTrough = true;
+    for (let j = 1; j <= halfWindow; j++) {
+      if (prices[i] > prices[i - j] || prices[i] > prices[i + j]) { isTrough = false; break; }
+    }
+    if (isTrough && (troughs.length === 0 || (i - troughs[troughs.length - 1]) >= halfWindow)) {
+      troughs.push(i);
+    }
+  }
+  return troughs;
+}
+function filterTroughs(troughs, prices, nominal, tol) {
+  if (troughs.length <= 1) return troughs;
+  const minGap = nominal * (1 - tol);
+  const filtered = [troughs[0]];
+  for (let i = 1; i < troughs.length; i++) {
+    const gap = troughs[i] - filtered[filtered.length - 1];
+    if (gap >= minGap) filtered.push(troughs[i]);
+    else if (prices[troughs[i]] < prices[filtered[filtered.length - 1]]) filtered[filtered.length - 1] = troughs[i];
+  }
+  return filtered;
+}
+function findCrest(prices, start, end) {
+  let max = -Infinity, idx = start;
+  for (let i = start; i <= Math.min(end, prices.length - 1); i++) {
+    if (prices[i] > max) { max = prices[i]; idx = i; }
+  }
+  return { idx, price: max };
+}
+
+// ═══════════════════════════════════════════════
+// ADAPTIVE CYCLE DETECTION (from signal.html)
+// ═══════════════════════════════════════════════
+function autocorr(values, lag) {
+  const n = values.length;
+  if (n <= lag + 2) return -1;
+  const x = values.slice(0, n - lag);
+  const y = values.slice(lag);
+  const mx = mean(x), my = mean(y);
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < x.length; i++) {
+    const vx = x[i] - mx, vy = y[i] - my;
+    num += vx * vy; dx += vx * vx; dy += vy * vy;
+  }
+  if (dx === 0 || dy === 0) return -1;
+  return num / Math.sqrt(dx * dy);
+}
+function estimateDominantCycle(closes, minLag = 35, maxLag = 90) {
+  if (closes.length < maxLag + 20) return { lag: 60, corr: 0, fallback: true };
+  const returns = [];
+  for (let i = 1; i < closes.length; i++) {
+    returns.push((closes[i] - closes[i - 1]) / closes[i - 1]);
+  }
+  const smooth = rollingMedian(returns, 5);
+  let bestLag = 60, bestCorr = -Infinity;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    const c = autocorr(smooth, lag);
+    if (c > bestCorr) { bestCorr = c; bestLag = lag; }
+  }
+  if (bestCorr < 0.35) return { lag: 60, corr: bestCorr, fallback: true };
+  return { lag: clamp(bestLag, 45, 75), corr: bestCorr, fallback: false };
+}
+
+// ═══════════════════════════════════════════════
+// VOLUME CLASSIFICATION (from signal.html — quantile-based)
+// ═══════════════════════════════════════════════
+function classifyVolume(volumes) {
+  if (volumes.length < 70) return { band: "normal", ratio20: 1, ratio60: 1, trend: 1 };
+  const recent5 = mean(volumes.slice(-5));
+  const prev5 = mean(volumes.slice(-10, -5));
+  const avg20 = mean(volumes.slice(-20));
+  const avg60 = mean(volumes.slice(-60));
+  const ratio20 = avg20 ? recent5 / avg20 : 1;
+  const ratio60 = avg60 ? recent5 / avg60 : 1;
+  const trend = prev5 ? recent5 / prev5 : 1;
+  const ratios = [];
+  for (let i = 60; i < volumes.length; i++) {
+    const local5 = mean(volumes.slice(i - 4, i + 1));
+    const local60 = mean(volumes.slice(i - 59, i + 1));
+    ratios.push(local60 ? local5 / local60 : 1);
+  }
+  const sorted = ratios.slice().sort((a, b) => a - b);
+  const q30 = quantile(sorted, 0.30);
+  const q70 = quantile(sorted, 0.70);
+  const q90 = quantile(sorted, 0.90);
+  let band = "normal";
+  if (ratio60 >= q90) band = "massive";
+  else if (ratio60 >= q70) band = "high";
+  else if (ratio60 < q30) band = "thin";
+  return { band, ratio20, ratio60, trend };
+}
+
+// ═══════════════════════════════════════════════
+// DATA FETCH — 3-endpoint fallback
+// ═══════════════════════════════════════════════
+async function fetchBTCData() {
+  // CoinGecko — gives prices + volumes
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.prices.map(([ts,p],i) => ({
+      date: new Date(ts),
+      price: p,
+      volume: j.total_volumes && j.total_volumes[i] ? j.total_volumes[i][1] : 0,
+    }));
+    if (d.length > 100) return { data: d, source: "CoinGecko" };
+  } catch(e) { console.warn("CoinGecko:", e); }
+  // Binance — prices + volumes paginated
+  try {
+    const all = [];
+    let end = Date.now();
+    for (let i=0; i<8; i++) {
+      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000&endTime=${end}`);
+      if (!r.ok) break;
+      const k = await r.json();
+      if (!k.length) break;
+      all.unshift(...k);
+      end = k[0][0] - 1;
+    }
+    if (all.length > 100) {
+      const seen = new Set();
+      const d = all.filter(k => { if(seen.has(k[0]))return false; seen.add(k[0]); return true; })
+        .map(k => ({ date: new Date(k[0]), price: +k[4], volume: +k[7] /* quote asset volume */ }))
+        .sort((a,b) => a.date - b.date);
+      return { data: d, source: "Binance" };
+    }
+  } catch(e) { console.warn("Binance:", e); }
+  // CryptoCompare — prices + volumes paginated
+  try {
+    const all = [];
+    let toTs = Math.floor(Date.now() / 1000);
+    for (let i=0; i<3; i++) {
+      const r = await fetch(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`);
+      if (!r.ok) break;
+      const j = await r.json();
+      if (!j.Data?.Data?.length) break;
+      all.unshift(...j.Data.Data);
+      toTs = j.Data.Data[0].time - 1;
+    }
+    if (all.length > 100) {
+      const seen = new Set();
+      const d = all.filter(x => { if(seen.has(x.time))return false; seen.add(x.time); return true; })
+        .map(x => ({ date: new Date(x.time * 1000), price: x.close, volume: x.volumeto || 0 }))
+        .filter(x => x.price > 0).sort((a,b) => a.date - b.date);
+      return { data: d, source: "CryptoCompare" };
+    }
+  } catch(e) { console.warn("CryptoCompare:", e); }
+  return { data: [], source: "ERROR" };
+}
+
+async function fetchFearGreed() {
+  try {
+    const r = await fetch("https://api.alternative.me/fng/?limit=30&format=json");
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    return j.data.map(d => ({
+      date: new Date(parseInt(d.timestamp) * 1000),
+      value: parseInt(d.value),
+      label: d.value_classification,
+    })).reverse();
+  } catch (e) {
+    console.warn("F&G:", e);
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════
+// INDICATOR #1 — FOUR YEAR (from four-year.html)
+// asOfIdx defaults to last day; pass earlier idx for "yesterday"
+// ═══════════════════════════════════════════════
+function computeFourYear(data, asOfIdx) {
+  if (data.length < 100) return null;
+  const endIdx = asOfIdx === undefined ? data.length - 1 : asOfIdx;
+  const slice = data.slice(0, endIdx + 1);
+  const prices = slice.map(d => d.price);
+  const dates  = slice.map(d => d.date);
+  const now = dates[dates.length - 1];
+  const currentPrice = prices[prices.length - 1];
+  const ath = Math.max(...prices);
+
+  const completed = CYCLES.slice(0,3).map(c => {
+    const lengthDays = daysBetween(c.low.date, c.nextLow.date);
+    const topDay = daysBetween(c.low.date, c.top.date);
+    const crestPosition = topDay / lengthDays;
+    const multiplier = c.top.price / c.low.price;
+    const drawdown = (c.top.price - c.nextLow.price) / c.top.price;
+    const halvingDay = daysBetween(c.low.date, c.halving);
+    const topAfterHalving = daysBetween(c.halving, c.top.date);
+    return { ...c, lengthDays, topDay, crestPosition, multiplier, drawdown,
+             halvingDay, topAfterHalving,
+             translation: crestPosition > 0.5 ? "RIGHT" : "LEFT" };
+  });
+  const avgLength = mean(completed.map(c => c.lengthDays));
+  const avgTopAfterHalving = mean(completed.map(c => c.topAfterHalving));
+
+  const c4 = CYCLES[3];
+  const daysSinceLow = daysBetween(c4.low.date, now);
+  const daysSinceHalving = daysBetween(c4.halving, now);
+  const progress = daysSinceLow / avgLength;
+
+  const projectedTopDate = new Date(c4.halving.getTime() + avgTopAfterHalving * 86400000);
+  const daysToProjectedTop = daysBetween(now, projectedTopDate);
+  const projectedNextLowDate = new Date(c4.low.date.getTime() + avgLength * 86400000);
+  const daysToProjectedLow = daysBetween(now, projectedNextLowDate);
+
+  let athIdx = 0;
+  for (let i = 0; i < prices.length; i++) if (prices[i] >= ath) athIdx = i;
+  const athDate = dates[athIdx];
+  const daysSinceAth = daysBetween(athDate, now);
+  const drawdownFromAth = (currentPrice - ath) / ath;
+  const currentMultiplier = currentPrice / c4.low.price;
+
+  // Phase determination — exact replication of four-year.html
+  const phase =
+    daysSinceHalving < 0 ? "PRE-HALVING" :
+    daysToProjectedTop > 0 && currentPrice >= ath * 0.9 ? "EXPANSION" :
+    daysToProjectedTop <= 0 && currentPrice < ath * 0.8 ? "DISTRIBUTION" :
+    progress > 0.85 ? "LATE CYCLE" :
+    progress > 0.5 ? "MID CYCLE" :
+    "EARLY CYCLE";
+
+  return {
+    phase,
+    daysSinceLow, daysSinceHalving, daysSinceAth,
+    avgLength, progress,
+    projectedTopDate, daysToProjectedTop,
+    projectedNextLowDate, daysToProjectedLow,
+    ath, athDate, currentPrice,
+    drawdownFromAth, currentMultiplier,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// INDICATOR #2 — VIBE (from vibe.html — exact replica)
+// ═══════════════════════════════════════════════
+function computeVibe(data, asOfIdx) {
+  if (data.length < 100) return null;
+  const endIdx = asOfIdx === undefined ? data.length - 1 : asOfIdx;
+  // Match vibe.html's 730d cutoff
+  const cutoff = new Date(data[endIdx].date.getTime() - 730 * 86400000);
+  const recent = data.slice(0, endIdx + 1).filter(d => d.date >= cutoff);
+  if (recent.length < 100) return null;
+  const prices = recent.map(d => d.price);
+  const now = prices.length - 1;
+  const currentPrice = prices[now];
+
+  let t60 = findTroughs(prices, 12);
+  t60 = filterTroughs(t60, prices, 60, 0.5);
+  if (t60.length < 2) { t60 = findTroughs(prices, 8); t60 = filterTroughs(t60, prices, 60, 0.6); }
+  let t20 = findTroughs(prices, 4);
+  t20 = filterTroughs(t20, prices, 20, 0.5);
+  if (t20.length < 2) { t20 = findTroughs(prices, 3); t20 = filterTroughs(t20, prices, 20, 0.6); }
+  if (t60.length < 1 || t20.length < 1) return null;
+
+  let avgLen60 = 60;
+  if (t60.length >= 2) {
+    const r = [];
+    for (let i = Math.max(0, t60.length - 5); i < t60.length - 1; i++) r.push(t60[i+1] - t60[i]);
+    if (r.length) avgLen60 = mean(r);
+  }
+  let avgSwing = 0.15;
+  if (t60.length >= 2) {
+    const amps = [];
+    for (let i = Math.max(0, t60.length - 4); i < t60.length - 1; i++) {
+      const c = findCrest(prices, t60[i], t60[i+1]);
+      const low = Math.min(prices[t60[i]], prices[t60[i+1]]);
+      amps.push((c.price - low) / low);
+    }
+    if (amps.length) avgSwing = mean(amps);
+  }
+
+  const last60 = t60[t60.length - 1];
+  const daysSince60 = now - last60;
+  const progress60 = daysSince60 / avgLen60;
+  const troughPrice60 = prices[last60];
+  const crest60 = findCrest(prices, last60, now);
+  const moveFromTrough = (currentPrice - troughPrice60) / troughPrice60;
+  const moveFromCrest = (currentPrice - crest60.price) / crest60.price;
+  const pastCrest = currentPrice < crest60.price * 0.97;
+  const nearTrough = daysSince60 <= 8;
+
+  const last20 = t20[t20.length - 1];
+  const daysSince20 = now - last20;
+  const crest20 = findCrest(prices, last20, now);
+  const near20Trough = daysSince20 <= 5;
+  const past20Crest = currentPrice < crest20.price * 0.97;
+
+  const deployScore =
+    (nearTrough ? 3 : 0) +
+    (near20Trough ? 2 : 0) +
+    (progress60 < 0.2 ? 3 : progress60 < 0.35 ? 2 : 0) +
+    (moveFromTrough < 0.03 ? 2 : moveFromTrough < 0.06 ? 1 : 0);
+  const exitScore =
+    (progress60 > 0.85 ? 3 : progress60 > 0.7 ? 2 : 0) +
+    (pastCrest ? 2 : 0) +
+    (past20Crest && progress60 > 0.5 ? 2 : 0) +
+    (moveFromCrest < -0.08 ? 2 : moveFromCrest < -0.04 ? 1 : 0);
+
+  let state;
+  if (deployScore >= 4)                            state = "DEPLOY";
+  else if (exitScore >= 4)                         state = "EXIT";
+  else if (deployScore >= 2 && exitScore < 2)      state = "DEPLOY";
+  else if (exitScore >= 2 && progress60 > 0.6)     state = "EXIT";
+  else                                              state = "RIDE";
+
+  const daysLeft = Math.max(0, Math.round(avgLen60 - daysSince60));
+
+  return {
+    state, deployScore, exitScore,
+    daysSince60, daysSince20, progress60,
+    avgLen60, avgSwing, daysLeft,
+    troughPrice60, crest60, moveFromTrough, moveFromCrest,
+    nearTrough, near20Trough, pastCrest, past20Crest,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// INDICATOR #3 — SIGNAL (from signal.html — exact replica)
+// ═══════════════════════════════════════════════
+function computeSignal(data, fng, asOfIdx) {
+  if (data.length < 100) return null;
+  const endIdx = asOfIdx === undefined ? data.length - 1 : asOfIdx;
+  const slice = data.slice(0, endIdx + 1);
+  const closes = slice.map(d => d.price);
+  const vols = slice.map(d => d.volume || 0);
+  const now = closes.length - 1;
+  const currentPrice = closes[now];
+
+  const cyc = estimateDominantCycle(closes);
+
+  let t60 = findTroughs(closes, 12);
+  t60 = filterTroughs(t60, closes, 60, 0.5);
+  if (t60.length < 2) { t60 = findTroughs(closes, 8); t60 = filterTroughs(t60, closes, 60, 0.6); }
+  if (t60.length < 1) return null;
+  let t20 = findTroughs(closes, 4);
+  t20 = filterTroughs(t20, closes, 20, 0.5);
+  if (t20.length < 2) { t20 = findTroughs(closes, 3); t20 = filterTroughs(t20, closes, 20, 0.6); }
+
+  let avgLen60 = cyc.lag;
+  if (t60.length >= 2) {
+    const r = [];
+    for (let i = Math.max(0, t60.length - 5); i < t60.length - 1; i++) r.push(t60[i+1] - t60[i]);
+    if (r.length) avgLen60 = Math.round(mean(r));
+  }
+
+  const last60 = t60[t60.length - 1];
+  const daysSince60 = now - last60;
+  const progress60 = daysSince60 / avgLen60;
+  const troughPrice60 = closes[last60];
+  const crest60 = findCrest(closes, last60, now);
+  const moveFromTrough = (currentPrice - troughPrice60) / troughPrice60;
+  const moveFromCrest = (currentPrice - crest60.price) / crest60.price;
+  const pastCrest = currentPrice < crest60.price * 0.97;
+  const nearTrough = daysSince60 <= 8;
+
+  const last20 = t20.length > 0 ? t20[t20.length - 1] : last60;
+  const daysSince20 = now - last20;
+  const crest20 = findCrest(closes, last20, now);
+  const near20Trough = daysSince20 <= 5;
+  const past20Crest = currentPrice < crest20.price * 0.97;
+
+  const volClass = classifyVolume(vols);
+  const fgValue = fng.length > 0 ? fng[fng.length - 1].value : 50;
+  const flowState = inferFlowState(fgValue, volClass.band);
+
+  const deployScore =
+    (nearTrough ? 3 : 0) +
+    (near20Trough ? 2 : 0) +
+    (progress60 < 0.20 ? 3 : progress60 < 0.35 ? 2 : 0) +
+    (moveFromTrough < 0.03 ? 2 : moveFromTrough < 0.06 ? 1 : 0);
+  const exitScore =
+    (progress60 > 0.85 ? 3 : progress60 > 0.70 ? 2 : 0) +
+    (pastCrest && progress60 > 0.5 ? 2 : pastCrest ? 1 : 0) +
+    (past20Crest && progress60 > 0.6 ? 2 : 0) +
+    (moveFromCrest < -0.08 && progress60 > 0.5 ? 2 : moveFromCrest < -0.04 && progress60 > 0.5 ? 1 : 0);
+
+  let flowBoost = 0;
+  if (flowState === "CAPITULATION") flowBoost = 3;
+  else if (flowState === "ABSORPTION") flowBoost = 2;
+  else if (flowState === "DISTRIBUTION") flowBoost = -2;
+  else if (flowState === "EXHAUSTION") flowBoost = -3;
+
+  const adjDeploy = deployScore + Math.max(0, flowBoost);
+  const adjExit = exitScore + Math.max(0, -flowBoost);
+
+  let state;
+  if (adjDeploy >= 4) state = "DEPLOY";
+  else if (adjExit >= 4) state = "EXIT";
+  else if (adjDeploy >= 2 && adjExit < 2) state = "DEPLOY";
+  else if (adjExit >= 2 && progress60 > 0.6) state = "EXIT";
+  else state = "RIDE";
+
+  return {
+    state, cycleLen: cyc.lag, cycleCorr: cyc.corr, cycleFallback: cyc.fallback,
+    daysSince60, progress60, avgLen60,
+    moveFromTrough, moveFromCrest, deployScore, exitScore,
+    adjDeploy, adjExit, flowState, fgValue, volBand: volClass.band,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// FLOW STATE (used by signal & flow indicators)
+// Adopting the simpler signal.html version
+// ═══════════════════════════════════════════════
+function inferFlowState(fgValue, volumeBand) {
+  if (fgValue <= 15) return volumeBand === "massive" || volumeBand === "high" ? "CAPITULATION" : "ACCUMULATION";
+  if (fgValue <= 30) return volumeBand === "massive" || volumeBand === "high" ? "ABSORPTION" : "ACCUMULATION";
+  if (fgValue <= 45) return volumeBand === "massive" || volumeBand === "high" ? "ABSORPTION" : "ACCUMULATION";
+  if (fgValue <= 55) return "MOMENTUM";
+  if (fgValue <= 70) return volumeBand === "thin" ? "EXHAUSTION" : "MOMENTUM";
+  if (fgValue <= 85) return volumeBand === "thin" ? "EXHAUSTION" : "DISTRIBUTION";
+  return volumeBand === "massive" ? "DISTRIBUTION" : "EXHAUSTION";
+}
+
+// ═══════════════════════════════════════════════
+// INDICATOR #4 — FLOW (from flow.html exact logic)
+// ═══════════════════════════════════════════════
+function computeFlow(data, fng, asOfIdx) {
+  if (data.length < 60) return null;
+  const endIdx = asOfIdx === undefined ? data.length - 1 : asOfIdx;
+  const slice = data.slice(0, endIdx + 1);
+
+  const currentPrice = slice[slice.length - 1].price;
+  // F&G as-of: if asOfIdx is earlier, try to pick F&G entry near that date
+  let fgValue = 50, fgLabel = "Neutral";
+  if (fng.length) {
+    const target = slice[slice.length - 1].date;
+    let best = fng[fng.length - 1];
+    let bestDiff = Math.abs(best.date - target);
+    for (const f of fng) {
+      const d = Math.abs(f.date - target);
+      if (d < bestDiff) { best = f; bestDiff = d; }
+    }
+    fgValue = best.value; fgLabel = best.label;
+  }
+
+  const recentVols = slice.slice(-5).map(v => v.volume || 0);
+  const vol20 = slice.slice(-20).map(v => v.volume || 0);
+  const vol60 = slice.slice(-60).map(v => v.volume || 0);
+  const avgRecent = mean(recentVols);
+  const avg20 = mean(vol20);
+  const avg60 = vol60.length ? mean(vol60) : avg20;
+  const volRatio20 = avg20 ? avgRecent / avg20 : 1;
+  const volRatio60 = avg60 ? avgRecent / avg60 : 1;
+
+  const volHigh = volRatio20 > 1.4;
+  const volMassive = volRatio20 > 1.8;
+  const volNormal = volRatio20 >= 0.7 && volRatio20 <= 1.4;
+  const volThin = volRatio20 < 0.7;
+
+  let state;
+  if (fgValue <= 15 && volMassive)               state = "CAPITULATION";
+  else if (fgValue <= 30 && volHigh)             state = "ABSORPTION";
+  else if (fgValue <= 30 && !volHigh)            state = "ACCUMULATION";
+  else if (fgValue <= 45 && volHigh)             state = "ABSORPTION";
+  else if (fgValue >= 75 && volThin)             state = "EXHAUSTION";
+  else if (fgValue >= 70 && volHigh)             state = "DISTRIBUTION";
+  else if (fgValue >= 55 && volThin)             state = "EXHAUSTION";
+  else if (fgValue > 45 && fgValue < 70 && volHigh) state = "MOMENTUM";
+  else if (fgValue <= 45 && volNormal)           state = "ACCUMULATION";
+  else                                            state = "MOMENTUM";
+
+  return {
+    state, fgValue, fgLabel,
+    volRatio20, volRatio60,
+    volBand: volMassive ? "massive" : volHigh ? "high" : volThin ? "thin" : "normal",
+  };
+}
+
+// ═══════════════════════════════════════════════
+// INDICATOR #5 — CYCLES (from cycles.html)
+// True Bressert low-to-low
+// ═══════════════════════════════════════════════
+function computeCycles(data, asOfIdx) {
+  if (data.length < 120) return null;
+  const endIdx = asOfIdx === undefined ? data.length - 1 : asOfIdx;
+  const slice = data.slice(0, endIdx + 1);
+  const prices = slice.map(d => d.price);
+  const dates = slice.map(d => d.date);
+  const now = prices.length - 1;
+
+  let t60 = findTroughs(prices, 12);
+  t60 = filterTroughs(t60, prices, 60, 0.5);
+  if (t60.length < 2) { t60 = findTroughs(prices, 8); t60 = filterTroughs(t60, prices, 60, 0.6); }
+  let t20 = findTroughs(prices, 4);
+  t20 = filterTroughs(t20, prices, 20, 0.5);
+  if (t20.length < 2) { t20 = findTroughs(prices, 3); t20 = filterTroughs(t20, prices, 20, 0.6); }
+
+  const completed60 = [];
+  for (let i = 0; i < t60.length - 1; i++) {
+    const len = t60[i+1] - t60[i];
+    const crest = findCrest(prices, t60[i], t60[i+1]);
+    completed60.push({ length: len, crest });
+  }
+  const avgLen60 = completed60.length
+    ? mean(completed60.slice(-6).map(c => c.length))
+    : 60;
+  const avgLen20 = (() => {
+    const c20 = [];
+    for (let i = 0; i < t20.length - 1; i++) c20.push(t20[i+1] - t20[i]);
+    return c20.length ? mean(c20.slice(-6)) : 20;
+  })();
+
+  const last60 = t60.length ? t60[t60.length - 1] : null;
+  const last20 = t20.length ? t20[t20.length - 1] : null;
+  if (last60 === null || last20 === null) return null;
+
+  const daysSince60 = now - last60;
+  const daysSince20 = now - last20;
+  const crest60 = findCrest(prices, last60, now);
+  const crestPos60 = (crest60.idx - last60) / Math.max(1, daysSince60);
+  const translation60 = crestPos60 > 0.5 ? "RIGHT" : "LEFT";
+
+  return {
+    last60Date: dates[last60], last60Price: prices[last60], daysSince60,
+    last20Date: dates[last20], last20Price: prices[last20], daysSince20,
+    avgLen60: Math.round(avgLen60), avgLen20: Math.round(avgLen20),
+    translation60,
+    crest60Price: crest60.price, crest60Date: dates[crest60.idx],
+  };
+}
+
+// ═══════════════════════════════════════════════
+// CONSENSUS — derive top-level state from the 5
+// ═══════════════════════════════════════════════
+// Map each indicator to a directional bias: DEPLOY / RIDE / EXIT / BOTTOM ZONE / DISTRIBUTION
+function consensus(fy, vibe, sig, flow, cyc) {
+  // Each indicator votes
+  const votes = { DEPLOY: 0, RIDE: 0, EXIT: 0, BOTTOM_ZONE: 0, DISTRIBUTION: 0 };
+  const sources = [];
+
+  // 4-year phase → directional bias
+  if (fy) {
+    let v;
+    switch (fy.phase) {
+      case "BOTTOM ZONE": v = "BOTTOM_ZONE"; break;
+      case "EARLY CYCLE": v = "DEPLOY"; break;
+      case "MID CYCLE":   v = "RIDE"; break;
+      case "EXPANSION":   v = "RIDE"; break;
+      case "LATE CYCLE":  v = "EXIT"; break;
+      case "DISTRIBUTION": v = "DISTRIBUTION"; break;
+      default: v = "RIDE";
+    }
+    votes[v]++;
+    sources.push({ name: "4-year", vote: v, raw: fy.phase });
+  }
+
+  // Vibe → direct
+  if (vibe) { votes[vibe.state]++; sources.push({ name: "vibe", vote: vibe.state, raw: vibe.state }); }
+  // Signal → direct
+  if (sig)  { votes[sig.state]++;  sources.push({ name: "signal", vote: sig.state, raw: sig.state }); }
+
+  // Flow → directional
+  if (flow) {
+    let v;
+    switch (flow.state) {
+      case "CAPITULATION": v = "DEPLOY"; break;
+      case "ABSORPTION":   v = "DEPLOY"; break;
+      case "ACCUMULATION": v = "RIDE"; break;
+      case "MOMENTUM":     v = "RIDE"; break;
+      case "DISTRIBUTION": v = "EXIT"; break;
+      case "EXHAUSTION":   v = "EXIT"; break;
+      default: v = "RIDE";
+    }
+    votes[v]++;
+    sources.push({ name: "flow", vote: v, raw: flow.state });
+  }
+
+  // Cycles → directional
+  if (cyc) {
+    let v;
+    // Where in 60d cycle?
+    const p = cyc.daysSince60 / cyc.avgLen60;
+    if (cyc.daysSince60 <= 8)         v = "DEPLOY";
+    else if (p > 0.85)                v = "EXIT";
+    else                              v = "RIDE";
+    votes[v]++;
+    sources.push({ name: "cycles", vote: v, raw: `${cyc.daysSince60}d/${cyc.avgLen60}d, ${cyc.translation60}` });
+  }
+
+  // Winner
+  let winner = "RIDE", max = -1;
+  for (const k of Object.keys(votes)) if (votes[k] > max) { max = votes[k]; winner = k; }
+
+  // Format display
+  const display = winner === "BOTTOM_ZONE" ? "BOTTOM ZONE" : winner;
+
+  // count breakdown
+  const total = sources.length;
+  const matchCount = sources.filter(s => s.vote === winner).length;
+
+  return { state: winner, display, votes, sources, total, matchCount };
+}
+
+function stateColor(s) {
+  switch(s) {
+    case "DEPLOY": return GREEN;
+    case "RIDE": return GOLD;
+    case "EXIT": return RED;
+    case "BOTTOM_ZONE":
+    case "BOTTOM ZONE": return CYAN;
+    case "DISTRIBUTION": return ORANGE;
+    case "EXPANSION": return GREEN;
+    case "EARLY CYCLE": return GREEN;
+    case "MID CYCLE": return GOLD;
+    case "LATE CYCLE": return RED;
+    case "PRE-HALVING": return CYAN;
+    case "CAPITULATION": return PURPLE;
+    case "ABSORPTION": return GREEN;
+    case "ACCUMULATION": return CYAN;
+    case "MOMENTUM": return GOLD;
+    case "EXHAUSTION": return RED;
+    case "RIGHT": return GREEN;
+    case "LEFT": return RED;
+    default: return "#fff";
+  }
+}
+
+// ═══════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════
+function renderCard(title, state, color, desc, rows) {
+  const rowsHtml = rows.map(([l,v,c]) =>
+    `<div class="card-row"><span class="lbl">${l}</span><span class="val" style="${c?`color:${c}`:""}">${v}</span></div>`
+  ).join("");
+  return `
+    <div class="card" style="border-color:${color}33">
+      <div class="card-title">${title}</div>
+      <div class="card-state" style="color:${color}">${state}</div>
+      <div class="card-desc">${desc}</div>
+      <div class="card-rows">${rowsHtml}</div>
+    </div>
+  `;
+}
+
+function render(today, yest, source) {
+  const { fy, vibe, sig, flow, cyc, price, prevPrice } = today;
+
+  // ── Consensus ──
+  const c = consensus(fy, vibe, sig, flow, cyc);
+  const col = stateColor(c.state);
+  document.getElementById("consensus").style.borderColor = col + "55";
+  document.getElementById("bigState").textContent = c.display;
+  document.getElementById("bigState").style.color = col;
+
+  const voteBreak = c.sources.map(s =>
+    `<span style="color:${stateColor(s.vote)}">${s.name.toUpperCase()}=${s.vote === "BOTTOM_ZONE" ? "BOTTOM" : s.vote}</span>`
+  ).join(" · ");
+  document.getElementById("consensusDetail").innerHTML =
+    `<strong>${c.matchCount}/${c.total} indicators agree.</strong> &nbsp; ${voteBreak}`;
+
+  // ── Price row ──
+  const deltaPct = prevPrice ? ((price - prevPrice) / prevPrice) * 100 : 0;
+  const deltaDollar = prevPrice ? price - prevPrice : 0;
+  const deltaCls = deltaPct >= 0 ? "delta-pos" : "delta-neg";
+  const sign = deltaPct >= 0 ? "+" : "";
+  document.getElementById("priceRow").innerHTML =
+    `<span class="price">$${fmtP(price)}</span> &nbsp; · &nbsp;
+     <span class="${deltaCls}">${sign}${deltaPct.toFixed(2)}%</span> &nbsp;
+     <span class="${deltaCls}">(${sign}$${Math.abs(Math.round(deltaDollar)).toLocaleString()})</span>
+     <span style="color:rgba(255,255,255,0.3)"> from yesterday's close</span>`;
+
+  // ── 5 cards ──
+  const cardsHtml = [];
+
+  // 4-year
+  if (fy) {
+    cardsHtml.push(renderCard(
+      "4-YEAR CYCLE", fy.phase, stateColor(fy.phase),
+      "Halving cycle phase. Low-to-low. The macro backdrop.",
+      [
+        ["DAYS SINCE LOW", `${fy.daysSinceLow} / ${Math.round(fy.avgLength)}`, null],
+        ["PROGRESS", `${Math.round(fy.progress * 100)}%`, null],
+        ["DAYS SINCE HALVING", `${fy.daysSinceHalving}d`, null],
+        ["ATH / DRAWDOWN", `$${fmtP(fy.ath)} · ${(fy.drawdownFromAth*100).toFixed(1)}%`, fy.drawdownFromAth < -0.15 ? RED : null],
+        ["DAYS SINCE ATH", `${fy.daysSinceAth}d`, null],
+        ["PROJ. NEXT LOW", `${fmtMonth(fy.projectedNextLowDate)} · ${fy.daysToProjectedLow}d`, fy.daysToProjectedLow < 200 ? CYAN : null],
+        ["MULTIPLIER", `${fy.currentMultiplier.toFixed(1)}× from bottom`, null],
+      ]
+    ));
+  }
+
+  // Vibe
+  if (vibe) {
+    const desc = vibe.state === "DEPLOY" ? "Wave just reset. Hardcoded 60d." :
+                 vibe.state === "EXIT"   ? "Wave is cresting. Hardcoded 60d." :
+                                            "In the wave. Hardcoded 60d.";
+    cardsHtml.push(renderCard(
+      "VIBE (60D HARDCODED)", vibe.state, stateColor(vibe.state),
+      desc,
+      [
+        ["DAY OF CYCLE", `${vibe.daysSince60} / ${Math.round(vibe.avgLen60)}`, null],
+        ["PROGRESS", `${Math.round(vibe.progress60 * 100)}%`, vibe.progress60 > 0.85 ? RED : vibe.progress60 < 0.2 ? GREEN : null],
+        ["DEPLOY SCORE", `${vibe.deployScore}`, vibe.deployScore >= 4 ? GREEN : null],
+        ["EXIT SCORE", `${vibe.exitScore}`, vibe.exitScore >= 4 ? RED : null],
+        ["MOVE FROM TROUGH", `${(vibe.moveFromTrough*100).toFixed(1)}%`, null],
+        ["MOVE FROM CREST", `${(vibe.moveFromCrest*100).toFixed(1)}%`, vibe.moveFromCrest < -0.05 ? RED : null],
+        ["DAYS LEFT", `~${vibe.daysLeft}d to trough`, null],
+      ]
+    ));
+  }
+
+  // Signal
+  if (sig) {
+    const desc = sig.cycleFallback
+      ? "Adaptive cycle (autocorrelation) — fell back to 60d."
+      : `Adaptive cycle detected ${sig.cycleLen}d (corr ${sig.cycleCorr.toFixed(2)}).`;
+    const cycleDiverges = !sig.cycleFallback && Math.abs(sig.cycleLen - 60) > 5;
+    cardsHtml.push(renderCard(
+      "SIGNAL (ADAPTIVE)", sig.state, stateColor(sig.state),
+      desc,
+      [
+        ["DETECTED CYCLE", `${sig.cycleLen}d ${cycleDiverges ? "<span style='color:"+GOLD+"'>(≠60)</span>" : ""}`, cycleDiverges ? GOLD : null],
+        ["CORR", `${sig.cycleCorr.toFixed(2)}`, sig.cycleCorr < 0.35 ? RED : null],
+        ["DAY OF CYCLE", `${sig.daysSince60} / ${sig.avgLen60}`, null],
+        ["DEPLOY (raw/adj)", `${sig.deployScore} / ${sig.adjDeploy}`, sig.adjDeploy >= 4 ? GREEN : null],
+        ["EXIT (raw/adj)", `${sig.exitScore} / ${sig.adjExit}`, sig.adjExit >= 4 ? RED : null],
+        ["FLOW", sig.flowState, stateColor(sig.flowState)],
+        ["F&G", `${sig.fgValue}`, null],
+      ]
+    ));
+  }
+
+  // Flow
+  if (flow) {
+    const desc =
+      flow.state === "CAPITULATION" ? "Panic selling into institutional hands." :
+      flow.state === "ABSORPTION"   ? "Smart money buying fear." :
+      flow.state === "ACCUMULATION" ? "Quiet building. Volume steady." :
+      flow.state === "MOMENTUM"     ? "Real participation. Conviction." :
+      flow.state === "DISTRIBUTION" ? "Greed with heavy volume. Selling into strength." :
+      flow.state === "EXHAUSTION"   ? "Greed on fumes. No volume." :
+                                       "—";
+    cardsHtml.push(renderCard(
+      "FLOW (F&G + VOL)", flow.state, stateColor(flow.state),
+      desc,
+      [
+        ["F&G", `${flow.fgValue} (${flow.fgLabel})`, null],
+        ["VOL BAND", flow.volBand.toUpperCase(),
+          flow.volBand === "massive" || flow.volBand === "high" ? GREEN :
+          flow.volBand === "thin" ? RED : null],
+        ["VOL RATIO (20d)", `${flow.volRatio20.toFixed(2)}×`, null],
+        ["VOL RATIO (60d)", `${flow.volRatio60.toFixed(2)}×`, null],
+      ]
+    ));
+  }
+
+  // Cycles
+  if (cyc) {
+    const p60 = cyc.daysSince60 / cyc.avgLen60;
+    const stateLabel = cyc.daysSince60 <= 8 ? "RESET" : p60 > 0.85 ? "OVERDUE" : "ACTIVE";
+    const stateCol = cyc.daysSince60 <= 8 ? GREEN : p60 > 0.85 ? RED : GOLD;
+    cardsHtml.push(renderCard(
+      "CYCLES (BRESSERT)", stateLabel, stateCol,
+      `True low-to-low trough detection. Translation: ${cyc.translation60}.`,
+      [
+        ["LAST 60D TROUGH", `${fmtD(cyc.last60Date)}`, null],
+        ["60D TROUGH PRICE", `$${fmtP(cyc.last60Price)}`, null],
+        ["DAYS SINCE", `${cyc.daysSince60}d / ${cyc.avgLen60}d`, null],
+        ["LAST 20D TROUGH", `${fmtD(cyc.last20Date)}`, null],
+        ["20D TROUGH PRICE", `$${fmtP(cyc.last20Price)}`, null],
+        ["DAYS SINCE 20D", `${cyc.daysSince20}d / ${cyc.avgLen20}d`, null],
+        ["TRANSLATION", cyc.translation60, stateColor(cyc.translation60)],
+      ]
+    ));
+  }
+
+  document.getElementById("cards").innerHTML = cardsHtml.join("");
+
+  // ── What changed ──
+  const changes = [];
+  const compare = [
+    ["4-year",   fy?.phase,      yest.fy?.phase],
+    ["vibe",     vibe?.state,    yest.vibe?.state],
+    ["signal",   sig?.state,     yest.sig?.state],
+    ["flow",     flow?.state,    yest.flow?.state],
+    ["cycles trans.", cyc?.translation60, yest.cyc?.translation60],
+  ];
+  for (const [name, today, prev] of compare) {
+    if (today === undefined || prev === undefined) continue;
+    if (today === prev) {
+      changes.push(`<div class="change-row"><span class="label">${name.toUpperCase()}</span><span style="color:rgba(255,255,255,0.5)">${prev}</span> <span class="arrow">→</span> <span style="color:${stateColor(today)}">${today}</span> <span style="color:rgba(255,255,255,0.25); font-size:10px">no change</span></div>`);
+    } else {
+      changes.push(`<div class="change-row flip"><span class="label">${name.toUpperCase()}</span><span style="color:${stateColor(prev)};opacity:0.6">${prev}</span> <span class="arrow">→</span> <span style="color:${stateColor(today)}">${today}</span> &nbsp; <span class="badge" style="background:rgba(255,215,0,0.15);color:${GOLD};border:1px solid ${GOLD}44">FLIP</span></div>`);
+    }
+  }
+  const anyFlip = compare.some(([_,t,p]) => t !== undefined && p !== undefined && t !== p);
+  if (!anyFlip) {
+    changes.unshift(`<div class="nothing">No state transitions in the last 24h — system stable.</div>`);
+  }
+  document.getElementById("changes").innerHTML = changes.join("");
+
+  // ── Setups ──
+  const setups = [];
+
+  // 60d trough nearing (deploy window)
+  if (vibe && vibe.daysSince60 >= 50 && vibe.avgLen60 > 30) {
+    const left = Math.max(0, Math.round(vibe.avgLen60 - vibe.daysSince60));
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(0,230,118,0.15);color:${GREEN};border:1px solid ${GREEN}44">60D TROUGH NEARING</span> &nbsp; vibe cycle at <strong>${Math.round(vibe.progress60*100)}%</strong> (${vibe.daysSince60}d / ${Math.round(vibe.avgLen60)}d). <strong>~${left}d</strong> to next trough — deploy window opening.</div>`);
+  }
+  // Past-crest (exit window)
+  if (vibe && vibe.exitScore >= 4) {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(255,23,68,0.15);color:${RED};border:1px solid ${RED}44">EXIT WINDOW</span> &nbsp; vibe exitScore = <strong>${vibe.exitScore}</strong>, progress60 = <strong>${vibe.progress60.toFixed(2)}</strong>, move from crest = <strong>${(vibe.moveFromCrest*100).toFixed(1)}%</strong>. Wave cresting/crested.</div>`);
+  }
+  if (vibe && vibe.deployScore >= 4) {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(0,230,118,0.15);color:${GREEN};border:1px solid ${GREEN}44">DEPLOY WINDOW</span> &nbsp; vibe deployScore = <strong>${vibe.deployScore}</strong>. Price near trough, cycle young.</div>`);
+  }
+  // 4-year + signal convergence
+  if (fy && (fy.phase === "DISTRIBUTION" || fy.phase === "LATE CYCLE") && sig && sig.state === "EXIT") {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(255,152,0,0.15);color:${ORANGE};border:1px solid ${ORANGE}44">MACRO + MICRO CONVERGE EXIT</span> &nbsp; 4-year = <strong>${fy.phase}</strong> AND signal = <strong>EXIT</strong>. Macro and micro both say take money.</div>`);
+  }
+  if (fy && fy.phase === "EARLY CYCLE" && sig && sig.state === "DEPLOY") {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(0,230,118,0.15);color:${GREEN};border:1px solid ${GREEN}44">MACRO + MICRO CONVERGE DEPLOY</span> &nbsp; 4-year = EARLY CYCLE AND signal = DEPLOY. Both agree go.</div>`);
+  }
+  // Bottom zone proximity
+  if (fy && fy.daysToProjectedLow > 0 && fy.daysToProjectedLow < 200) {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(79,195,247,0.15);color:${CYAN};border:1px solid ${CYAN}44">CYCLE BOTTOM PROXIMITY</span> &nbsp; projected 4yr low <strong>${fmtMonth(fy.projectedNextLowDate)}</strong> · <strong>${fy.daysToProjectedLow}d</strong> out. Drawdown from ATH: <strong>${(fy.drawdownFromAth*100).toFixed(1)}%</strong>.</div>`);
+  }
+  // Volume spike
+  if (flow && (flow.volBand === "massive" || (flow.volRatio20 > 1.6))) {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(224,64,251,0.15);color:${PURPLE};border:1px solid ${PURPLE}44">VOLUME SPIKE</span> &nbsp; vol ${flow.volBand.toUpperCase()}, ratio20 = <strong>${flow.volRatio20.toFixed(2)}×</strong>. Real participation behind the move.</div>`);
+  }
+  // F&G extremes
+  if (flow && flow.fgValue <= 20) {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(0,230,118,0.15);color:${GREEN};border:1px solid ${GREEN}44">EXTREME FEAR</span> &nbsp; F&G = <strong>${flow.fgValue}</strong> (${flow.fgLabel}). Historically deploy territory.</div>`);
+  }
+  if (flow && flow.fgValue >= 80) {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(255,23,68,0.15);color:${RED};border:1px solid ${RED}44">EXTREME GREED</span> &nbsp; F&G = <strong>${flow.fgValue}</strong> (${flow.fgLabel}). Historically exit territory.</div>`);
+  }
+  // 20d cycle reset
+  if (cyc && cyc.daysSince20 <= 5) {
+    setups.push(`<div class="setup-row"><span class="badge" style="background:rgba(79,195,247,0.15);color:${CYAN};border:1px solid ${CYAN}44">20D TROUGH FRESH</span> &nbsp; 20d cycle just reset (<strong>${cyc.daysSince20}d</strong> since trough at $${fmtP(cyc.last20Price)}).</div>`);
+  }
+
+  if (!setups.length) setups.push(`<div class="nothing">No setups firing — system in chop / mid-state.</div>`);
+  document.getElementById("setups").innerHTML = setups.join("");
+
+  // ── Disagreements ──
+  const conflicts = [];
+  // Vibe vs signal
+  if (vibe && sig && vibe.state !== sig.state) {
+    const why = sig.cycleFallback
+      ? "(signal fell back to 60d so logic similar — divergence due to flow boost / regime guards)"
+      : `(signal detected ${sig.cycleLen}d cycle vs vibe's hardcoded 60d, corr=${sig.cycleCorr.toFixed(2)})`;
+    conflicts.push(`<div class="conflict-row">VIBE = <span style="color:${stateColor(vibe.state)}">${vibe.state}</span>, SIGNAL = <span style="color:${stateColor(sig.state)}">${sig.state}</span> ${why}. Signal is usually the leading edge — adaptive sees what 60d hardcoded can't.</div>`);
+  }
+  // 4-year vs vibe/signal
+  if (fy && vibe) {
+    const fyBias = (fy.phase === "EARLY CYCLE") ? "DEPLOY" :
+                   (fy.phase === "LATE CYCLE" || fy.phase === "DISTRIBUTION") ? "EXIT" :
+                   "RIDE";
+    if (fyBias !== vibe.state && fyBias !== "RIDE" && vibe.state !== "RIDE") {
+      conflicts.push(`<div class="conflict-row">4-YEAR macro bias = <span style="color:${stateColor(fyBias)}">${fyBias}</span> (${fy.phase}) vs VIBE micro = <span style="color:${stateColor(vibe.state)}">${vibe.state}</span>. Macro and 60d wave disagree — vibe trades the local wave, 4-year holds the backdrop.</div>`);
+    }
+  }
+  // Flow vs price action (signal)
+  if (sig && flow) {
+    const flowDir = (flow.state === "CAPITULATION" || flow.state === "ABSORPTION") ? "DEPLOY-LEANING" :
+                    (flow.state === "DISTRIBUTION" || flow.state === "EXHAUSTION") ? "EXIT-LEANING" :
+                    "NEUTRAL";
+    if ((flowDir === "DEPLOY-LEANING" && sig.state === "EXIT") ||
+        (flowDir === "EXIT-LEANING" && sig.state === "DEPLOY")) {
+      conflicts.push(`<div class="conflict-row">FLOW = <span style="color:${stateColor(flow.state)}">${flow.state}</span> (${flowDir}) vs SIGNAL timing = <span style="color:${stateColor(sig.state)}">${sig.state}</span>. Conviction conflict — the move and the sentiment disagree.</div>`);
+    }
+  }
+  // Adaptive cycle divergence
+  if (sig && !sig.cycleFallback && Math.abs(sig.cycleLen - 60) > 8) {
+    conflicts.push(`<div class="conflict-row">Adaptive cycle = <strong>${sig.cycleLen}d</strong> (corr=${sig.cycleCorr.toFixed(2)}) — diverges meaningfully from hardcoded 60d. Vibe timing may be off by ${Math.abs(sig.cycleLen - 60)}d.</div>`);
+  }
+  if (!conflicts.length) conflicts.push(`<div class="nothing">No meaningful disagreements — indicators broadly aligned.</div>`);
+  document.getElementById("conflicts").innerHTML = conflicts.join("");
+
+  // ── Footer ──
+  document.getElementById("footer").textContent =
+    `Updated ${new Date().toISOString().slice(0,16).replace("T"," ")} UTC · ` +
+    `Source: ${source}`;
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+const CACHE_KEY = "btc-dashboard-cache-v1";
+
+function saveCache(payload) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(payload)); } catch(e) {}
+}
+function loadCache() {
+  try {
+    const s = localStorage.getItem(CACHE_KEY);
+    if (!s) return null;
+    return JSON.parse(s);
+  } catch(e) { return null; }
+}
+
+function buildSnapshot(data, fng, idx) {
+  return {
+    price: data[idx].price,
+    prevPrice: idx > 0 ? data[idx - 1].price : null,
+    fy:   computeFourYear(data, idx),
+    vibe: computeVibe(data, idx),
+    sig:  computeSignal(data, fng, idx),
+    flow: computeFlow(data, fng, idx),
+    cyc:  computeCycles(data, idx),
+  };
+}
+
+let dotCount = 0;
+const dotTimer = setInterval(() => {
+  dotCount = (dotCount+1)%4;
+  const el = document.getElementById("dots");
+  if (el) el.textContent = ".".repeat(dotCount);
+}, 400);
+
+async function main() {
+  let result = await fetchBTCData();
+  let fng = await fetchFearGreed();
+  let usingCache = false;
+
+  if (!result.data.length) {
+    // Try cache
+    const cached = loadCache();
+    if (cached) {
+      result = { data: cached.data.map(d => ({...d, date: new Date(d.date)})), source: cached.source + " (cached)" };
+      fng = cached.fng.map(f => ({...f, date: new Date(f.date)}));
+      usingCache = true;
+    } else {
+      clearInterval(dotTimer);
+      document.getElementById("loading").innerHTML =
+        '<div style="color:#FF1744;letter-spacing:3px">NO DATA · ALL ENDPOINTS UNREACHABLE</div>';
+      return;
+    }
+  }
+
+  clearInterval(dotTimer);
+
+  // Cache successful fetch
+  if (!usingCache) {
+    saveCache({
+      data: result.data,
+      fng: fng,
+      source: result.source,
+      ts: Date.now(),
+    });
+  }
+
+  const data = result.data;
+  const N = data.length;
+
+  // Build today + yesterday snapshots
+  const today = buildSnapshot(data, fng, N - 1);
+  const yest  = N > 2 ? buildSnapshot(data, fng, N - 2) : today;
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  // Show stale badge if cached
+  let sourceLabel = result.source;
+  if (usingCache) sourceLabel += ` <span class="stale">USING CACHE</span>`;
+  if (!fng.length) sourceLabel += ` <span class="stale">F&G UNAVAILABLE</span>`;
+
+  render(today, yest, sourceLabel);
+}
+
+main();
+</script>
+</body>
+</html>
