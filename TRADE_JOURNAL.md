@@ -76,6 +76,46 @@ Trades where YOUR intuition fired but edge didn't catch it (different timeframe,
 
 ---
 
+
+## AUTO-LOGGED EDGE SIGNALS
+
+*Auto-logged by edge-tracker (Nevada cron). One row per state transition.*
+
+| Date | Transition | Price | Score | Size | Reasons | Took? |
+|---|---|---|---|---|---|---|
+| 2026-01-24 | EXIT → LEAN EXIT | $89,108 | -10 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-01-26 | LEAN EXIT → EXIT | $88,275 | -35 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
+| 2026-02-09 | EXIT → LEAN EXIT | $70,109 | -10 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-02-11 | LEAN EXIT → EXIT | $67,040 | -35 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
+| 2026-02-17 | EXIT → WAIT | $67,478 | +10 | 0/3 | 60D cycle early (day 12 of ~57) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-02-22 | WAIT → BUY | $67,627 | +45 | 2/3 | 20D cycle just troughed (day 4) · 60D cycle early (day 17 of ~57) · 60D troughs breaking lower | |
+| 2026-02-24 | BUY → LEAN BUY | $64,070 | +20 | 1/3 | 60D cycle early (day 19 of ~57) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-02-26 | LEAN BUY → WAIT | $67,498 | +10 | 0/3 | 60D cycle early (day 21 of ~57) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-02-28 | WAIT → BUY | $66,985 | +45 | 2/3 | 20D cycle just troughed (day 4) · 60D cycle early (day 23 of ~57) · 60D troughs breaking lower | |
+| 2026-03-02 | BUY → LEAN BUY | $68,832 | +20 | 1/3 | 60D cycle early (day 25 of ~57) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-03-03 | LEAN BUY → WAIT | $68,338 | +10 | 0/3 | 60D cycle mid-phase · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-03-09 | WAIT → LEAN EXIT | $68,439 | -20 | 0/3 | 60D cycle mid-phase · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-03-12 | LEAN EXIT → LEAN BUY | $70,528 | +25 | 1/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-03-14 | LEAN BUY → WAIT | $71,224 | +0 | 0/3 | 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-03-16 | WAIT → LEAN EXIT | $74,885 | -10 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 20D cycle in topping zone (day 8) | |
+| 2026-03-18 | LEAN EXIT → EXIT | $71,249 | -30 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
+| 2026-03-25 | EXIT → LEAN EXIT | $71,305 | -20 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
+| 2026-03-26 | LEAN EXIT → WAIT | $68,782 | +5 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-03-28 | WAIT → LEAN EXIT | $66,327 | -20 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
+| 2026-03-29 | LEAN EXIT → EXIT | $65,968 | -35 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
+| 2026-04-02 | EXIT → LEAN EXIT | $66,895 | -10 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
+| 2026-04-04 | LEAN EXIT → EXIT | $67,291 | -35 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
+| 2026-04-10 | EXIT → LEAN BUY | $72,990 | +35 | 1/3 | 60D cycle early (day 12 of ~53) · 60D troughs making higher lows · Post-halving expansion window | |
+| 2026-04-15 | LEAN BUY → BUY | $74,831 | +45 | 3/3 | 60D cycle early (day 17 of ~53) · 60D troughs making higher lows · Post-halving expansion window | |
+| 2026-04-20 | BUY → WAIT | $75,865 | +15 | 0/3 | 60D cycle early (day 22 of ~53) · 60D troughs making higher lows · Late 4-year cycle | |
+| 2026-05-03 | WAIT → LEAN BUY | $78,557 | +30 | 1/3 | 20D cycle just troughed (day 4) · 60D troughs making higher lows · Late 4-year cycle | |
+| 2026-05-05 | LEAN BUY → WAIT | $80,907 | +5 | 0/3 | 60D troughs making higher lows · Late 4-year cycle | |
+| 2026-05-13 | WAIT → LEAN EXIT | $79,291 | -25 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 60D past midpoint, price declining from crest | |
+| 2026-05-14 | LEAN EXIT → WAIT | $81,079 | -5 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 20D cycle in topping zone (day 15) | |
+| 2026-05-15 | WAIT → LEAN EXIT | $79,065 | -25 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 60D past midpoint, price declining from crest | |
+| 2026-05-16 | LEAN EXIT → EXIT | $78,115 | -30 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 60D past midpoint, price declining from crest | |
+
+---
 ## REVIEW LOG — append rows weekly
 
 | Week ending | Edge signals fired | Taken | Declined | $ captured | $ missed | Notes |
