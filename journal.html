@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC — Trade Journal</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    min-height: 100vh; padding: 20px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .container { max-width: 1100px; width: 100%; }
+  h1 { font-size: 22px; letter-spacing: 6px; text-align: center; margin-bottom: 4px; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; text-align: center; margin-bottom: 24px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; margin-bottom: 20px;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+    font-size: 10px; letter-spacing: 2px; color: rgba(255,255,255,0.4); }
+  .topbar a { color: #4FC3F7; text-decoration: none; margin-left: 14px; }
+  .topbar a:hover { color: #00E676; }
+  #content {
+    background: rgba(255,255,255,0.015);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 28px 32px;
+    line-height: 1.6;
+    font-size: 13px;
+  }
+  #content h1 { font-size: 20px; letter-spacing: 4px; margin: 0 0 14px 0; text-align: left; }
+  #content h2 { font-size: 14px; letter-spacing: 3px; margin: 28px 0 12px 0; color: #FFD700; border-bottom: 1px solid rgba(255,215,0,0.15); padding-bottom: 6px; }
+  #content h3 { font-size: 12px; letter-spacing: 2px; margin: 18px 0 10px 0; color: #4FC3F7; }
+  #content p { margin: 10px 0; color: rgba(255,255,255,0.85); }
+  #content em { color: rgba(255,255,255,0.45); font-style: normal; font-size: 11px; letter-spacing: 1px; }
+  #content strong { color: #FFD700; }
+  #content code {
+    background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px;
+    font-size: 12px; color: #00E676;
+  }
+  #content pre {
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);
+    padding: 14px; border-radius: 6px; overflow-x: auto; margin: 12px 0;
+  }
+  #content pre code { background: transparent; color: rgba(255,255,255,0.75); padding: 0; }
+  #content ul, #content ol { margin: 10px 0 10px 24px; }
+  #content li { margin: 4px 0; color: rgba(255,255,255,0.85); }
+  #content hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 24px 0; }
+  #content table {
+    border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 11px;
+  }
+  #content th {
+    background: rgba(255,255,255,0.04); padding: 8px 10px; text-align: left;
+    border: 1px solid rgba(255,255,255,0.06); color: #FFD700; font-weight: 600;
+    letter-spacing: 1px; font-size: 10px; text-transform: uppercase;
+  }
+  #content td {
+    padding: 8px 10px; border: 1px solid rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.85); vertical-align: top;
+  }
+  #content tr:nth-child(even) td { background: rgba(255,255,255,0.01); }
+  #content tr:hover td { background: rgba(255,255,255,0.04); }
+  /* Color hints for missed/captured patterns */
+  #content td:has(strong) strong { color: inherit; }
+  .loading { text-align: center; padding: 60px 0; color: rgba(255,255,255,0.4); }
+  .footer { margin-top: 30px; font-size: 9px; color: rgba(255,255,255,0.15); letter-spacing: 1px; text-align: center; }
+  .error { color: #FF1744; padding: 20px; background: rgba(255,23,68,0.05); border: 1px solid rgba(255,23,68,0.2); border-radius: 6px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>BTC RINGS · TRADE JOURNAL</h1>
+  <div class="subtitle">YOUR CALLS · YOUR RECORD · YOUR EDGE</div>
+
+  <div class="topbar">
+    <span id="lastUpdate">Loading…</span>
+    <span>
+      <a href="dashboard-v2.html">← dashboard v2</a>
+      <a href="PLAYBOOK.md" target="_blank">playbook ↗</a>
+      <a href="nav.html">all indicators</a>
+    </span>
+  </div>
+
+  <div id="content">
+    <div class="loading">LOADING JOURNAL…</div>
+  </div>
+
+  <div class="footer">EDIT THE MARKDOWN FILE TO ADD TRADES · RELOAD THIS PAGE TO SEE CHANGES</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<script>
+(async () => {
+  const url = "TRADE_JOURNAL.md?_=" + Date.now();
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const md = await r.text();
+    // Render via marked
+    marked.setOptions({ gfm: true, breaks: false });
+    document.getElementById("content").innerHTML = marked.parse(md);
+    document.getElementById("lastUpdate").textContent =
+      "LOADED · " + new Date().toLocaleString("en-US", { dateStyle:"short", timeStyle:"short" });
+  } catch (e) {
+    document.getElementById("content").innerHTML =
+      '<div class="error">Failed to load TRADE_JOURNAL.md — ' + (e.message || e) + '<br><br>Path tried: ' + url + '<br><br>If this is local: serve the folder via <code>python3 -m http.server</code> from <code>code/btc-rings-site/</code>, then visit <code>http://localhost:8000/journal.html</code>.</div>';
+    document.getElementById("lastUpdate").textContent = "ERROR";
+  }
+})();
+</script>
+</body>
+</html>
+</parameter>
+</invoke>
