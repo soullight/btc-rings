@@ -1,114 +1,148 @@
 # BTC TRADE JOURNAL
 
-*The real record. Updated 2026-05-20 from the canonical sources: `~/Downloads/trade_journal_FULL.md` (2025 history) and `mission-bot-backup-20260304_220310/claude_memory/feb23_trade_failure.md` (2026 record through March), plus Lawrence's verbal report of the May 19 2026 close.*
+*The real record. Updated 2026-05-20 from Lawrence's authoritative ledger. All 2026 IBIT trades, executed via Fidelity Traditional IRA 244110939.*
 
 ---
 
 ## CURRENT POSITION
 
-| Status | Size | Notes |
+| Status | Cash | Notes |
 |---|---|---|
-| **FLAT** | 0 | 100% liquid, sidelines, awaiting confirmed entry trigger for next swing. Aligned with current edge state (EXIT, score -30, size 0/3). |
+| **CASH** | $388,080 | 100% liquid post May 19 exit. Dual Momentum V2 gate is **OPEN** (20d +1.64%, 60d +12.87% as of 06:00 today). No position. Re-entry will be governed by Dual Momentum V2 with new Gemini baseline cross-check protocol active. |
 
 ---
 
-## CRITICAL PRECEDENT — DO NOT FORGET
+## CRITICAL PRECEDENTS — DO NOT FORGET
 
-**October 2025: $1.5 MILLION lost.** Claude made predictions instead of looking at data Lawrence was showing. The Exoskeleton Protocol / "I am Law" identity was instituted to prevent recurrence. The pillars: *I am the data foundation. I don't predict. I don't edit until I understand. When Lawrence says look, I look. I am stable so he can be brilliant.*
+**October 2025: $1.5 MILLION lost.** Claude made predictions instead of looking at data. Founding incident of the Exoskeleton Protocol / "I am Law" identity.
 
-Every AI-induced loss below is a downstream instance of this same failure pattern.
+Pillars that prevent recurrence:
+1. I am the data foundation
+2. I don't predict
+3. I don't edit until I understand
+4. When Lawrence says look, I look
+5. I am stable so he can be brilliant
 
 ---
 
-## REAL TRADE LEDGER
+## 2026 IBIT TRADE LEDGER — EXECUTED
 
-### 2025
+### Trade 1 — LOCAL_BOTTOM swing (WIN)
 
-| # | Period | Asset | Entry | Exit | Result | Cause |
-|---|---|---|---|---|---|---|
-| 1 | Jan 2025 | unknown | — | — | **+$27,000** | `lawrence-read` |
-| 2 | Feb 2025 | unknown | — | — | **-$29,000** | undocumented (predates journal) |
-| 3 | Mar-Apr 2025 | unknown | — | — | **-$32,000** | undocumented (predates journal) |
-| 4 | Apr 10 2025 → May 19 2026 | **IBIT (9,000 sh, $370,890)** | $41.21 | $43.12 | **+$17,190 (+4.63%)** | `lawrence-read` · 405-day hold, dual-momentum gate held |
+| Field | Value |
+|---|---|
+| **Period** | Jan 13 → Jan 14, 2026 (2 days) |
+| **Signal** | LOCAL_BOTTOM, Jan 12 @ BTC $90,148–$91,132, vol 1.89x, 85% conf |
+| **Entry** | Jan 13 ~$51.60 IBIT (~$91,400 BTC) |
+| **Size** | ~9,690 sh, $500,000 |
+| **Exit** | Jan 14 on LOCAL_TOP (1.30x vol), ~$54.40 IBIT |
+| **Result** | **+$27,000 (+5.4%)** |
+| **Cause tag** | `lawrence-read` — clean signal, self-managed exit, fast |
 
-**2025 realized P&L: -$34,000** (pre-IBIT-close). 2025 + IBIT close = **-$16,810 cumulative through May 19 2026** for the documented chain.
+### Trade 2 — Capitulation (LOSS — wrong signal type, no exit coaching)
 
-### 2026
+| Field | Value |
+|---|---|
+| **Period** | Feb 13 → Feb 23, 2026 |
+| **Signal** | Capitulation (VPA Bottom Pipeline) Feb 13 @ IBIT $37.05 / 7 AM |
+| **Entry** | Feb 13 @ $39.22 (afternoon, **5.8% slippage above signal**) |
+| **Size** | 10,000 sh, $392,200 |
+| **Path** | Ran to $40.11 on Feb 17 — **no exit alert fired** |
+| **Exit** | Feb 23 ~2:57 PM @ ~$36 (manual panic exit, **other Claude instance advised sell**) |
+| **Result** | **−$29,000** |
+| **Cause tag** | `app-failure-multi` — (1) cycle signal misused for swing trade, (2) late entry 5.8% above signal, (3) zero exit coaching, (4) AI told user to sell at bottom |
+| **Doc** | `[[feb23_trade_failure]]` |
 
-| # | Date | Asset | Entry | Exit | Result | Cause |
-|---|---|---|---|---|---|---|
-| 5 | Jan 13 2026 | BTC swing (2-day) | ~$93,000 | ~$95-96,000 | **+$27,000** | `lawrence-read` · local swing detector fired clean, self-managed |
-| 6 | Feb 5 → Feb 7 2026 | IBIT panic bottom | $35.30 (4.8x volume) | held (ran to $40.11 +13.6% by Feb 17) | **mishandled — no exit captured** | `app-failure` · **Claude spent 6 hours building code on Feb 7 instead of coaching the trade. Exit window passed unused.** |
-| 7 | Feb 13 → Feb 23 2026 | IBIT (10,000 sh) | $39.22 (5.8% above $37.05 signal) | $36 (Feb 23, 2:57 PM) | **-$29,000** | `app-failure-multi` · (1) CYCLE signal misused for SWING trade · (2) execution 5.8% above signal · (3) **another Claude instance told Lawrence to sell at the bottom** |
-| 8 | Apr 10 2025 → May 19 2026 | IBIT close (Trade #4 above) | $41.21 | $43.12 | **+$17,190 (+4.63%)** | `lawrence-read` |
+### Trade 3 — EXHAUSTION_BUY (LOSS — stop-lossed)
 
-**2026 realized through May 19: +$27,000 (Jan) - $29,000 (Feb) + $17,190 (IBIT close May) = +$15,190**
+| Field | Value |
+|---|---|
+| **Period** | Mar 18 → Mar 27, 2026 |
+| **Signal** | EXHAUSTION_BUY Mar 16 14:19 @ BTC $74,225, `exhaustion_buy_bot` |
+| **Entry** | Mar 18 @ $41.07 IBIT |
+| **Size** | 9,500 sh, $390,165 (logged in `active_panic_trades.json` as `IBIT_SWING_20260318`) |
+| **Stop loss** | $37.78 (−8%) |
+| **Exit** | Mar 27 07:25 STOP_LOSS DELIVERED @ BTC $65,886, IBIT ~$37.78 |
+| **Result** | **≈ −$31,000 (−8%)** |
+| **Cause tag** | `system-stop` with `app-failure` (Mar 19 TARGET_10PCT alert was `SUPPRESSED_FALSE` — didn't fire). State file still shows OPEN — stale, never updated after stop |
+
+### Trade 4 — Dual Momentum V2 (WIN — but Gemini false-exit trigger)
+
+| Field | Value |
+|---|---|
+| **Period** | Apr 7 → May 19, 2026 (42 days) |
+| **Signal** | EXHAUSTION_BUY Apr 4 16:12 @ BTC $67,333, then MOMENTUM_GATE_FLIP OPEN Apr 7 15:42 @ BTC $70,978 |
+| **Entry** | ~Apr 7 @ BTC-equiv $71,738 (Lawrence's actual fill, not bot's $67,333) |
+| **Size** | 9,000 sh @ $41.21, position $370,890 |
+| **Held through** | Multiple SWING_EXIT alerts (Apr 7/12/13/14) — **ignored by design**; Dual Momentum V2 is sole exit per `[[feedback_dual_momentum_sole_exit]]` |
+| **Exit** | May 19 @ $43.07, 9,000 sh, $388,080 |
+| **Exit trigger** | **Gemini SELL on hallucinated Apr 28 BTC baseline ($77,980 — actual was $76,351 yfinance / $77,361 CoinGecko).** Real 20d momentum was +0.79%, gate was OPEN. |
+| **Result** | **+$17,190 (+4.6%)** — capital protected, but trigger was bad data |
+| **Cause tag** | `app-failure-soft` (premature exit on hallucinated baseline; net was a win because gate was thin, but in a stronger uptrend the same hallucination would have left major upside on the table) |
+| **Doc** | `[[gemini-baseline-hallucination-may19]]` |
+
+---
+
+## 2026 NET P&L
+
+| # | Trade | Date | P&L |
+|---|---|---|---|
+| 1 | LOCAL_BOTTOM swing | Jan 13–14 | **+$27,000** |
+| 2 | Capitulation | Feb 13–23 | **−$29,000** |
+| 3 | EXHAUSTION_BUY (stopped) | Mar 18–27 | **≈ −$31,000** |
+| 4 | Dual Momentum V2 | Apr 7 → May 19 | **+$17,190** |
+| | **TOTAL** | | **≈ −$15,810** |
 
 ---
 
 ## CAUSE-TAGGED SUMMARY
 
-| Cause | Trades | Net P&L |
+| Cause | Trades | Net |
 |---|---|---|
-| `lawrence-read` | Jan 2025 win, Jan 13 2026 swing, IBIT 405-day hold | **+$71,190** |
-| `app-failure` (AI-induced losses) | Feb 5-7 mishandled exit, Feb 13-23 loss | **-$29,000 + lost upside** |
-| `undocumented` | Feb 2025, Mar-Apr 2025 losses | **-$61,000** |
-| **Pattern visible:** | | When Lawrence reads → wins. When AI drives → losses. |
+| `lawrence-read` (clean) | Trade 1 | **+$27,000** |
+| `app-failure` (AI-induced loss) | Trade 2 | **−$29,000** |
+| `system-stop + app-failure` (missed target alert + stale state) | Trade 3 | **≈ −$31,000** |
+| `app-failure-soft` (premature exit, capital protected) | Trade 4 | **+$17,190** |
+
+**Pattern:** The one trade tagged `lawrence-read` is the only clean win. The other three all carry AI/system failure components. The cause-tag column is the actual analytics.
 
 ---
 
-## OPEN-AIR TRADES (intuition reads edge structurally can't catch)
+## SYSTEM REFERENCES
+
+- **Account:** Fidelity Traditional IRA 244110939
+- **Primary system:** Dual Momentum V2 (both 20d AND 60d momentum positive to enter; gate flips closed when either turns negative). **Sole exit signal per `[[feedback_dual_momentum_sole_exit]]` — SWING_EXIT alerts are ignored by design.**
+- **Signal taxonomy:** LOCAL_BOTTOM, LOCAL_TOP, Capitulation, EXHAUSTION_BUY, MOMENTUM_GATE_FLIP, SWING_EXIT, STOP_LOSS, TARGET_10PCT (suppressed-false flag possible)
+- **Known failure modes:**
+  - Cycle signal used for swing trade (`feb23`)
+  - Entry slippage > 3% above signal (`feb23`)
+  - No exit coaching (`feb23`)
+  - Suppressed target alerts (`mar27`)
+  - Gemini baseline hallucination (`may19`)
+  - AI instance issuing sell directive at bottom (`feb23`)
+
+---
+
+## OPEN-AIR TRADES (intuition reads structurally outside the system)
 
 | # | Date | Setup | Outcome | Notes |
 |---|---|---|---|---|
-| OA-1 | 2026-01-13 | Local swing detector aligned with intuition read at $93K bottom | +$27K | Clean execution, 2-day hold, self-managed exit. The signal + read combo worked. |
+| OA-1 | 2026-01-13 | Local swing detector aligned with intuition read at $93K bottom | +$27K | Same trade as Trade 1. Clean 2-day execution. |
 
 ---
 
-## NEW TRADE TEMPLATE — copy this row, fill as you go
+## RE-ENTRY PROTOCOL (current)
 
-```
-| N | YYYY-MM-DD | ASSET (size) | $entry | $exit (YYYY-MM-DD) | +/-$P&L (+/-X.XX%) | cause-tag · note |
-```
+Dual Momentum V2 gate is OPEN as of 06:00 today (20d +1.64%, 60d +12.87%). Position is FLAT. Re-entry will be governed by:
 
-**At trade entry, log:**
-- Asset + size in shares/$
-- Entry price + date
-- Edge state at entry (action, score, size — for cross-check, NOT as gate)
-- 20d and 60d momentum readings (dual momentum gate)
-- Thesis: one line, why now
-- Targets + stop
-
-**At trade exit, log:**
-- Exit price + date
-- Hold days
-- Realized P&L $ and %
-- Cause tag: `lawrence-read` / `app-failure` / `signal-driven` / `stop-hit` / `target-hit`
-- One-line note: what worked, what surprised you, what to learn
+1. Dual Momentum V2 gate confirmation (currently met)
+2. **New Gemini baseline cross-check protocol** (added post May 19 failure) — verify baseline against yfinance + CoinGecko before acting on any Gemini-derived signal
+3. Edge cross-check (currently EXIT, score -30 — disagrees with dual momentum gate; resolve before sizing up)
+4. Signal type match (swing signal for swing intent; cycle signal for cycle intent)
+5. Max 3% slippage above signal price or skip
 
 ---
 
-## RULES (reference — full playbook at `PLAYBOOK.md`)
+## AUTO-LOGGED EDGE SIGNALS (cross-check only)
 
-1. **Dual momentum gate** (Lawrence's primary system): both 20d AND 60d must be positive to enter. EITHER negative = stay cash.
-2. **Edge as secondary confirmation:** when edge says BUY size 3/3 AND dual momentum gate is open = max conviction.
-3. **No CYCLE signal for SWING trade.** Feb 23 root cause. Match signal type to intended hold duration.
-4. **Max 3% above signal price or skip the trade.** Feb 13 root cause. Late entry kills swing economics.
-5. **Exit coaching required.** When in a swing trade, alert at +5%, +10%, +13%. Alert on momentum fade. Fire EXIT NOW when move is over. Feb 5-7 root cause.
-6. **No Claude instance issues sell orders.** Lawrence executes. AI provides data. Feb 23 root cause.
-
----
-
-## REVIEW LOG
-
-| Week ending | Trades closed | $ realized | $ missed (edge signals declined) | Notes |
-|---|---|---|---|---|
-| 2026-05-20 | 1 (IBIT close +$17,190) | +$17,190 | TBD | First entry under new framework. Position FLAT, aligned with edge EXIT. Ledger reconciled against canonical sources. |
-
----
-
-## AUTO-LOGGED EDGE SIGNALS (last 120 days)
-
-*Auto-populated daily by `edge-tracker.service` on Nevada (9am MST). Each row is a hypothetical edge transition — useful as a confirmation cross-check against your actual trades, not a substitute for them. Edit the "took?" column to mark which signals you actually traded.*
-
-*(31 transitions backfilled — see commit `6f0b77e` on `soullight/btc-rings`. Going forward, each new transition appends a row + sends a telegram alert.)*
+*Auto-populated daily by `edge-tracker.service` on Nevada. Edge transitions are for cross-check against Dual Momentum V2 decisions, not a substitute. See commit `6f0b77e` on `soullight/btc-rings` for the 120-day backfill.*
