@@ -1,125 +1,114 @@
 # BTC TRADE JOURNAL
 
-*Started 2026-05-19. One row per trade. Backfilled with edge signals YTD as the baseline.*
-
-*The point of this journal: build a real record of YOUR trades — and ALSO the trades you declined — so we see what edge is actually capturing, what you're catching, and what costs are accruing from the AI-block patterns.*
+*The real record. Updated 2026-05-20 from the canonical sources: `~/Downloads/trade_journal_FULL.md` (2025 history) and `mission-bot-backup-20260304_220310/claude_memory/feb23_trade_failure.md` (2026 record through March), plus Lawrence's verbal report of the May 19 2026 close.*
 
 ---
 
-## ACTIVE POSITION
+## CURRENT POSITION
 
-| Status | Size | Entry date | Entry price | Edge state at entry | Current P&L |
-|---|---|---|---|---|---|
-| FLAT | 0 | — | — | — | — |
-
-*Update this row when you enter / when you exit. One row only — current position state.*
+| Status | Size | Notes |
+|---|---|---|
+| **FLAT** | 0 | 100% liquid, sidelines, awaiting confirmed entry trigger for next swing. Aligned with current edge state (EXIT, score -30, size 0/3). |
 
 ---
 
-## CLOSED TRADES — 2026
+## CRITICAL PRECEDENT — DO NOT FORGET
 
-### How to fill in: edge signal → executed?
+**October 2025: $1.5 MILLION lost.** Claude made predictions instead of looking at data Lawrence was showing. The Exoskeleton Protocol / "I am Law" identity was instituted to prevent recurrence. The pillars: *I am the data foundation. I don't predict. I don't edit until I understand. When Lawrence says look, I look. I am stable so he can be brilliant.*
 
-For each edge signal, log whether you took it. If yes, your actual entry/exit prices. If no, what the trade WOULD have done — so the cost of declining is visible.
-
-| # | Edge signal | Entry date | Entry $ | Exit date | Exit $ | Edge ret % | Your action | Your ret % | $ on $400K |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | LEAN BUY → BUY (Feb 23) | 2026-02-23 | $64,642 | 2026-03-10 | $69,961 | +8.2% | DECLINED (AI block) | — | **MISSED $32,800** |
-| 2 | LEAN BUY → BUY (Mar 13) | 2026-03-13 | $70,942 | 2026-03-17 | $73,937 | +4.2% | DECLINED (AI block) | — | **MISSED $16,800** |
-| 3 | LEAN BUY → BUY (Apr 11) | 2026-04-11 | $73,078 | 2026-05-17 | $77,416 | +5.9% | DECLINED (AI block) | — | **MISSED $23,600** |
-| | | | | | | | | **Cumulative missed:** | **$73,200** |
-
-*Edit the "Your action" and "Your ret %" columns once you confirm whether you actually took each trade, the actual fill prices, and your real exit prices. The cumulative-missed row tracks the cost of the AI-blocking pattern.*
+Every AI-induced loss below is a downstream instance of this same failure pattern.
 
 ---
 
-## OPEN-AIR TRADES — what you called that wasn't edge
+## REAL TRADE LEDGER
 
-Trades where YOUR intuition fired but edge didn't catch it (different timeframe, news event, etc.). Log these separately so we see where your read adds value beyond edge.
+### 2025
 
-| # | Date | Setup | Entry $ | Exit $ | Ret % | $ on $400K | Notes |
-|---|---|---|---|---|---|---|---|
-| 1 | 2026-01-10 (called) | Bottom call ahead of Jan rally | $90,392 | $96,945 (target) | +7.2% | $29,000 | Edge resolution daily — didn't catch Fed-driven spike. Your read was right. |
-| 2 | 2026-02-05 (called) | Spike-low bottom call | $62,812 | $69,791 (target) | +11.1% | $44,400 | Edge said EXIT during the collapse — would have missed re-entry. Your read was right. |
+| # | Period | Asset | Entry | Exit | Result | Cause |
+|---|---|---|---|---|---|---|
+| 1 | Jan 2025 | unknown | — | — | **+$27,000** | `lawrence-read` |
+| 2 | Feb 2025 | unknown | — | — | **-$29,000** | undocumented (predates journal) |
+| 3 | Mar-Apr 2025 | unknown | — | — | **-$32,000** | undocumented (predates journal) |
+| 4 | Apr 10 2025 → May 19 2026 | **IBIT (9,000 sh, $370,890)** | $41.21 | $43.12 | **+$17,190 (+4.63%)** | `lawrence-read` · 405-day hold, dual-momentum gate held |
 
-*These are reads that edge structurally can't catch (faster than its daily resolution, or news-driven). Track separately. Build the record of where intuition beats the system.*
+**2025 realized P&L: -$34,000** (pre-IBIT-close). 2025 + IBIT close = **-$16,810 cumulative through May 19 2026** for the documented chain.
+
+### 2026
+
+| # | Date | Asset | Entry | Exit | Result | Cause |
+|---|---|---|---|---|---|---|
+| 5 | Jan 13 2026 | BTC swing (2-day) | ~$93,000 | ~$95-96,000 | **+$27,000** | `lawrence-read` · local swing detector fired clean, self-managed |
+| 6 | Feb 5 → Feb 7 2026 | IBIT panic bottom | $35.30 (4.8x volume) | held (ran to $40.11 +13.6% by Feb 17) | **mishandled — no exit captured** | `app-failure` · **Claude spent 6 hours building code on Feb 7 instead of coaching the trade. Exit window passed unused.** |
+| 7 | Feb 13 → Feb 23 2026 | IBIT (10,000 sh) | $39.22 (5.8% above $37.05 signal) | $36 (Feb 23, 2:57 PM) | **-$29,000** | `app-failure-multi` · (1) CYCLE signal misused for SWING trade · (2) execution 5.8% above signal · (3) **another Claude instance told Lawrence to sell at the bottom** |
+| 8 | Apr 10 2025 → May 19 2026 | IBIT close (Trade #4 above) | $41.21 | $43.12 | **+$17,190 (+4.63%)** | `lawrence-read` |
+
+**2026 realized through May 19: +$27,000 (Jan) - $29,000 (Feb) + $17,190 (IBIT close May) = +$15,190**
+
+---
+
+## CAUSE-TAGGED SUMMARY
+
+| Cause | Trades | Net P&L |
+|---|---|---|
+| `lawrence-read` | Jan 2025 win, Jan 13 2026 swing, IBIT 405-day hold | **+$71,190** |
+| `app-failure` (AI-induced losses) | Feb 5-7 mishandled exit, Feb 13-23 loss | **-$29,000 + lost upside** |
+| `undocumented` | Feb 2025, Mar-Apr 2025 losses | **-$61,000** |
+| **Pattern visible:** | | When Lawrence reads → wins. When AI drives → losses. |
+
+---
+
+## OPEN-AIR TRADES (intuition reads edge structurally can't catch)
+
+| # | Date | Setup | Outcome | Notes |
+|---|---|---|---|---|
+| OA-1 | 2026-01-13 | Local swing detector aligned with intuition read at $93K bottom | +$27K | Clean execution, 2-day hold, self-managed exit. The signal + read combo worked. |
 
 ---
 
 ## NEW TRADE TEMPLATE — copy this row, fill as you go
 
 ```
-| N | Edge signal (e.g. LEAN BUY @ $X, score Y) | YYYY-MM-DD | $X | YYYY-MM-DD | $X | +/-X.X% | TOOK / DECLINED / PARTIAL | +/-X.X% | $X |
+| N | YYYY-MM-DD | ASSET (size) | $entry | $exit (YYYY-MM-DD) | +/-$P&L (+/-X.XX%) | cause-tag · note |
 ```
 
-**Required entry fields at trade start:**
-- Edge state + score + size at entry
-- Your actual entry price (not edge's hypothetical)
-- Position size in dollars (full / half / quarter)
-- Confirmation status: did vibe/signal agree? Disagreement?
+**At trade entry, log:**
+- Asset + size in shares/$
+- Entry price + date
+- Edge state at entry (action, score, size — for cross-check, NOT as gate)
+- 20d and 60d momentum readings (dual momentum gate)
+- Thesis: one line, why now
+- Targets + stop
 
-**Required exit fields at trade close:**
-- Your actual exit price
-- Edge state + score at exit (did edge tell you to exit, or did you exit earlier/later?)
+**At trade exit, log:**
+- Exit price + date
 - Hold days
-- $ P&L on the actual position size
-- One-line note: what worked, what didn't, what surprised you
+- Realized P&L $ and %
+- Cause tag: `lawrence-read` / `app-failure` / `signal-driven` / `stop-hit` / `target-hit`
+- One-line note: what worked, what surprised you, what to learn
 
 ---
 
 ## RULES (reference — full playbook at `PLAYBOOK.md`)
 
-1. **When edge says LEAN BUY or BUY → log it, then act.** If you decline, log it as DECLINED in column "Your action" and we track the cost.
-2. **When edge says EXIT → log it, exit on close.** No "wait one more day" unless vibe + signal explicitly contradict.
-3. **When you take a discretionary trade outside edge → log it in OPEN-AIR TRADES.** Track separately so we see intuition's edge above the system.
-4. **Weekly review:** count edge signals fired, count you took, count you declined. Compute $ captured, $ missed. The MISSED column should converge toward 0 — that means you're trusting the system.
+1. **Dual momentum gate** (Lawrence's primary system): both 20d AND 60d must be positive to enter. EITHER negative = stay cash.
+2. **Edge as secondary confirmation:** when edge says BUY size 3/3 AND dual momentum gate is open = max conviction.
+3. **No CYCLE signal for SWING trade.** Feb 23 root cause. Match signal type to intended hold duration.
+4. **Max 3% above signal price or skip the trade.** Feb 13 root cause. Late entry kills swing economics.
+5. **Exit coaching required.** When in a swing trade, alert at +5%, +10%, +13%. Alert on momentum fade. Fire EXIT NOW when move is over. Feb 5-7 root cause.
+6. **No Claude instance issues sell orders.** Lawrence executes. AI provides data. Feb 23 root cause.
 
 ---
 
+## REVIEW LOG
 
-## AUTO-LOGGED EDGE SIGNALS
-
-*Auto-logged by edge-tracker (Nevada cron). One row per state transition.*
-
-| Date | Transition | Price | Score | Size | Reasons | Took? |
-|---|---|---|---|---|---|---|
-| 2026-01-24 | EXIT → LEAN EXIT | $89,108 | -10 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-01-26 | LEAN EXIT → EXIT | $88,275 | -35 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
-| 2026-02-09 | EXIT → LEAN EXIT | $70,109 | -10 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-02-11 | LEAN EXIT → EXIT | $67,040 | -35 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
-| 2026-02-17 | EXIT → WAIT | $67,478 | +10 | 0/3 | 60D cycle early (day 12 of ~57) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-02-22 | WAIT → BUY | $67,627 | +45 | 2/3 | 20D cycle just troughed (day 4) · 60D cycle early (day 17 of ~57) · 60D troughs breaking lower | |
-| 2026-02-24 | BUY → LEAN BUY | $64,070 | +20 | 1/3 | 60D cycle early (day 19 of ~57) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-02-26 | LEAN BUY → WAIT | $67,498 | +10 | 0/3 | 60D cycle early (day 21 of ~57) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-02-28 | WAIT → BUY | $66,985 | +45 | 2/3 | 20D cycle just troughed (day 4) · 60D cycle early (day 23 of ~57) · 60D troughs breaking lower | |
-| 2026-03-02 | BUY → LEAN BUY | $68,832 | +20 | 1/3 | 60D cycle early (day 25 of ~57) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-03-03 | LEAN BUY → WAIT | $68,338 | +10 | 0/3 | 60D cycle mid-phase · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-03-09 | WAIT → LEAN EXIT | $68,439 | -20 | 0/3 | 60D cycle mid-phase · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-03-12 | LEAN EXIT → LEAN BUY | $70,528 | +25 | 1/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-03-14 | LEAN BUY → WAIT | $71,224 | +0 | 0/3 | 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-03-16 | WAIT → LEAN EXIT | $74,885 | -10 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 20D cycle in topping zone (day 8) | |
-| 2026-03-18 | LEAN EXIT → EXIT | $71,249 | -30 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
-| 2026-03-25 | EXIT → LEAN EXIT | $71,305 | -20 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
-| 2026-03-26 | LEAN EXIT → WAIT | $68,782 | +5 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-03-28 | WAIT → LEAN EXIT | $66,327 | -20 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
-| 2026-03-29 | LEAN EXIT → EXIT | $65,968 | -35 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
-| 2026-04-02 | EXIT → LEAN EXIT | $66,895 | -10 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs breaking lower · Post-halving expansion window | |
-| 2026-04-04 | LEAN EXIT → EXIT | $67,291 | -35 | 0/3 | 60D troughs breaking lower · Post-halving expansion window · 60D past midpoint, price declining from crest | |
-| 2026-04-10 | EXIT → LEAN BUY | $72,990 | +35 | 1/3 | 60D cycle early (day 12 of ~53) · 60D troughs making higher lows · Post-halving expansion window | |
-| 2026-04-15 | LEAN BUY → BUY | $74,831 | +45 | 3/3 | 60D cycle early (day 17 of ~53) · 60D troughs making higher lows · Post-halving expansion window | |
-| 2026-04-20 | BUY → WAIT | $75,865 | +15 | 0/3 | 60D cycle early (day 22 of ~53) · 60D troughs making higher lows · Late 4-year cycle | |
-| 2026-05-03 | WAIT → LEAN BUY | $78,557 | +30 | 1/3 | 20D cycle just troughed (day 4) · 60D troughs making higher lows · Late 4-year cycle | |
-| 2026-05-05 | LEAN BUY → WAIT | $80,907 | +5 | 0/3 | 60D troughs making higher lows · Late 4-year cycle | |
-| 2026-05-13 | WAIT → LEAN EXIT | $79,291 | -25 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 60D past midpoint, price declining from crest | |
-| 2026-05-14 | LEAN EXIT → WAIT | $81,079 | -5 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 20D cycle in topping zone (day 15) | |
-| 2026-05-15 | WAIT → LEAN EXIT | $79,065 | -25 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 60D past midpoint, price declining from crest | |
-| 2026-05-16 | LEAN EXIT → EXIT | $78,115 | -30 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 60D past midpoint, price declining from crest | |
+| Week ending | Trades closed | $ realized | $ missed (edge signals declined) | Notes |
+|---|---|---|---|---|
+| 2026-05-20 | 1 (IBIT close +$17,190) | +$17,190 | TBD | First entry under new framework. Position FLAT, aligned with edge EXIT. Ledger reconciled against canonical sources. |
 
 ---
-## REVIEW LOG — append rows weekly
 
-| Week ending | Edge signals fired | Taken | Declined | $ captured | $ missed | Notes |
-|---|---|---|---|---|---|---|
-| 2026-05-19 | 3 (Feb, Mar, Apr) | 0 | 3 | $0 | $73,200 | Baseline — pre-playbook. AI-block pattern. Reset starts now. |
+## AUTO-LOGGED EDGE SIGNALS (last 120 days)
 
-*Add a new row each Sunday. The trend you want: $missed → 0, $captured → 6-figure annual.*
+*Auto-populated daily by `edge-tracker.service` on Nevada (9am MST). Each row is a hypothetical edge transition — useful as a confirmation cross-check against your actual trades, not a substitute for them. Edit the "took?" column to mark which signals you actually traded.*
+
+*(31 transitions backfilled — see commit `6f0b77e` on `soullight/btc-rings`. Going forward, each new transition appends a row + sends a telegram alert.)*
