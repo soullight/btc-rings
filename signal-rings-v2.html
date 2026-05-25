@@ -427,11 +427,29 @@ function drawRings(canvas, ctx) {
 
   // ── Center text block ──
 
-  ctx.font = '700 30px "SF Mono", monospace';
-  ctx.fillStyle = '#fff';
+  // Price color = signal color (green/amber/red) based on MA-structure health
+  // — instant visual read of trend without reading the dots or label
+  const priceColor = aboveCount >= 3 ? '#00E676'
+                   : aboveCount >= 2 ? '#FF9100'
+                   : '#FF1744';
+
+  // Subtle directional arrow next to price (▲ if 3+/4 cleared, ▼ if 1-/4, • if 2/4 neutral)
+  const trendArrow = aboveCount >= 3 ? ' ▲' : aboveCount <= 1 ? ' ▼' : '';
+
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('$' + price.toLocaleString('en-US', { maximumFractionDigits: 0 }), cx, cy - 22);
+
+  // Outer glow pass (drawn first, behind the price)
+  ctx.font = '800 34px "SF Mono", monospace';
+  ctx.shadowColor = priceColor;
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = priceColor;
+  ctx.fillText('$' + price.toLocaleString('en-US', { maximumFractionDigits: 0 }) + trendArrow, cx, cy - 22);
+  // Second pass for stronger "thick" rendering
+  ctx.shadowBlur = 6;
+  ctx.fillText('$' + price.toLocaleString('en-US', { maximumFractionDigits: 0 }) + trendArrow, cx, cy - 22);
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
 
   ctx.font = '600 9px "SF Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
