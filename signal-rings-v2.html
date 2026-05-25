@@ -99,6 +99,9 @@
 <div style="text-align:center;">
   <h1>SIGNAL RINGS · V2</h1>
   <div class="subtitle">FIXED RADII · STATUS DOTS · CLOCK LABELS · ONE GLANCE</div>
+  <div style="margin-top:8px; font-size:9px; letter-spacing:2px;">
+    <a href="./regime.html" style="color:rgba(255,215,0,0.7); text-decoration:none; border:1px solid rgba(255,215,0,0.25); padding:3px 10px; border-radius:12px;">→ REGIME RINGS (INSTITUTIONAL MAP)</a>
+  </div>
 </div>
 
 <div id="loading" class="loading">
@@ -462,14 +465,16 @@ function drawRings(canvas, ctx) {
     const lx = cx + Math.cos(ring.labelClock) * labelR;
     const ly = cy + Math.sin(ring.labelClock) * labelR;
 
+    // Label name — white for readability (was tinted by ring color; user said make white)
     ctx.font = '700 11px "SF Mono", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = isAth || isAbove ? ring.color : ring.color + 'B0';
+    ctx.fillStyle = '#ffffff';
     ctx.fillText(ring.label, lx, ly - 7);
 
+    // Price under the label — slightly dimmer so the label name pops more
     ctx.font = '500 9px "SF Mono", monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
     ctx.fillText('$' + ring.value.toLocaleString('en-US', { maximumFractionDigits: 0 }), lx, ly + 6);
   });
 

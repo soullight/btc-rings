@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REGIME RINGS — Institutional Map</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 8px; color: rgba(255,255,255,0.9); }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; margin-top: 6px; }
+  canvas { border-radius: 12px; margin-top: 16px; }
+  .loading { text-align: center; padding: 80px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(255,215,0,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 10px 0;
+    background: rgba(255,215,0,0.08); border: 1px solid rgba(255,215,0,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; box-shadow:0 0 6px currentColor; }
+  .bottom-bar {
+    margin-top: 16px; max-width: 700px; width: 100%;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  }
+  .bottom-card {
+    padding: 12px 14px; border-radius: 8px;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
+    text-align: center;
+  }
+  .bottom-card .lbl { font-size: 8px; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
+  .bottom-card .val { font-size: 16px; font-weight: 700; }
+  .bottom-card .sub { font-size: 9px; color: rgba(255,255,255,0.25); margin-top: 4px; }
+  .breakdown {
+    margin-top: 14px; max-width: 700px; width: 100%;
+    padding: 12px 16px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 1px;
+    line-height: 1.7;
+  }
+  .breakdown .row { display: flex; justify-content: space-between; gap: 12px; }
+  .breakdown .lbl-bk { color: rgba(255,255,255,0.3); }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.12); letter-spacing: 1px; text-align:center; }
+  #refresh {
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15);
+    color:rgba(255,255,255,0.6); font-family:inherit; font-size:10px; letter-spacing:2px;
+    padding:7px 16px; border-radius:6px; cursor:pointer; transition:all .15s;
+    margin-top: 14px;
+  }
+  #refresh:hover { background:rgba(255,255,255,0.1); color:#fff; }
+  #refresh:disabled { opacity:0.4; cursor:wait; }
+  @media (max-width: 600px) {
+    .bottom-bar { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>REGIME RINGS</h1>
+  <div class="subtitle">INSTITUTIONAL MAP · BUY BLOOD · SELL GOLD</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">LOADING REGIME<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot" id="badgeDot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="bottomBar" class="bottom-bar"></div>
+  <div id="breakdown" class="breakdown"></div>
+  <button id="refresh">RELOAD</button>
+  <div class="footer" id="footer">REGIME = (CASCADE + RATES + CYCLE) / 3 · TROUGH 2026-03-29 @ $65,968</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG — KNOBS YOU MAY ADJUST
+// ═══════════════════════════════════════════════
+const TROUGH_DATE = new Date('2026-03-29T00:00:00Z');
+const TROUGH_PRICE = 65968;
+const CYCLE_LEN = 60;
+const ASSETS = ['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','TIAUSDT','TRXUSDT'];
+const ZONE_BLOOD = -40;   // regime <= this → BLOOD ZONE → BUY
+const ZONE_GOLD = 40;     // regime >= this → GOLD ZONE → SELL
+
+// ═══════════════════════════════════════════════
+// FETCH
+// ═══════════════════════════════════════════════
+async function fetchKlines(symbol, interval, limit){
+  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+  if(!r.ok) throw new Error('Binance '+symbol+' '+r.status);
+  return r.json();
+}
+
+async function fetchYahoo(symbol){
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1y&interval=1d`;
+  const proxies = [
+    u => u,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  ];
+  for(const p of proxies){
+    try{
+      const r = await fetch(p(url));
+      if(!r.ok) continue;
+      const j = await r.json();
+      const closes = j.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
+      const arr = closes.filter(x => x !== null);
+      if(arr.length > 50) return arr;
+    }catch(e){continue;}
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════
+// MATH
+// ═══════════════════════════════════════════════
+function sma(arr, n){ if(arr.length < n) return null; return arr.slice(-n).reduce((a,b)=>a+b,0)/n; }
+
+function countCleared(daily, weekly, price){
+  // Returns count of MAs price is above out of 5: 200W, 20W, 200D, 50D, 20D
+  const checks = [
+    sma(weekly, 200), sma(weekly, 20),
+    sma(daily, 200), sma(daily, 50), sma(daily, 20)
+  ];
+  return checks.reduce((acc,ma) => acc + (ma !== null && price > ma ? 1 : 0), 0);
+}
+
+function cascadeScore(assetData){
+  let totalCleared = 0, totalMAs = 0, detail = [];
+  for(const a of ASSETS){
+    const ad = assetData[a];
+    if(!ad){ detail.push({sym:a.replace('USDT',''), cleared:null}); continue; }
+    const c = countCleared(ad.daily, ad.weekly, ad.price);
+    totalCleared += c;
+    totalMAs += 5;
+    detail.push({sym:a.replace('USDT',''), cleared:c});
+  }
+  const score = totalMAs > 0 ? (totalCleared / totalMAs) * 200 - 100 : 0;
+  return { score, cleared: totalCleared, total: totalMAs, detail };
+}
+
+function rateScore(yields){
+  // Per yield: at 52W high = -100, above both 20D/50D = -50, above one = 0, below both = +50
+  const recent = yields.slice(-252); // 52w
+  const high52 = Math.max(...recent);
+  const ma20 = sma(yields, 20);
+  const ma50 = sma(yields, 50);
+  const cur = yields[yields.length-1];
+  const atHigh = cur >= high52 * 0.99;
+  const aboveMA20 = ma20 !== null && cur > ma20;
+  const aboveMA50 = ma50 !== null && cur > ma50;
+  let s = 0, state = '';
+  if(atHigh){ s = -100; state = '52W HIGH'; }
+  else if(aboveMA20 && aboveMA50){ s = -50; state = 'rising'; }
+  else if(aboveMA20 || aboveMA50){ s = 0; state = 'mixed'; }
+  else{ s = 50; state = 'contained'; }
+  return { score: s, state, value: cur };
+}
+
+function ratesComposite(tnx, tyx){
+  const ten = tnx ? rateScore(tnx) : { score: 0, state: 'no data', value: null };
+  const thirty = tyx ? rateScore(tyx) : { score: 0, state: 'no data', value: null };
+  const score = (ten.score + thirty.score) / 2;
+  return { score, ten, thirty };
+}
+
+function cycleScore(){
+  const now = new Date();
+  const ms = now - TROUGH_DATE;
+  const day = Math.floor(ms / (1000*60*60*24));
+  let s, phase;
+  if(day < 0){ s = 0; phase = 'PRE-TROUGH'; }
+  else if(day <= 12){ s = 60; phase = 'EARLY — riding'; }
+  else if(day <= 25){ s = 30; phase = 'MID — ride'; }
+  else if(day <= 40){ s = 0; phase = 'MID-LATE — neutral'; }
+  else if(day <= 55){ s = -50; phase = 'LATE — tighten'; }
+  else if(day <= 65){ s = -75; phase = 'TROUGH WINDOW'; }
+  else{ s = -30; phase = 'OVERDUE — stale'; }
+  return { score: s, day, phase };
+}
+
+// ═══════════════════════════════════════════════
+// CALL LOGIC
+// ═══════════════════════════════════════════════
+function regimeCall(regime){
+  if(regime <= ZONE_BLOOD)
+    return { call: 'BUY THE BLOOD', color: '#FF1744', action: 'Institutions accumulating · price weakness is opportunity' };
+  if(regime >= ZONE_GOLD)
+    return { call: 'SELL THE GOLD', color: '#FFD700', action: 'Institutions distributing · price strength is the exit' };
+  return { call: 'WAIT', color: 'rgba(255,255,255,0.7)', action: 'No institutional edge · trade price patterns only' };
+}
+
+// ═══════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════
+async function loadAll(){
+  document.getElementById('loading').style.display='block';
+  document.getElementById('app').style.display='none';
+  let dotInterval = setInterval(()=>{
+    const d = document.getElementById('dots');
+    if(d) d.textContent = '.'.repeat(((+(d.dataset.n||0)+1)%4));
+    d.dataset.n = (+(d.dataset.n||0)+1)%4;
+  }, 300);
+
+  try{
+    // Fetch all assets in parallel
+    const assetData = {};
+    await Promise.all(ASSETS.map(async sym => {
+      try{
+        const [daily, weekly] = await Promise.all([
+          fetchKlines(sym, '1d', 250),
+          fetchKlines(sym, '1w', 220)
+        ]);
+        const dailyCloses = daily.map(k => +k[4]);
+        const weeklyCloses = weekly.map(k => +k[4]);
+        assetData[sym] = {
+          daily: dailyCloses,
+          weekly: weeklyCloses,
+          price: dailyCloses[dailyCloses.length-1]
+        };
+      }catch(e){ assetData[sym] = null; console.warn(sym, e.message); }
+    }));
+
+    // Fetch rates in parallel
+    const [tnx, tyx] = await Promise.all([fetchYahoo('%5ETNX'), fetchYahoo('%5ETYX')]);
+
+    // Compute scores
+    const casc = cascadeScore(assetData);
+    const rates = ratesComposite(tnx, tyx);
+    const cycle = cycleScore();
+    const regime = (casc.score + rates.score + cycle.score) / 3;
+    const call = regimeCall(regime);
+    const btcPrice = assetData['BTCUSDT']?.price || 0;
+
+    clearInterval(dotInterval);
+    document.getElementById('loading').style.display='none';
+    document.getElementById('app').style.display='flex';
+
+    render({ casc, rates, cycle, regime, call, btcPrice, assetData });
+  }catch(e){
+    clearInterval(dotInterval);
+    document.getElementById('loading').innerHTML =
+      `<div class="loading-text" style="color:#FF1744">FETCH FAILED — ${e.message}</div>`;
+  }
+}
+
+function render(d){
+  const { casc, rates, cycle, regime, call, btcPrice, assetData } = d;
+
+  // Badge
+  document.getElementById('badgeDot').style.background = call.color;
+  document.getElementById('badgeDot').style.color = call.color;
+  document.getElementById('badgeText').textContent = call.call;
+  document.getElementById('badge').style.background = `${call.color}11`;
+  document.getElementById('badge').style.borderColor = `${call.color}33`;
+
+  // Canvas
+  const canvas = document.getElementById('canvas');
+  const size = Math.min(window.innerWidth - 40, 680);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size * dpr; canvas.height = size * dpr;
+  canvas.style.width = size+'px'; canvas.style.height = size+'px';
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  const cx = size/2, cy = size/2;
+  const minR = 50, maxR = size/2 * 0.88;
+
+  // Map regime score [-100, +100] → radius [minR, maxR]
+  const s2r = s => minR + ((s + 100) / 200) * (maxR - minR);
+
+  // Background
+  ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0, 0, size, size);
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size/2);
+  bg.addColorStop(0, 'rgba(15,15,30,0.5)'); bg.addColorStop(1, 'rgba(10,10,15,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+
+  // BLOOD ZONE (inner)
+  const rBloodOuter = s2r(ZONE_BLOOD);
+  const rBloodInner = s2r(-100);
+  const bGrad = ctx.createRadialGradient(cx, cy, rBloodInner*0.9, cx, cy, rBloodOuter*1.05);
+  bGrad.addColorStop(0, 'rgba(255,23,68,0.0)');
+  bGrad.addColorStop(0.3, 'rgba(255,23,68,0.18)');
+  bGrad.addColorStop(0.7, 'rgba(255,23,68,0.18)');
+  bGrad.addColorStop(1, 'rgba(255,23,68,0.0)');
+  ctx.beginPath();
+  ctx.arc(cx, cy, rBloodOuter, 0, Math.PI*2);
+  ctx.arc(cx, cy, rBloodInner*0.6, 0, Math.PI*2, true);
+  ctx.closePath();
+  ctx.fillStyle = bGrad; ctx.fill();
+  // Edge
+  ctx.beginPath(); ctx.arc(cx, cy, rBloodOuter, 0, Math.PI*2);
+  ctx.strokeStyle = '#FF1744'; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; ctx.stroke();
+  ctx.globalAlpha = 0.12; ctx.lineWidth = 18; ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // BLOOD label
+  ctx.textAlign = 'center'; ctx.font = 'bold 12px monospace';
+  ctx.fillStyle = '#FF1744'; ctx.globalAlpha = 0.9;
+  ctx.fillText('BLOOD ZONE — BUY', cx, cy + rBloodOuter + 20);
+  ctx.font = '9px monospace'; ctx.globalAlpha = 0.4;
+  ctx.fillText('institutions accumulating', cx, cy + rBloodOuter + 34);
+  ctx.globalAlpha = 1;
+
+  // GOLD ZONE (outer)
+  const rGoldInner = s2r(ZONE_GOLD);
+  const rGoldOuter = s2r(100);
+  const gGrad = ctx.createRadialGradient(cx, cy, rGoldInner*0.97, cx, cy, rGoldOuter*1.03);
+  gGrad.addColorStop(0, 'rgba(255,215,0,0.0)');
+  gGrad.addColorStop(0.3, 'rgba(255,215,0,0.12)');
+  gGrad.addColorStop(0.7, 'rgba(255,215,0,0.12)');
+  gGrad.addColorStop(1, 'rgba(255,215,0,0.0)');
+  ctx.beginPath();
+  ctx.arc(cx, cy, rGoldOuter, 0, Math.PI*2);
+  ctx.arc(cx, cy, rGoldInner, 0, Math.PI*2, true);
+  ctx.closePath();
+  ctx.fillStyle = gGrad; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, rGoldInner, 0, Math.PI*2);
+  ctx.strokeStyle = '#FFD700'; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; ctx.stroke();
+  ctx.globalAlpha = 0.1; ctx.lineWidth = 20; ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // GOLD label
+  ctx.font = 'bold 12px monospace'; ctx.fillStyle = '#FFD700'; ctx.globalAlpha = 0.9;
+  ctx.fillText('GOLD ZONE — SELL', cx, cy - rGoldInner - 14);
+  ctx.font = '9px monospace'; ctx.globalAlpha = 0.4;
+  ctx.fillText('institutions distributing', cx, cy - rGoldInner - 28);
+  ctx.globalAlpha = 1;
+
+  // Zero line (center neutral)
+  const rZero = s2r(0);
+  ctx.beginPath(); ctx.arc(cx, cy, rZero, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([3,5]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Component dots — Cascade, Rates, Cycle (small markers at the 45° angle)
+  const components = [
+    { label: 'C', score: casc.score, color: '#00E676', angle: Math.PI * -0.45 },
+    { label: 'R', score: rates.score, color: '#29B6F6', angle: Math.PI * 0.05 },
+    { label: 'Y', score: cycle.score, color: '#AB47BC', angle: Math.PI * 0.55 },
+  ];
+  components.forEach(c => {
+    const r = s2r(c.score);
+    const x = cx + r * Math.cos(c.angle);
+    const y = cy + r * Math.sin(c.angle);
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2);
+    ctx.fillStyle = c.color; ctx.globalAlpha = 0.9; ctx.fill();
+    ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI*2); ctx.fillStyle = c.color; ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = 'bold 9px monospace'; ctx.fillStyle = c.color; ctx.textAlign = 'center';
+    ctx.fillText(c.label, x, y + 3);
+  });
+
+  // YOU ARE HERE — current regime ring
+  const rCur = s2r(regime);
+  ctx.beginPath(); ctx.arc(cx, cy, rCur, 0, Math.PI*2);
+  ctx.strokeStyle = call.color; ctx.lineWidth = 5; ctx.stroke();
+  [[16,0.35],[32,0.12],[50,0.04]].forEach(([w,a]) => {
+    ctx.beginPath(); ctx.arc(cx, cy, rCur, 0, Math.PI*2);
+    ctx.strokeStyle = call.color; ctx.globalAlpha = a; ctx.lineWidth = w; ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+
+  // Label arm
+  const la = -Math.PI/6;
+  const lx = cx + rCur*Math.cos(la), ly = cy + rCur*Math.sin(la);
+  const ox = 24, oy = -10;
+  ctx.beginPath(); ctx.moveTo(lx, ly);
+  ctx.lineTo(lx+ox, ly+oy); ctx.lineTo(lx+ox+130, ly+oy);
+  ctx.strokeStyle = call.color; ctx.globalAlpha = 0.4; ctx.lineWidth = 1; ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 18px monospace'; ctx.fillStyle = call.color;
+  ctx.fillText(`${regime >= 0 ? '+' : ''}${regime.toFixed(0)}`, lx+ox+4, ly+oy-10);
+  ctx.font = 'bold 9px monospace'; ctx.globalAlpha = 0.7;
+  ctx.fillText('REGIME SCORE', lx+ox+4, ly+oy-24);
+  ctx.globalAlpha = 0.5; ctx.font = '9px monospace';
+  ctx.fillText(call.call, lx+ox+4, ly+oy+6);
+  ctx.globalAlpha = 1;
+
+  // Center text
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillStyle = call.color;
+  ctx.fillText(call.call, cx, cy - 8);
+  ctx.font = '9px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  const words = call.action.split(' · ');
+  ctx.fillText(words[0], cx, cy + 8);
+  if(words[1]) ctx.fillText(words[1], cx, cy + 22);
+
+  // Bottom cards
+  const cascArrow = casc.score > 30 ? '▲' : casc.score < -30 ? '▼' : '●';
+  const ratesArrow = rates.score < -30 ? '▼' : rates.score > 30 ? '▲' : '●';
+  document.getElementById('bottomBar').innerHTML = `
+    <div class="bottom-card">
+      <div class="lbl">REGIME</div>
+      <div class="val" style="color:${call.color}">${regime >= 0 ? '+' : ''}${regime.toFixed(0)}</div>
+      <div class="sub" style="color:${call.color}">${call.call}</div>
+    </div>
+    <div class="bottom-card">
+      <div class="lbl">CASCADE</div>
+      <div class="val" style="color:#00E676">${casc.cleared}/${casc.total}</div>
+      <div class="sub">${cascArrow} MAs cleared across 6 assets</div>
+    </div>
+    <div class="bottom-card">
+      <div class="lbl">RATES</div>
+      <div class="val" style="color:#29B6F6">${rates.ten.state}</div>
+      <div class="sub">10Y ${rates.ten.value !== null ? rates.ten.value.toFixed(2)+'%' : '—'} · 30Y ${rates.thirty.state}</div>
+    </div>
+    <div class="bottom-card">
+      <div class="lbl">CYCLE</div>
+      <div class="val" style="color:#AB47BC">day ${cycle.day}/${CYCLE_LEN}</div>
+      <div class="sub">${cycle.phase}</div>
+    </div>`;
+
+  // Breakdown line — which alts are weak, which yields are pressing
+  const cascRows = casc.detail.map(d =>
+    d.cleared === null
+      ? `<span style="color:rgba(255,255,255,0.2)">${d.sym}:—</span>`
+      : `<span style="color:${d.cleared >= 4 ? '#00E676' : d.cleared >= 2 ? 'rgba(255,255,255,0.5)' : '#FF1744'}">${d.sym}:${d.cleared}/5</span>`
+  ).join(' · ');
+
+  const weak = casc.detail.filter(d => d.cleared !== null && d.cleared <= 1).map(d => d.sym);
+  const strong = casc.detail.filter(d => d.cleared !== null && d.cleared >= 4).map(d => d.sym);
+
+  document.getElementById('breakdown').innerHTML = `
+    <div class="row"><span class="lbl-bk">CASCADE DETAIL</span><span>${cascRows}</span></div>
+    <div class="row"><span class="lbl-bk">WEAKEST</span><span style="color:${weak.length ? '#FF1744' : 'rgba(255,255,255,0.3)'}">${weak.length ? weak.join(', ') + ' — leak forming' : 'none — full structure intact'}</span></div>
+    <div class="row"><span class="lbl-bk">STRONGEST</span><span style="color:${strong.length ? '#00E676' : 'rgba(255,255,255,0.3)'}">${strong.length ? strong.join(', ') : 'none — broad weakness'}</span></div>
+    <div class="row"><span class="lbl-bk">RATES READ</span><span>10Y ${rates.ten.value !== null ? rates.ten.value.toFixed(2)+'% ('+rates.ten.state+')' : 'no data'} · 30Y ${rates.thirty.value !== null ? rates.thirty.value.toFixed(2)+'% ('+rates.thirty.state+')' : 'no data'}</span></div>
+    <div class="row"><span class="lbl-bk">CYCLE READ</span><span>${cycle.day} days from $${TROUGH_PRICE.toLocaleString()} trough · ${cycle.phase}</span></div>
+    <div class="row"><span class="lbl-bk">BTC PRICE</span><span style="color:#fff">$${btcPrice.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>`;
+}
+
+document.getElementById('refresh').addEventListener('click', () => {
+  document.getElementById('refresh').disabled = true;
+  loadAll().finally(() => {
+    document.getElementById('refresh').disabled = false;
+  });
+});
+
+loadAll();
+</script>
+</body>
+</html>
