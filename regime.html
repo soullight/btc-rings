@@ -96,10 +96,21 @@ const ZONE_BLOOD = -40;   // regime <= this → BLOOD ZONE → BUY
 const ZONE_GOLD = 40;     // regime >= this → GOLD ZONE → SELL
 
 // ═══════════════════════════════════════════════
-// FETCH
+// FETCH (with timeouts so the page can't hang)
 // ═══════════════════════════════════════════════
+async function fetchWithTimeout(url, ms = 7000){
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    return r;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 async function fetchKlines(symbol, interval, limit){
-  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+  const r = await fetchWithTimeout(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`, 8000);
   if(!r.ok) throw new Error('Binance '+symbol+' '+r.status);
   return r.json();
 }
@@ -113,15 +124,21 @@ async function fetchYahoo(symbol){
   ];
   for(const p of proxies){
     try{
-      const r = await fetch(p(url));
+      const r = await fetchWithTimeout(p(url), 5000);
       if(!r.ok) continue;
       const j = await r.json();
       const closes = j.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
       const arr = closes.filter(x => x !== null);
       if(arr.length > 50) return arr;
-    }catch(e){continue;}
+    }catch(e){ console.warn('Yahoo proxy failed:', e.message); continue; }
   }
+  console.warn('All Yahoo proxies failed for', symbol, '— rates will be neutral');
   return null;
+}
+
+function setLoadingMsg(msg){
+  const el = document.querySelector('.loading-text');
+  if(el) el.innerHTML = msg + '<span id="dots"></span>';
 }
 
 // ═══════════════════════════════════════════════
@@ -217,6 +234,7 @@ async function loadAll(){
 
   try{
     // Fetch all assets in parallel
+    setLoadingMsg('FETCHING ASSETS');
     const assetData = {};
     await Promise.all(ASSETS.map(async sym => {
       try{
@@ -234,8 +252,16 @@ async function loadAll(){
       }catch(e){ assetData[sym] = null; console.warn(sym, e.message); }
     }));
 
-    // Fetch rates in parallel
+    // Verify we got at least BTC — without that, the page can't render meaningfully
+    if (!assetData['BTCUSDT']) {
+      throw new Error('Binance BTC fetch failed — check ad-blocker / VPN');
+    }
+
+    // Fetch rates in parallel (timeouts inside fetchYahoo, won't hang)
+    setLoadingMsg('FETCHING RATES');
     const [tnx, tyx] = await Promise.all([fetchYahoo('%5ETNX'), fetchYahoo('%5ETYX')]);
+
+    setLoadingMsg('RENDERING');
 
     // Compute scores
     const casc = cascadeScore(assetData);
