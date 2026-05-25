@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signal Rings v2 — Fixed Radii + Status Dots</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 16px;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 8px; color: rgba(255,255,255,0.9); }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; margin-top: 4px; }
+  canvas { border-radius: 12px; margin-top: 12px; cursor: crosshair; }
+  .loading { text-align: center; padding: 80px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring {
+    width: 50px; height: 50px; border-radius: 50%; margin: 24px auto 0;
+    border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 14px; border-radius: 20px; font-size: 10px; margin: 8px 0;
+    background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2);
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:#00E676; box-shadow:0 0 6px #00E676; }
+
+  /* Bottom stats */
+  .stats {
+    margin-top: 14px; max-width: 800px; width: 100%;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  }
+  .stat-card {
+    padding: 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
+    text-align: center;
+  }
+  .stat-card .lbl { font-size: 7px; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin-bottom: 4px; }
+  .stat-card .val { font-size: 15px; font-weight: 700; }
+  .stat-card .sub { font-size: 8px; color: rgba(255,255,255,0.25); margin-top: 3px; }
+
+  /* Signal panel */
+  .signal-panel {
+    margin-top: 14px; max-width: 800px; width: 100%;
+    padding: 16px 20px; border-radius: 10px;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08);
+    text-align: center;
+  }
+  .signal-big { font-size: 28px; font-weight: 700; letter-spacing: 6px; }
+  .signal-sub { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 6px; letter-spacing: 1px; }
+  .signal-action { font-size: 12px; margin-top: 8px; letter-spacing: 1px; }
+
+  /* Cascade strip */
+  .cascade-strip {
+    margin-top: 10px; max-width: 800px; width: 100%;
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+  }
+  .cascade-card {
+    padding: 8px 4px; border-radius: 6px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    text-align: center;
+  }
+  .cascade-card .c-name { font-size: 9px; font-weight: 700; letter-spacing: 2px; }
+  .cascade-card .c-rings { font-size: 8px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+  .cascade-card .c-strength { font-size: 10px; font-weight: 700; margin-top: 3px; }
+
+  .footer { margin-top: 12px; font-size: 8px; color: rgba(255,255,255,0.1); letter-spacing: 1px; text-align: center; padding-bottom: 20px; }
+
+  @media (max-width: 600px) {
+    .stats { grid-template-columns: repeat(3, 1fr); }
+    .cascade-strip { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div style="text-align:center;">
+  <h1>SIGNAL RINGS · V2</h1>
+  <div class="subtitle">FIXED RADII · STATUS DOTS · CLOCK LABELS · ONE GLANCE</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="loading-text">LOADING<span id="dots"></span></div>
+  <div class="pulse-ring"></div>
+</div>
+
+<div id="app" style="display:none; flex-direction:column; align-items:center; width:100%;">
+  <div id="badge" class="badge"><span class="dot"></span><span id="badgeText">LIVE</span></div>
+  <canvas id="canvas"></canvas>
+  <div id="signalPanel" class="signal-panel"></div>
+  <div id="stats" class="stats"></div>
+  <div id="cascadeStrip" class="cascade-strip"></div>
+  <div class="footer">LIVE · BINANCE API · MAs COMPUTED FROM REAL HISTORY</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// SIGNAL RINGS — MA Structure Visualization
+// ═══════════════════════════════════════════════════════════════
+//
+// The rings represent REAL moving averages computed from price history.
+// Each ring is a structural level. Price moves through them like water.
+//
+// RINGS (inside → outside):
+//   200-Week SMA — the bedrock (cycle-level support)
+//   200-Day SMA  — the trend line (macro direction)
+//   50-Day SMA   — the momentum line (medium-term)
+//   20-Day SMA   — the pulse (short-term action)
+//   ATH          — the high-water mark (residue on the walls)
+//
+// Above all rings = full bull
+// Dropping through = weakening
+// Below all = bear
+//
+// This doesn't need updating. MAs compute themselves.
+// Built to last 5-10 years.
+// ═══════════════════════════════════════════════════════════════
+
+let livePrice = 0;
+let wsConnected = false;
+let maData = {};
+let cascadeResults = {};
+let animProgress = 0;
+
+// ── Ring definitions ──
+const RINGS = [
+  { key: 'sma200w', label: '200W', fullLabel: '200-WEEK SMA', color: '#FF1744', glowColor: 'rgba(255,23,68,0.3)', desc: 'BEDROCK' },
+  { key: 'sma200d', label: '200D', fullLabel: '200-DAY SMA', color: '#FF9100', glowColor: 'rgba(255,145,0,0.3)', desc: 'TREND' },
+  { key: 'sma50d',  label: '50D',  fullLabel: '50-DAY SMA',  color: '#FFEA00', glowColor: 'rgba(255,234,0,0.3)', desc: 'MOMENTUM' },
+  { key: 'sma20d',  label: '20D',  fullLabel: '20-DAY SMA',  color: '#00E676', glowColor: 'rgba(0,230,118,0.3)', desc: 'PULSE' },
+  { key: 'ath',     label: 'ATH',  fullLabel: 'ALL-TIME HIGH', color: '#E040FB', glowColor: 'rgba(224,64,251,0.2)', desc: 'HIGH WATER' },
+];
+
+// ── Cascade assets ──
+const CASCADE = [
+  { symbol: 'BTCUSDT', name: 'BTC' },
+  { symbol: 'ETHUSDT', name: 'ETH' },
+  { symbol: 'SOLUSDT', name: 'SOL' },
+  { symbol: 'XRPUSDT', name: 'XRP' },
+  { symbol: 'TIAUSDT', name: 'TIA' },
+  { symbol: 'TRXUSDT', name: 'TRX' },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════════════════════
+
+function calcSMA(closes, period) {
+  if (closes.length < period) return null;
+  const slice = closes.slice(-period);
+  return slice.reduce((a,b) => a+b, 0) / period;
+}
+
+function calcEMA(closes, period) {
+  if (closes.length < period) return null;
+  const mult = 2 / (period + 1);
+  let ema = closes.slice(0, period).reduce((a,b) => a+b, 0) / period;
+  for (let i = period; i < closes.length; i++) {
+    ema = (closes[i] - ema) * mult + ema;
+  }
+  return ema;
+}
+
+async function fetchKlines(symbol, interval, limit) {
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Binance ${r.status}`);
+  return await r.json();
+}
+
+async function fetchAllBTCData() {
+  // Fetch daily (250 days for 200-day SMA)
+  const daily = await fetchKlines('BTCUSDT', '1d', 250);
+  const dailyCloses = daily.map(k => parseFloat(k[4]));
+  const dailyHighs = daily.map(k => parseFloat(k[2]));
+
+  // Fetch weekly (210 weeks for 200-week SMA)
+  const weekly = await fetchKlines('BTCUSDT', '1w', 210);
+  const weeklyCloses = weekly.map(k => parseFloat(k[4]));
+
+  const price = dailyCloses[dailyCloses.length - 1];
+  const ath = Math.max(...dailyHighs, ...weeklyCloses);
+
+  maData = {
+    price,
+    ath: Math.max(ath, 109350), // known ATH floor
+    sma200w: calcSMA(weeklyCloses, 200),
+    sma200d: calcSMA(dailyCloses, 200),
+    sma128d: calcSMA(dailyCloses, 128),
+    sma50d: calcSMA(dailyCloses, 50),
+    sma20d: calcSMA(dailyCloses, 20),
+    ema200d: calcEMA(dailyCloses, 200),
+    roc20: dailyCloses.length > 20 ? ((price - dailyCloses[dailyCloses.length - 21]) / dailyCloses[dailyCloses.length - 21] * 100) : null,
+    roc60: dailyCloses.length > 60 ? ((price - dailyCloses[dailyCloses.length - 61]) / dailyCloses[dailyCloses.length - 61] * 100) : null,
+  };
+
+  livePrice = price;
+  return maData;
+}
+
+async function fetchCascadeData() {
+  for (const asset of CASCADE) {
+    try {
+      const daily = await fetchKlines(asset.symbol, '1d', 210);
+      const weekly = await fetchKlines(asset.symbol, '1w', 210);
+      const dc = daily.map(k => parseFloat(k[4]));
+      const wc = weekly.map(k => parseFloat(k[4]));
+      const p = dc[dc.length - 1];
+
+      const checks = {
+        '200W': calcSMA(wc, 200) ? p > calcSMA(wc, 200) : null,
+        '200D': calcSMA(dc, 200) ? p > calcSMA(dc, 200) : null,
+        '50D': calcSMA(dc, 50) ? p > calcSMA(dc, 50) : null,
+        '20D': calcSMA(dc, 20) ? p > calcSMA(dc, 20) : null,
+      };
+
+      const above = Object.values(checks).filter(v => v === true).length;
+      const total = Object.values(checks).filter(v => v !== null).length;
+      const roc30 = dc.length > 30 ? ((p - dc[dc.length - 31]) / dc[dc.length - 31] * 100) : 0;
+
+      cascadeResults[asset.name] = { price: p, checks, above, total, roc30 };
+      await new Promise(r => setTimeout(r, 150));
+    } catch(e) {
+      cascadeResults[asset.name] = { error: true };
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WEBSOCKET — live price updates
+// ═══════════════════════════════════════════════════════════════
+
+function connectWS() {
+  const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+  ws.onopen = () => { wsConnected = true; updateBadge(); };
+  ws.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    livePrice = parseFloat(d.p);
+    maData.price = livePrice;
+  };
+  ws.onclose = () => { wsConnected = false; updateBadge(); setTimeout(connectWS, 5000); };
+  ws.onerror = () => ws.close();
+}
+
+function updateBadge() {
+  const el = document.getElementById('badgeText');
+  el.textContent = wsConnected ? 'LIVE' : 'RECONNECTING...';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CANVAS RENDERING — The Rings
+// ═══════════════════════════════════════════════════════════════
+
+function drawRings(canvas, ctx) {
+  const W = canvas.width;
+  const H = canvas.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const maxR = Math.min(W, H) * 0.42;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!maData.price) return;
+
+  const price = maData.price;
+
+  // ── FIXED RADII (v2) ──
+  // v1 mapped radius to absolute price (log-scale), which clustered the MAs
+  // because they live in a similar value-band ($61K-$80K) while ATH was a lonely
+  // outer ring with a huge dead zone between them. v2 uses fixed radii (evenly
+  // spaced) so each ring is visually distinct. Status is conveyed by ring
+  // color/style + a dot/diamond marker at 12 o'clock on each ring.
+  //
+  // Ring ordering preserved by price (200W innermost, ATH outermost).
+  // Label clock positions are fixed at ~72° intervals starting at 12 o'clock so
+  // the eye finds each label in the same place every read.
+
+  const ringSpecs = [
+    { key: 'sma200w', label: '200W', radius: 0.38, labelClock: -Math.PI / 2 },                       // 12 o'clock
+    { key: 'sma200d', label: '200D', radius: 0.52, labelClock: -Math.PI / 2 + 2 * Math.PI / 5 },     // ~2:24
+    { key: 'sma50d',  label: '50D',  radius: 0.65, labelClock: -Math.PI / 2 + 4 * Math.PI / 5 },     // ~4:48
+    { key: 'sma20d',  label: '20D',  radius: 0.79, labelClock: -Math.PI / 2 + 6 * Math.PI / 5 },     // ~7:12
+    { key: 'ath',     label: 'ATH',  radius: 0.94, labelClock: -Math.PI / 2 + 8 * Math.PI / 5 },     // ~9:36
+  ];
+
+  const rings = ringSpecs.map(spec => {
+    const ringDef = RINGS.find(r => r.key === spec.key);
+    return {
+      ...ringDef,
+      ...spec,
+      value: maData[spec.key],
+      r: spec.radius * maxR * animProgress,
+    };
+  }).filter(r => r.value);
+
+  // Faint grid circles for depth (every 25%)
+  for (let i = 1; i <= 4; i++) {
+    const r = (maxR * i / 4) * animProgress;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.015)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // MA status (ATH excluded from "cleared" count)
+  const maRings = rings.filter(r => r.key !== 'ath');
+  const aboveCount = maRings.filter(r => price > r.value).length;
+  const totalMAs = maRings.length;
+  const healthPct = totalMAs ? aboveCount / totalMAs : 0;
+
+  // Water fill extends to the outermost CLEARED ring (subtler than v1)
+  let waterRadius = 0;
+  maRings.forEach(r => { if (price > r.value && r.r > waterRadius) waterRadius = r.r; });
+
+  if (waterRadius > 0) {
+    let waterColor;
+    if (healthPct >= 0.75) waterColor = '0,230,118';
+    else if (healthPct >= 0.5) waterColor = '255,145,0';
+    else waterColor = '255,23,68';
+
+    const waterGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, waterRadius);
+    waterGrad.addColorStop(0, `rgba(${waterColor},0.08)`);
+    waterGrad.addColorStop(0.7, `rgba(${waterColor},0.03)`);
+    waterGrad.addColorStop(1, `rgba(${waterColor},0)`);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, waterRadius, 0, Math.PI * 2);
+    ctx.fillStyle = waterGrad;
+    ctx.fill();
+  }
+
+  // Pulse for cleared-status dots
+  const pulse = 1 + Math.sin(Date.now() / 500) * 0.08;
+
+  // ── Draw each ring ──
+  rings.forEach(ring => {
+    const isAth = ring.key === 'ath';
+    const isAbove = !isAth && price > ring.value;
+
+    // Outer glow
+    ctx.beginPath();
+    ctx.arc(cx, cy, ring.r, 0, Math.PI * 2);
+    ctx.strokeStyle = ring.glowColor;
+    ctx.lineWidth = isAth ? 5 : (isAbove ? 5 : 3);
+    ctx.stroke();
+
+    // Main ring stroke — solid if cleared/ATH, dashed-dim if below
+    ctx.beginPath();
+    ctx.arc(cx, cy, ring.r, 0, Math.PI * 2);
+    if (isAth) {
+      ctx.strokeStyle = ring.color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+    } else if (isAbove) {
+      ctx.strokeStyle = ring.color;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = ring.color + '50';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 5]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Status marker at 12 o'clock on this ring
+    const dotX = cx;
+    const dotY = cy - ring.r;
+    if (isAth) {
+      // Diamond marker for ATH (target / reference)
+      const s = 6;
+      ctx.beginPath();
+      ctx.moveTo(dotX, dotY - s);
+      ctx.lineTo(dotX + s, dotY);
+      ctx.lineTo(dotX, dotY + s);
+      ctx.lineTo(dotX - s, dotY);
+      ctx.closePath();
+      ctx.fillStyle = ring.color;
+      ctx.fill();
+      ctx.strokeStyle = '#0a0a0f';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (isAbove) {
+      // Filled colored dot (cleared) — gently pulsing
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 5 * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = ring.color;
+      ctx.fill();
+      ctx.strokeStyle = '#0a0a0f';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      // Hollow red dot (below)
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fill();
+      ctx.strokeStyle = '#FF1744';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Label at fixed clock position outside the ring
+    const labelR = ring.r + 24;
+    const lx = cx + Math.cos(ring.labelClock) * labelR;
+    const ly = cy + Math.sin(ring.labelClock) * labelR;
+
+    ctx.font = '700 11px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = isAth || isAbove ? ring.color : ring.color + 'B0';
+    ctx.fillText(ring.label, lx, ly - 7);
+
+    ctx.font = '500 9px "SF Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillText('$' + ring.value.toLocaleString('en-US', { maximumFractionDigits: 0 }), lx, ly + 6);
+  });
+
+  // ── Center text block ──
+
+  ctx.font = '700 30px "SF Mono", monospace';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('$' + price.toLocaleString('en-US', { maximumFractionDigits: 0 }), cx, cy - 22);
+
+  ctx.font = '600 9px "SF Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText('YOU ARE HERE', cx, cy - 2);
+
+  // 4 cleared-MA dots in center (mirror of the ring dots, for at-a-glance read)
+  const dotSpacing = 16;
+  const dotsStartX = cx - (dotSpacing * (maRings.length - 1)) / 2;
+  const dotsY = cy + 18;
+  maRings.forEach((ring, i) => {
+    const above = price > ring.value;
+    const dx = dotsStartX + i * dotSpacing;
+    ctx.beginPath();
+    ctx.arc(dx, dotsY, 5, 0, Math.PI * 2);
+    if (above) {
+      ctx.fillStyle = ring.color;
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fill();
+      ctx.strokeStyle = ring.color + '70';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  });
+
+  // Cleared count label
+  const structLabel = aboveCount + '/' + totalMAs + ' MAs CLEARED';
+  const structColor = aboveCount >= 3 ? '#00E676' : aboveCount >= 2 ? '#FF9100' : '#FF1744';
+  ctx.font = '600 9px "SF Mono", monospace';
+  ctx.fillStyle = structColor;
+  ctx.fillText(structLabel, cx, cy + 36);
+
+  // Distance from ATH
+  if (maData.ath) {
+    const athDist = ((price - maData.ath) / maData.ath * 100);
+    ctx.font = '500 8px "SF Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillText(athDist.toFixed(1) + '% from ATH', cx, cy + 52);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SIGNAL COMPUTATION
+// ═══════════════════════════════════════════════════════════════
+
+function computeSignal() {
+  if (!maData.price) return { signal: '---', action: '', color: '#fff', score: 0 };
+
+  const p = maData.price;
+  let score = 0;
+
+  // MA structure scoring
+  if (maData.sma200w && p > maData.sma200w) score += 2;
+  else if (maData.sma200w) score -= 2;
+
+  if (maData.sma200d && p > maData.sma200d) score += 1.5;
+  else if (maData.sma200d) score -= 1.5;
+
+  if (maData.sma50d && p > maData.sma50d) score += 1;
+  else if (maData.sma50d) score -= 1;
+
+  if (maData.sma20d && p > maData.sma20d) score += 0.5;
+  else if (maData.sma20d) score -= 0.5;
+
+  // Momentum bonus
+  if (maData.roc20 > 0 && maData.roc60 > 0) score += 1;
+  else if (maData.roc20 < 0 && maData.roc60 < 0) score -= 1;
+
+  // Normalize to -2 to +2 range
+  const maxScore = 7; // 2 + 1.5 + 1 + 0.5 + 1 + cascadeBonus
+  const normalized = (score / maxScore) * 2;
+
+  // Cascade bonus
+  let cascadeOn = 0;
+  let cascadeOff = 0;
+  Object.values(cascadeResults).forEach(c => {
+    if (c.error) return;
+    if (c.above >= 3) cascadeOn++;
+    else if (c.above <= 1) cascadeOff++;
+  });
+
+  let cascadeBonus = (cascadeOn - cascadeOff) * 0.3;
+  const finalScore = Math.max(-2, Math.min(2, normalized + cascadeBonus));
+
+  let signal, action, color;
+  if (finalScore > 1.2) {
+    signal = 'STRONG BUY'; action = 'Full position — all MAs supporting'; color = '#00E676';
+  } else if (finalScore > 0.4) {
+    signal = 'BUY BIAS'; action = 'Structure intact — lean long'; color = '#69F0AE';
+  } else if (finalScore > -0.4) {
+    signal = 'NEUTRAL'; action = 'No edge — wait for clarity'; color = '#FF9100';
+  } else if (finalScore > -1.2) {
+    signal = 'SELL BIAS'; action = 'Weakening — tighten stops'; color = '#FF6E40';
+  } else {
+    signal = 'STRONG SELL'; action = 'Below structure — exit or hedge'; color = '#FF1744';
+  }
+
+  return { signal, action, color, score: finalScore };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI RENDERING
+// ═══════════════════════════════════════════════════════════════
+
+function renderStats() {
+  const el = document.getElementById('stats');
+  if (!maData.price) return;
+
+  const items = [
+    { label: '200W SMA', value: maData.sma200w, key: 'sma200w' },
+    { label: '200D SMA', value: maData.sma200d, key: 'sma200d' },
+    { label: '50D SMA', value: maData.sma50d, key: 'sma50d' },
+    { label: '20D SMA', value: maData.sma20d, key: 'sma20d' },
+    { label: 'ATH', value: maData.ath, key: 'ath' },
+  ];
+
+  el.innerHTML = items.map(item => {
+    if (!item.value) return '';
+    const above = maData.price > item.value;
+    const pctDiff = ((maData.price - item.value) / item.value * 100);
+    const ring = RINGS.find(r => r.key === item.key);
+    const color = ring ? ring.color : '#fff';
+    return `<div class="stat-card">
+      <div class="lbl">${item.label}</div>
+      <div class="val" style="color:${color}">$${item.value.toLocaleString('en-US', {maximumFractionDigits:0})}</div>
+      <div class="sub" style="color:${above ? '#00E676' : '#FF1744'}">${above ? '▲' : '▼'} ${pctDiff.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSignal() {
+  const el = document.getElementById('signalPanel');
+  const sig = computeSignal();
+  el.innerHTML = `
+    <div class="signal-big" style="color:${sig.color}">${sig.signal}</div>
+    <div class="signal-sub">Composite: ${sig.score.toFixed(2)} / 2.00</div>
+    <div class="signal-action" style="color:${sig.color}">${sig.action}</div>
+  `;
+  el.style.borderColor = sig.color + '30';
+}
+
+function renderCascade() {
+  const el = document.getElementById('cascadeStrip');
+  const btcRoc = cascadeResults['BTC'] ? cascadeResults['BTC'].roc30 : 0;
+
+  el.innerHTML = CASCADE.map(asset => {
+    const c = cascadeResults[asset.name];
+    if (!c || c.error) return `<div class="cascade-card"><div class="c-name">${asset.name}</div><div class="c-rings">--</div></div>`;
+
+    const relStr = asset.name === 'BTC' ? '' : (c.roc30 > btcRoc ? '▲' : '▼');
+    const relColor = asset.name === 'BTC' ? '#fff' : (c.roc30 > btcRoc ? '#00E676' : '#FF1744');
+    const structColor = c.above >= 3 ? '#00E676' : c.above >= 2 ? '#FF9100' : '#FF1744';
+
+    return `<div class="cascade-card">
+      <div class="c-name">${asset.name}</div>
+      <div class="c-rings" style="color:${structColor}">${c.above}/${c.total} MAs</div>
+      <div class="c-strength" style="color:${relColor}">${relStr} ${c.roc30.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════════
+
+function animate() {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Size canvas
+  const size = Math.min(window.innerWidth - 32, 700);
+  canvas.width = size;
+  canvas.height = size;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+
+  function frame() {
+    if (animProgress < 1) animProgress += 0.02;
+    if (animProgress > 1) animProgress = 1;
+    drawRings(canvas, ctx);
+    renderSignal();
+    requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+
+async function init() {
+  // Loading dots
+  const dotsEl = document.getElementById('dots');
+  let dots = '';
+  const dotInterval = setInterval(() => { dots = dots.length >= 3 ? '' : dots + '.'; dotsEl.textContent = dots; }, 400);
+
+  try {
+    await fetchAllBTCData();
+    await fetchCascadeData();
+
+    clearInterval(dotInterval);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    renderStats();
+    renderCascade();
+    animate();
+    connectWS();
+
+    // Refresh cascade every 5 minutes
+    setInterval(async () => {
+      await fetchCascadeData();
+      renderCascade();
+    }, 300000);
+
+    // Refresh MAs every 2 minutes
+    setInterval(async () => {
+      await fetchAllBTCData();
+      renderStats();
+    }, 120000);
+
+  } catch(e) {
+    clearInterval(dotInterval);
+    document.getElementById('loading').innerHTML = `
+      <div class="loading-text" style="color:#FF1744;">ERROR: ${e.message}</div>
+      <div style="margin-top:16px;font-size:11px;color:rgba(255,255,255,0.3);">Retrying in 10s...</div>
+    `;
+    setTimeout(init, 10000);
+  }
+}
+
+// Handle resize
+window.addEventListener('resize', () => {
+  const canvas = document.getElementById('canvas');
+  if (canvas) {
+    const size = Math.min(window.innerWidth - 32, 700);
+    canvas.width = size;
+    canvas.height = size;
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+  }
+});
+
+init();
+</script>
+</body>
+</html>
