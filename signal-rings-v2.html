@@ -502,17 +502,10 @@ function drawRings(canvas, ctx) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // Outer glow pass (drawn first, behind the price)
+  // Single crisp pass — no shadow blur (the multi-pass glow was making the digits fuzzy)
   ctx.font = '800 34px "SF Mono", monospace';
-  ctx.shadowColor = priceColor;
-  ctx.shadowBlur = 18;
   ctx.fillStyle = priceColor;
   ctx.fillText('$' + price.toLocaleString('en-US', { maximumFractionDigits: 0 }) + trendArrow, cx, cy - 22);
-  // Second pass for stronger "thick" rendering
-  ctx.shadowBlur = 6;
-  ctx.fillText('$' + price.toLocaleString('en-US', { maximumFractionDigits: 0 }) + trendArrow, cx, cy - 22);
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = 'transparent';
 
   ctx.font = '600 9px "SF Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
