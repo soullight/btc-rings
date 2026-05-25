@@ -109,10 +109,25 @@ async function fetchWithTimeout(url, ms = 7000){
   }
 }
 
+// Binance with CORS proxy fallback (some networks / adblockers block api.binance.com direct)
 async function fetchKlines(symbol, interval, limit){
-  const r = await fetchWithTimeout(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`, 8000);
-  if(!r.ok) throw new Error('Binance '+symbol+' '+r.status);
-  return r.json();
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const tries = [
+    () => fetchWithTimeout(url, 8000),
+    () => fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(url)}`, 9000),
+    () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, 10000),
+  ];
+  let lastErr;
+  for(const t of tries){
+    try{
+      const r = await t();
+      if(!r.ok){ lastErr = new Error('HTTP '+r.status); continue; }
+      const j = await r.json();
+      if(Array.isArray(j) && j.length > 0) return j;
+      lastErr = new Error('empty response');
+    }catch(e){ lastErr = e; console.warn('Binance try failed for', symbol, e.message); }
+  }
+  throw lastErr || new Error('all binance paths failed');
 }
 
 async function fetchYahoo(symbol){
@@ -228,8 +243,10 @@ async function loadAll(){
   document.getElementById('app').style.display='none';
   let dotInterval = setInterval(()=>{
     const d = document.getElementById('dots');
-    if(d) d.textContent = '.'.repeat(((+(d.dataset.n||0)+1)%4));
-    d.dataset.n = (+(d.dataset.n||0)+1)%4;
+    if(!d) return;
+    const n = (+(d.dataset.n||0)+1) % 4;
+    d.textContent = '.'.repeat(n);
+    d.dataset.n = n;
   }, 300);
 
   try{
@@ -252,9 +269,14 @@ async function loadAll(){
       }catch(e){ assetData[sym] = null; console.warn(sym, e.message); }
     }));
 
-    // Verify we got at least BTC — without that, the page can't render meaningfully
-    if (!assetData['BTCUSDT']) {
-      throw new Error('Binance BTC fetch failed — check ad-blocker / VPN');
+    // Log per-asset success/failure for debugging
+    const got = ASSETS.filter(s => assetData[s]).map(s => s.replace('USDT',''));
+    const missed = ASSETS.filter(s => !assetData[s]).map(s => s.replace('USDT',''));
+    console.log('Cascade fetched:', got.join(','), '— missing:', missed.join(',') || 'none');
+
+    // Don't hard-fail — render whatever we have. Cascade will just be sparser.
+    if (got.length === 0) {
+      throw new Error('No price data available — Binance + CORS proxies all unreachable. Check network / adblocker / VPN.');
     }
 
     // Fetch rates in parallel (timeouts inside fetchYahoo, won't hang)
@@ -269,7 +291,8 @@ async function loadAll(){
     const cycle = cycleScore();
     const regime = (casc.score + rates.score + cycle.score) / 3;
     const call = regimeCall(regime);
-    const btcPrice = assetData['BTCUSDT']?.price || 0;
+    const btcPrice = assetData['BTCUSDT']?.price || assetData['ETHUSDT']?.price || 0;
+    console.log('Regime:', regime.toFixed(1), '| Cascade:', casc.score.toFixed(0), '| Rates:', rates.score, '| Cycle:', cycle.score, '| Call:', call.call);
 
     clearInterval(dotInterval);
     document.getElementById('loading').style.display='none';
