@@ -143,6 +143,11 @@ Dual Momentum V2 gate is OPEN as of 06:00 today (20d +1.64%, 60d +12.87%). Posit
 
 ---
 
-## AUTO-LOGGED EDGE SIGNALS (cross-check only)
+## AUTO-LOGGED EDGE SIGNALS
 
-*Auto-populated daily by `edge-tracker.service` on Nevada. Edge transitions are for cross-check against Dual Momentum V2 decisions, not a substitute. See commit `6f0b77e` on `soullight/btc-rings` for the 120-day backfill.*
+*Auto-logged by edge-tracker (Nevada cron).*
+
+| Date | Transition | Price | Score | Size | Reasons | Took? |
+|---|---|---|---|---|---|---|
+| 2026-05-26 | EXIT → WAIT | $76,422 | -5 | 0/3 | 20D cycle just troughed (day 4) · 60D troughs making higher lows · Late 4-year cycle | |
+
