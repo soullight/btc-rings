@@ -1,0 +1,60 @@
+{
+  "generated_utc": "2026-06-09 15:34:38",
+  "model": "NeoQuasar/Kronos-mini",
+  "window_days": 30,
+  "step_hours": 12,
+  "n_paths": 20,
+  "horizon_hours": 24,
+  "lookback_hours": 360,
+  "note": "hit_rate vs base_rate_up = directional edge. brier_skill>0 beats naive. high_conf = points where |prob-0.5|>=0.15. Gate before sizing on Kronos.",
+  "results": [
+    {
+      "name": "BTC",
+      "symbol": "BTCUSDT",
+      "n": 61,
+      "base_rate_up": 0.4098,
+      "hit_rate": 0.4918,
+      "brier": 0.3821,
+      "brier_skill": -0.5797,
+      "high_conf_n": 45,
+      "high_conf_hit_rate": 0.5111,
+      "mean_prob": 0.65
+    },
+    {
+      "name": "ETH",
+      "symbol": "ETHUSDT",
+      "n": 61,
+      "base_rate_up": 0.3607,
+      "hit_rate": 0.5082,
+      "brier": 0.3323,
+      "brier_skill": -0.4409,
+      "high_conf_n": 45,
+      "high_conf_hit_rate": 0.5111,
+      "mean_prob": 0.6008
+    },
+    {
+      "name": "SOL",
+      "symbol": "SOLUSDT",
+      "n": 61,
+      "base_rate_up": 0.3607,
+      "hit_rate": 0.4262,
+      "brier": 0.4088,
+      "brier_skill": -0.7728,
+      "high_conf_n": 45,
+      "high_conf_hit_rate": 0.3778,
+      "mean_prob": 0.5098
+    },
+    {
+      "name": "ZEC",
+      "symbol": "ZECUSDT",
+      "n": 61,
+      "base_rate_up": 0.5082,
+      "hit_rate": 0.5574,
+      "brier": 0.2718,
+      "brier_skill": -0.0875,
+      "high_conf_n": 40,
+      "high_conf_hit_rate": 0.575,
+      "mean_prob": 0.4984
+    }
+  ]
+}

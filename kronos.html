@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Rings — Kronos Forecast</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #fff;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
+    padding: 20px; max-width: 1100px; margin: 0 auto;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 6px; text-align: center; }
+  .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; text-align: center; margin-top: 4px; margin-bottom: 18px; }
+  .loading { text-align: center; padding: 80px 0; }
+  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .pulse-ring { width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
+    border: 2px solid rgba(79,195,247,0.3); animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:0.3} 50%{transform:scale(1.2);opacity:0.8} }
+
+  .tabs { display:flex; gap:8px; justify-content:center; margin-bottom:18px; flex-wrap:wrap; }
+  .tab { padding:8px 16px; border-radius:8px; font-size:12px; font-weight:700; letter-spacing:2px;
+    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); cursor:pointer; color:rgba(255,255,255,0.5); }
+  .tab.active { background:rgba(79,195,247,0.1); border-color:rgba(79,195,247,0.4); color:#4FC3F7; }
+  .tab .t-sub { font-size:8px; font-weight:400; letter-spacing:1px; margin-top:2px; opacity:0.7; }
+
+  .signal-box { text-align: center; padding: 22px; border-radius: 10px; margin-bottom: 8px; }
+  .signal-box.bull { background: rgba(0,230,118,0.06); border: 2px solid rgba(0,230,118,0.2); }
+  .signal-box.bear { background: rgba(255,23,68,0.06); border: 2px solid rgba(255,23,68,0.2); }
+  .signal-box.neutral { background: rgba(255,255,255,0.02); border: 2px solid rgba(255,255,255,0.06); }
+  .signal-label { font-size: 10px; letter-spacing: 3px; margin-bottom: 8px; color: rgba(255,255,255,0.4); }
+  .signal-action { font-size: 26px; font-weight: 700; letter-spacing: 4px; }
+  .signal-reason { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 8px; line-height: 1.6; }
+
+  .confirm-note { text-align:center; font-size:9px; letter-spacing:2px; color:rgba(255,255,255,0.3); margin-bottom:18px; }
+  .confirm-note b { color: rgba(255,215,0,0.6); }
+
+  .gauges { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
+  .gauge { padding:16px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); }
+  .gauge .glbl { font-size:9px; letter-spacing:2px; color:rgba(255,255,255,0.35); margin-bottom:10px; text-align:center; }
+  .bar { height:10px; border-radius:5px; background:rgba(255,255,255,0.05); overflow:hidden; }
+  .bar > span { display:block; height:100%; border-radius:5px; }
+  .gauge .gval { font-size:22px; font-weight:700; text-align:center; margin-top:10px; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .stat { padding: 14px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); text-align: center; }
+  .stat .lbl { font-size: 8px; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
+  .stat .val { font-size: 18px; font-weight: 700; }
+  .stat .sub { font-size: 9px; color: rgba(255,255,255,0.25); margin-top: 4px; }
+
+  .section { font-size: 11px; letter-spacing: 3px; color: rgba(255,255,255,0.4); margin: 20px 0 10px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  canvas { width: 100%; border-radius: 8px; margin-bottom: 16px; }
+  .green { color: #00E676; } .red { color: #FF1744; } .gold { color: #FFD700; } .cyan { color: #4FC3F7; }
+  .meta { font-size:9px; color:rgba(255,255,255,0.25); text-align:center; letter-spacing:1px; line-height:1.7; margin-top:10px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px; }
+  th { text-align: right; padding: 6px 8px; font-size: 8px; letter-spacing: 1px; color: rgba(255,255,255,0.3); border-bottom: 1px solid rgba(255,255,255,0.06); }
+  th:first-child, td:first-child { text-align: left; }
+  td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); color: rgba(255,255,255,0.7); text-align: right; }
+  .val-note { font-size:9px; color:rgba(255,255,255,0.3); line-height:1.6; }
+
+  .footer-links { text-align:center; margin-top:24px; font-size:10px; letter-spacing:2px; }
+  .footer-links a { color: rgba(79,195,247,0.6); text-decoration:none; margin:0 8px; }
+</style>
+</head>
+<body>
+  <h1>KRONOS</h1>
+  <div class="subtitle">FOUNDATION-MODEL 24H FORECAST · BTC · ETH · SOL · ZEC · CONFIRMATION ONLY</div>
+
+  <div id="loading" class="loading">
+    <div class="loading-text">LOADING FORECAST…</div>
+    <div class="pulse-ring"></div>
+  </div>
+
+  <div id="app" style="display:none;">
+    <div id="tabs" class="tabs"></div>
+
+    <div id="signalBox" class="signal-box neutral">
+      <div class="signal-label">KRONOS READ — 24H AHEAD</div>
+      <div id="signalAction" class="signal-action">—</div>
+      <div id="signalReason" class="signal-reason"></div>
+    </div>
+    <div class="confirm-note">EDGE IS THE CALL · KRONOS IS CONFIRMATION · <b>PATTERN WINS — KRONOS DOES NOT GET A VOTE</b></div>
+
+    <div class="gauges">
+      <div class="gauge">
+        <div class="glbl">UPSIDE PROBABILITY (24H)</div>
+        <div class="bar"><span id="upBar"></span></div>
+        <div id="upVal" class="gval">—</div>
+      </div>
+      <div class="gauge">
+        <div class="glbl">VOLATILITY AMPLIFICATION</div>
+        <div class="bar"><span id="volBar"></span></div>
+        <div id="volVal" class="gval">—</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat"><div class="lbl">LAST CLOSE</div><div id="sLast" class="val">—</div><div class="sub">spot context</div></div>
+      <div class="stat"><div class="lbl">MEAN 24H TARGET</div><div id="sTarget" class="val">—</div><div class="sub">avg of paths</div></div>
+      <div class="stat"><div class="lbl">EXPECTED RETURN</div><div id="sRet" class="val">—</div><div class="sub">24h</div></div>
+      <div class="stat"><div class="lbl">PATHS</div><div id="sPaths" class="val">—</div><div class="sub">monte carlo</div></div>
+    </div>
+
+    <div class="section">FORECAST CONE — MEAN + P10/P90 BAND</div>
+    <canvas id="cone" width="1060" height="340"></canvas>
+    <div class="meta" id="meta"></div>
+
+    <div class="section">WALK-FORWARD VALIDATION — DOES THE SIGNAL PREDICT DIRECTION?</div>
+    <div id="valWrap"><div class="val-note">No validation file yet. Run <code>python3 kronos/kronos_validate.py</code> locally.</div></div>
+  </div>
+
+  <div class="footer-links">
+    <a href="edge.html">edge (the call)</a>
+    <a href="dashboard-v2.html">dashboard</a>
+    <a href="nav.html">all indicators</a>
+    <a href="https://github.com/shiyu-coder/Kronos" target="_blank">kronos repo</a>
+  </div>
+
+<script>
+const pct = n => (n * 100).toFixed(1) + '%';
+const money = (n) => {
+  if (n >= 1000) return '$' + n.toLocaleString('en-US', {maximumFractionDigits: 0});
+  if (n >= 1) return '$' + n.toFixed(2);
+  return '$' + n.toFixed(4);
+};
+
+let DATA = null, current = 0;
+
+async function load() {
+  try {
+    const r = await fetch('kronos/kronos_signals.json?t=' + Date.now());
+    DATA = await r.json();
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      '<div class="loading-text">No forecast yet. Run <code>python3 kronos/kronos_forecast.py</code> locally.</div>';
+    return;
+  }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  buildTabs();
+  render(0);
+  loadValidation();
+}
+
+function buildTabs() {
+  const el = document.getElementById('tabs');
+  el.innerHTML = DATA.assets.map((a, i) => {
+    const up = a.upside_probability;
+    const cls = up >= 0.55 ? 'green' : up <= 0.45 ? 'red' : 'gold';
+    return `<div class="tab" data-i="${i}" onclick="render(${i})">
+      ${a.name}<div class="t-sub ${cls}">${pct(up)}↑</div></div>`;
+  }).join('');
+}
+
+function render(i) {
+  current = i;
+  const d = DATA.assets[i];
+  document.querySelectorAll('.tab').forEach((t, k) => t.classList.toggle('active', k === i));
+
+  const up = d.upside_probability;
+  const bull = up >= 0.55, bear = up <= 0.45;
+  const box = document.getElementById('signalBox');
+  const act = document.getElementById('signalAction');
+  box.className = 'signal-box ' + (bull ? 'bull' : bear ? 'bear' : 'neutral');
+  act.textContent = d.name + ' · ' + d.read;
+  act.className = 'signal-action ' + (bull ? 'green' : bear ? 'red' : 'gold');
+  document.getElementById('signalReason').textContent =
+    `${pct(up)} of ${DATA.n_paths} sampled paths close higher in ${DATA.horizon_hours}h · mean target ${money(d.mean_target)}`;
+
+  const upBar = document.getElementById('upBar');
+  upBar.style.width = pct(up);
+  upBar.style.background = bull ? '#00E676' : bear ? '#FF1744' : '#FFD700';
+  const upVal = document.getElementById('upVal');
+  upVal.textContent = pct(up);
+  upVal.className = 'gval ' + (bull ? 'green' : bear ? 'red' : 'gold');
+
+  const va = d.volatility_amplification;
+  const volBar = document.getElementById('volBar');
+  volBar.style.width = pct(va);
+  volBar.style.background = va > 0.7 ? '#FF1744' : va > 0.4 ? '#FFD700' : '#4FC3F7';
+  const volVal = document.getElementById('volVal');
+  volVal.textContent = pct(va);
+  volVal.className = 'gval ' + (va > 0.7 ? 'red' : va > 0.4 ? 'gold' : 'cyan');
+
+  document.getElementById('sLast').textContent = money(d.last_close);
+  document.getElementById('sTarget').textContent = money(d.mean_target);
+  const ret = document.getElementById('sRet');
+  ret.textContent = (d.expected_return >= 0 ? '+' : '') + (d.expected_return * 100).toFixed(2) + '%';
+  ret.className = 'val ' + (d.expected_return >= 0 ? 'green' : 'red');
+  document.getElementById('sPaths').textContent = DATA.n_paths;
+
+  document.getElementById('meta').innerHTML =
+    `model ${DATA.model} · context ${DATA.lookback_hours}h ending ${d.context_last_ts_utc} UTC · generated ${DATA.generated_utc} UTC<br>` +
+    `realized vol ${pct(d.realized_vol_hourly)}/h → forecast vol ${pct(d.forecast_vol_hourly)}/h`;
+
+  drawCone(d);
+}
+
+function drawCone(d) {
+  const cv = document.getElementById('cone'), ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, padL = 78, padR = 20, padT = 20, padB = 30;
+  ctx.clearRect(0, 0, W, H);
+  const p10 = d.p10, p90 = d.p90, mean = d.mean_path, n = mean.length;
+  const all = p10.concat(p90, [d.last_close]);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  const padv = (hi - lo) * 0.1 || 1; lo -= padv; hi += padv;
+  const x = i => padL + (W - padL - padR) * (i / (n - 1));
+  const y = v => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = '10px monospace'; ctx.textAlign = 'right';
+  for (let g = 0; g <= 4; g++) {
+    const v = lo + (hi - lo) * g / 4, yy = y(v);
+    ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.stroke();
+    ctx.fillText(money(v), padL - 8, yy + 3);
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(padL, y(d.last_close)); ctx.lineTo(W - padR, y(d.last_close)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) { const xx = x(i), yy = y(p90[i]); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+  for (let i = n - 1; i >= 0; i--) ctx.lineTo(x(i), y(p10[i]));
+  ctx.closePath();
+  const bull = d.upside_probability >= 0.5;
+  ctx.fillStyle = bull ? 'rgba(0,230,118,0.10)' : 'rgba(255,23,68,0.10)';
+  ctx.fill();
+
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) { const xx = x(i), yy = y(mean[i]); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+  ctx.strokeStyle = bull ? '#00E676' : '#FF1744'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = bull ? '#00E676' : '#FF1744';
+  ctx.beginPath(); ctx.arc(x(n - 1), y(mean[n - 1]), 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.textAlign = 'center';
+  ctx.fillText('now', padL, H - 10);
+  ctx.fillText('+' + d.mean_path.length + 'h', x(n - 1), H - 10);
+}
+
+async function loadValidation() {
+  let v;
+  try { v = await (await fetch('kronos/kronos_validation.json?t=' + Date.now())).json(); }
+  catch (e) { return; }
+  const colColor = (r) => {
+    const edge = r.hit_rate - r.base_rate_up;
+    return edge > 0.03 ? 'green' : edge < -0.03 ? 'red' : 'gold';
+  };
+  const rows = v.results.map(r => `<tr>
+    <td>${r.name}</td><td>${r.n}</td>
+    <td>${pct(r.base_rate_up)}</td>
+    <td class="${colColor(r)}">${pct(r.hit_rate)}</td>
+    <td>${r.brier.toFixed(3)}</td>
+    <td class="${r.brier_skill > 0 ? 'green' : 'red'}">${r.brier_skill >= 0 ? '+' : ''}${r.brier_skill.toFixed(3)}</td>
+    <td>${r.high_conf_n}</td>
+    <td class="${r.high_conf_hit_rate > 0.5 ? 'green' : r.high_conf_hit_rate != null ? 'red' : ''}">${r.high_conf_hit_rate != null ? pct(r.high_conf_hit_rate) : 'n/a'}</td>
+  </tr>`).join('');
+  document.getElementById('valWrap').innerHTML = `
+    <table>
+      <tr><th>asset</th><th>n</th><th>base ↑</th><th>hit rate</th><th>brier</th><th>skill</th><th>HC n</th><th>HC hit</th></tr>
+      ${rows}
+    </table>
+    <div class="val-note">
+      <b>hit rate vs base ↑</b> = directional edge over the naive guess. <b>brier skill &gt; 0</b> beats always-guessing the base rate.
+      <b>HC</b> = high-confidence calls (|prob−0.5| ≥ 0.15). Window ${v.window_days}d · step ${v.step_hours}h · ${v.n_paths} paths · gen ${v.generated_utc} UTC.<br>
+      This is the gate before sizing on Kronos. It informs; Edge + pattern decide.
+    </div>`;
+}
+
+load();
+</script>
+</body>
+</html>
