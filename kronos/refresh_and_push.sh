@@ -47,8 +47,10 @@ fi
 log "committed."
 
 # --- Push, with a single rebase+retry on transient conflict ---
+# --autostash lets the rebase proceed even if unrelated tracked files in the
+# working tree are dirty (this repo carries other in-progress edits).
 push_once() {
-  "$GIT" pull --rebase origin "$BRANCH" >> "$LOG" 2>&1 && "$GIT" push origin "$BRANCH" >> "$LOG" 2>&1
+  "$GIT" pull --rebase --autostash origin "$BRANCH" >> "$LOG" 2>&1 && "$GIT" push origin "$BRANCH" >> "$LOG" 2>&1
 }
 if push_once; then
   log "pushed OK."
