@@ -154,8 +154,31 @@ async function apiFetch(url,timeout=25000){
   catch(e){clearTimeout(t);throw e;}
 }
 
-// ── BTC: CoinGecko → Binance → CryptoCompare ──
+// ── BTC: Coinbase → CoinGecko → Binance → CryptoCompare ──
+// (Binance geo-blocked in US; Coinbase candle: [t(s),low,high,open,close,vol] newest-first)
+async function _coinbaseBTC(count){
+  const G=86400; let endS=Math.floor(Date.now()/1000); const out=[]; let guard=0;
+  while(out.length<count && guard<30){
+    guard++;
+    const startS=endS-G*299;
+    let arr;
+    try{ arr=await apiFetch(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${G}&start=${startS}&end=${endS}`,8000); }
+    catch(e){ break; }
+    if(!Array.isArray(arr)||!arr.length)break;
+    for(const k of arr) out.push({date:new Date(k[0]*1000),price:k[4]});
+    const newEnd=arr[arr.length-1][0]-G;
+    if(newEnd>=endS)break;
+    endS=newEnd;
+  }
+  const seen=new Set();
+  return out.filter(x=>{const k=+x.date;if(seen.has(k))return false;seen.add(k);return true;})
+    .filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
+}
 async function fetchBTC(){
+  try{
+    const d=await _coinbaseBTC(2000);
+    if(d.length>100)return{data:d,source:"Coinbase"};
+  }catch(e){}
   try{
     const r=await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
     if(!r.ok)throw 0;const j=await r.json();

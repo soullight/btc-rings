@@ -98,12 +98,16 @@ canvas { display:block; border-radius:16px; }
   }
 
   async function getOHLC() {
-    // Try Binance first for actual OHLC
+    // Coinbase first — real OHLC (Binance geo-blocked in US).
+    // Coinbase candle: [time(s), low, high, open, close, vol] newest-first.
     try {
-      const d = await fetchJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200');
-      return d.map(k => ({ t: Number(k[0]), h: Number(k[2]), l: Number(k[3]), c: Number(k[4]) }));
-    } catch (e) { console.warn('Binance:', e.message); }
-    // Fallback: CoinGecko (close only)
+      const d = await fetchJSON('https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400');
+      if (Array.isArray(d) && d.length > 50) {
+        return d.map(k => ({ t: Number(k[0]) * 1000, h: Number(k[2]), l: Number(k[1]), c: Number(k[4]) }))
+                .sort((a, b) => a.t - b.t);
+      }
+    } catch (e) { console.warn('Coinbase:', e.message); }
+    // Fallback: CoinGecko (close only — h=l=c)
     try {
       const d = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily');
       return d.prices.map(p => ({ t: p[0], h: p[1], l: p[1], c: p[1] }));
@@ -198,11 +202,15 @@ canvas { display:block; border-radius:16px; }
   let ws = null, wsRetry = 1000, pollTimer = null;
 
   function connectWS() {
+    // Coinbase WS (Binance geo-blocked in US)
     try {
-      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+      ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+      ws.onopen = () => {
+        wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        ws.send(JSON.stringify({ type: 'subscribe', product_ids: ['BTC-USD'], channels: ['ticker'] }));
+      };
       ws.onmessage = (e) => {
-        try { S.livePrice = parseFloat(JSON.parse(e.data).p); updatePosition(); } catch (err) {}
+        try { const d = JSON.parse(e.data); if (d.type === 'ticker' && d.price) { S.livePrice = parseFloat(d.price); updatePosition(); } } catch (err) {}
       };
       ws.onclose = () => { setTimeout(connectWS, wsRetry); wsRetry = Math.min(wsRetry * 2, 30000); startPoll(); };
       ws.onerror = () => { ws.close(); };
@@ -213,7 +221,7 @@ canvas { display:block; border-radius:16px; }
     if (pollTimer) return;
     pollTimer = setInterval(async () => {
       try {
-        const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000);
+        const d = await fetchJSON('https://api.exchange.coinbase.com/products/BTC-USD/ticker', 5000);
         S.livePrice = parseFloat(d.price); updatePosition();
       } catch (e) {}
     }, 3000);

@@ -116,7 +116,7 @@
   <div id="ladder" class="ladder-strip"></div>
   <div id="stats" class="stats"></div>
   <div id="cascadeStrip" class="cascade-strip"></div>
-  <div class="footer">LIVE · BINANCE API · MAs COMPUTED FROM REAL HISTORY</div>
+  <div class="footer">LIVE · COINBASE API · MAs COMPUTED FROM REAL HISTORY</div>
 </div>
 
 <script>
@@ -187,7 +187,60 @@ function calcEMA(closes, period) {
   return ema;
 }
 
+// ── DATA SOURCE: Coinbase primary (Binance geo-blocked in US) ──
+// fetchKlines returns Binance-shaped arrays so all downstream math is unchanged.
+// Binance kline indices used downstream: [2]=high, [4]=close, [0]=openTime(ms).
+// Coinbase candle shape: [time(s), low, high, open, close, vol] (newest-first).
+function cbProduct(symbol){
+  return symbol.replace(/USDT$/,'').replace(/USD$/,'') + '-USD';
+}
+async function _fetchJSON(url, timeout=8000){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(), timeout);
+  try{ const r=await fetch(url,{signal:c.signal}); clearTimeout(t);
+    if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
+  catch(e){ clearTimeout(t); throw e; }
+}
+async function _coinbaseDaily(product, count){
+  const G=86400; let endS=Math.floor(Date.now()/1000); const out=[]; let guard=0;
+  // Coinbase caps ~300 candles/req; page back with a fixed 300-day window.
+  while(out.length < count && guard < 30){
+    guard++;
+    const startS=endS - G*299;
+    const url=`https://api.exchange.coinbase.com/products/${product}/candles?granularity=${G}&start=${startS}&end=${endS}`;
+    const c=await _fetchJSON(url);
+    if(!Array.isArray(c) || !c.length) break;
+    const mapped=c.map(k=>[k[0]*1000, k[3], k[2], k[1], k[4], k[5]]);
+    out.unshift(...mapped.slice().reverse());
+    const newEnd=c[c.length-1][0]-G;
+    if(newEnd >= endS) break;
+    endS=newEnd;
+  }
+  const seen=new Set(); const asc=out.filter(k=>{if(seen.has(k[0]))return false;seen.add(k[0]);return true;});
+  asc.sort((a,b)=>a[0]-b[0]);
+  return asc;
+}
+function _toWeekly(daily){
+  const wk=[];
+  for(let i=0;i<daily.length;i+=7){
+    const chunk=daily.slice(i,i+7); if(!chunk.length) break;
+    const high=Math.max(...chunk.map(k=>+k[2]));
+    const close=+chunk[chunk.length-1][4];
+    wk.push([chunk[0][0], chunk[0][1], high, chunk[0][3], close, 0]);
+  }
+  return wk;
+}
 async function fetchKlines(symbol, interval, limit) {
+  const product=cbProduct(symbol);
+  try{
+    if(interval==='1w'){
+      const daily=await _coinbaseDaily(product, limit*7);
+      const wk=_toWeekly(daily);
+      if(wk.length>10) return wk.slice(-limit);
+    } else {
+      const daily=await _coinbaseDaily(product, limit);
+      if(daily.length>10) return daily.slice(-limit);
+    }
+  }catch(e){ console.warn('Coinbase fail', symbol, interval, e); }
   const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
   const r = await fetch(url);
   if (!r.ok) throw new Error(`Binance ${r.status}`);
@@ -257,12 +310,18 @@ async function fetchCascadeData() {
 // ═══════════════════════════════════════════════════════════════
 
 function connectWS() {
-  const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-  ws.onopen = () => { wsConnected = true; updateBadge(); };
+  // Coinbase WS (Binance geo-blocked in US)
+  const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+  ws.onopen = () => {
+    wsConnected = true; updateBadge();
+    ws.send(JSON.stringify({type:'subscribe',product_ids:['BTC-USD'],channels:['ticker']}));
+  };
   ws.onmessage = (e) => {
     const d = JSON.parse(e.data);
-    livePrice = parseFloat(d.p);
-    maData.price = livePrice;
+    if (d.type === 'ticker' && d.price) {
+      livePrice = parseFloat(d.price);
+      maData.price = livePrice;
+    }
   };
   ws.onclose = () => { wsConnected = false; updateBadge(); setTimeout(connectWS, 5000); };
   ws.onerror = () => ws.close();

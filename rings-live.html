@@ -118,7 +118,7 @@ canvas { border-radius:12px; display:block; }
     </div>
 
     <div class="hud-section" style="border-color:rgba(255,255,255,0.12);">
-      <div class="hud-label">LIVE PRICE (BINANCE)</div>
+      <div class="hud-label">LIVE PRICE (COINBASE)</div>
       <div class="hud-value" id="livePrice" style="font-size:28px;">—</div>
       <div class="hud-sub" id="livePriceSub"></div>
       <div id="regimeBadge" class="regime-badge regime-expansion" style="margin-top:10px;">
@@ -237,6 +237,12 @@ canvas { border-radius:12px; display:block; }
     } catch(e) { clearTimeout(t); throw e; }
   }
 
+  async function fetchHistoricalCoinbase() {
+    // Coinbase candle: [t(s),low,high,open,close,vol] newest-first → {t(ms),c}
+    const d = await fetchJSON('https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400');
+    return d.map(k => ({t: Number(k[0])*1000, c: Number(k[4])})).sort((a,b) => a.t - b.t);
+  }
+
   async function fetchHistoricalCoinGecko() {
     const d = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=200&interval=daily');
     return d.prices.map(p => ({t: p[0], c: p[1]}));
@@ -253,7 +259,7 @@ canvas { border-radius:12px; display:block; }
   }
 
   async function getHistorical() {
-    const sources = [fetchHistoricalCoinGecko, fetchHistoricalBinance, fetchHistoricalCryptoCompare];
+    const sources = [fetchHistoricalCoinbase, fetchHistoricalCoinGecko, fetchHistoricalBinance, fetchHistoricalCryptoCompare];
     for(const fn of sources) {
       try { const d = await fn(); if(d && d.length > 50) return d; } catch(e) { console.warn('Source failed:', e.message); }
     }
@@ -345,20 +351,24 @@ canvas { border-radius:12px; display:block; }
   let pollingTimer = null;
 
   function connectWS() {
+    // Coinbase WS (Binance geo-blocked in US)
     try {
-      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+      ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
       ws.onopen = () => {
         S.wsConnected = true;
         wsRetryDelay = 1000;
         if(pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+        ws.send(JSON.stringify({type:'subscribe',product_ids:['BTC-USD'],channels:['ticker']}));
         console.log('WS connected');
       };
       ws.onmessage = (e) => {
         try {
           const d = JSON.parse(e.data);
-          S.livePrice = parseFloat(d.p);
-          S.lastWsTick = Date.now();
-          updateHUD();
+          if (d.type === 'ticker' && d.price) {
+            S.livePrice = parseFloat(d.price);
+            S.lastWsTick = Date.now();
+            updateHUD();
+          }
         } catch(err) {}
       };
       ws.onclose = () => {
@@ -378,7 +388,7 @@ canvas { border-radius:12px; display:block; }
     if(pollingTimer) return;
     pollingTimer = setInterval(async ()=>{
       try {
-        const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000);
+        const d = await fetchJSON('https://api.exchange.coinbase.com/products/BTC-USD/ticker', 5000);
         S.livePrice = parseFloat(d.price);
         S.lastWsTick = Date.now();
         updateHUD();
