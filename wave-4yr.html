@@ -31,6 +31,25 @@ let globalMax = 0;
 
 async function fetchHistory() {
   const NOV_2022_SEC = 1668988800;
+  // Coinbase PRIMARY (Binance geo-blocked in US). Candle: [t_s,low,high,open,close,vol] newest-first.
+  try {
+    const G = 86400; let endS = Math.floor(Date.now() / 1000); const map = new Map(); let guard = 0;
+    while (endS > NOV_2022_SEC && guard < 30) {
+      guard++; const startS = Math.max(NOV_2022_SEC, endS - G * 299);
+      const c = new AbortController(), t = setTimeout(() => c.abort(), 8000);
+      let arr;
+      try {
+        const r = await fetch(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${G}&start=${startS}&end=${endS}`, { signal: c.signal });
+        clearTimeout(t); if (!r.ok) throw new Error('HTTP ' + r.status); arr = await r.json();
+      } catch (e) { clearTimeout(t); break; }
+      if (!Array.isArray(arr) || !arr.length) break;
+      for (const k of arr) map.set(k[0], k[4]);
+      const newEnd = arr[arr.length - 1][0] - G; if (newEnd >= endS || startS <= NOV_2022_SEC) break; endS = newEnd;
+    }
+    const closes = [...map.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]).filter(p => p > 0);
+    if (closes.length >= 365) return closes;
+  } catch (e) { console.warn("Coinbase failed:", e.message); }
+
   // CryptoCompare: free, allows up to 2000 days of daily data
   try {
     const r = await fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=1400");

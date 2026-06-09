@@ -256,7 +256,31 @@ function normalizeCryptoTicker(ticker){
   return t + 'USDT';
 }
 
-// ── BINANCE (crypto, no key needed) ──
+// Map a ticker to a Coinbase product id, e.g. BTC -> BTC-USD
+function coinbaseProduct(ticker){
+  let t = ticker.toUpperCase().replace(/[-_ ]/g,'');
+  t = t.replace(/USDT$/,'').replace(/BUSD$/,'').replace(/USD$/,'');
+  return t + '-USD';
+}
+
+// ── COINBASE (crypto, no key, works from US — Binance is geo-blocked) ──
+// Coinbase candle: [t_s, low, high, open, close, vol] newest-first.
+async function fetchCoinbaseCrypto(ticker, rangeDays){
+  const prod = coinbaseProduct(ticker);
+  const G = 86400; const startS0 = Math.floor((Date.now() - rangeDays * 864e5)/1000);
+  let endS = Math.floor(Date.now()/1000); const map=new Map(); let guard=0;
+  while(endS > startS0 && guard < 30){
+    guard++; const startS = Math.max(startS0, endS - G*299);
+    const url = `https://api.exchange.coinbase.com/products/${prod}/candles?granularity=${G}&start=${startS}&end=${endS}`;
+    let arr; try { arr = await apiFetch(url); } catch(e){ break; }
+    if(!Array.isArray(arr) || !arr.length) break;
+    for(const k of arr) map.set(k[0], {t:k[0]*1000, o:k[3], h:k[2], l:k[1], c:k[4]});
+    const newEnd = arr[arr.length-1][0] - G; if(newEnd >= endS || startS <= startS0) break; endS = newEnd;
+  }
+  return [...map.values()].sort((a,b)=>a.t-b.t);
+}
+
+// ── BINANCE (crypto fallback; geo-blocked in US) ──
 async function fetchBinance(ticker, rangeDays){
   const sym = normalizeCryptoTicker(ticker);
   const all=[];
@@ -308,6 +332,9 @@ async function fetchTwelveData(ticker, rangeDays){
 // ── UNIFIED FETCH ──
 async function fetchData(ticker, rangeDays){
   if(isCrypto(ticker)){
+    // Coinbase primary (works from US); Binance fallback.
+    const d = await fetchCoinbaseCrypto(ticker, rangeDays);
+    if(d && d.length) return d;
     return await fetchBinance(ticker, rangeDays);
   } else {
     return await fetchTwelveData(ticker, rangeDays);
@@ -675,7 +702,7 @@ async function go(){
     }
 
     currentTicker = ticker.toUpperCase();
-    dataSource = isCrypto(ticker) ? 'BINANCE' : 'TWELVE DATA';
+    dataSource = isCrypto(ticker) ? 'COINBASE' : 'TWELVE DATA';
     $('source-tag').textContent = 'DATA: ' + dataSource + ' · ' + daily.length + ' DAYS';
 
     await buildSegments(daily);

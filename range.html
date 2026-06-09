@@ -236,8 +236,22 @@ canvas { border-radius:12px; display:block; }
     } catch (e) { clearTimeout(t); throw e; }
   }
 
+  async function fetchCoinbaseOHLC() {
+    // Coinbase daily OHLC, ~365 days (Binance geo-blocked in US).
+    // Coinbase candle: [t_s, low, high, open, close, vol] newest-first.
+    const G = 86400; let endS = Math.floor(Date.now() / 1000); const map = new Map(); let guard = 0;
+    while (map.size < 365 && guard < 10) {
+      guard++; const startS = endS - G * 299;
+      const arr = await fetchJSON(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${G}&start=${startS}&end=${endS}`, 8000);
+      if (!Array.isArray(arr) || !arr.length) break;
+      for (const k of arr) map.set(k[0], { t: k[0] * 1000, o: k[3], h: k[2], l: k[1], c: k[4], v: k[5] });
+      const newEnd = arr[arr.length - 1][0] - G; if (newEnd >= endS) break; endS = newEnd;
+    }
+    return [...map.values()].sort((a, b) => a.t - b.t);
+  }
+
   async function fetchBinanceOHLC() {
-    // Fetch 365 days of daily OHLC from Binance
+    // Fetch 365 days of daily OHLC from Binance (geo-blocked in US; last-resort)
     const d = await fetchJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=365');
     return d.map(k => ({
       t: Number(k[0]),
@@ -263,8 +277,9 @@ canvas { border-radius:12px; display:block; }
   }
 
   async function getOHLC() {
-    // Try Binance first (has actual OHLC), then CoinGecko as fallback
-    const sources = [fetchBinanceOHLC, fetchCoinGeckoOHLC];
+    // Coinbase first (real OHLC, works from US), then Binance, then CoinGecko
+    const sources = [fetchCoinbaseOHLC, fetchBinanceOHLC, fetchCoinGeckoOHLC];
+    const labels = new Map([[fetchCoinbaseOHLC,'Coinbase OHLC'],[fetchBinanceOHLC,'Binance OHLC'],[fetchCoinGeckoOHLC,'CoinGecko (close only)']]);
     for (const fn of sources) {
       try {
         const d = await fn();
@@ -278,7 +293,7 @@ canvas { border-radius:12px; display:block; }
             merged = [...older, ...d];
           }
           saveCache(merged);
-          $('dataSource').textContent = fn === fetchBinanceOHLC ? 'Binance OHLC' : 'CoinGecko (close only)';
+          $('dataSource').textContent = labels.get(fn) || 'Live';
           return merged;
         }
       } catch (e) { console.warn('OHLC source failed:', e.message); }

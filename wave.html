@@ -93,6 +93,46 @@ async function api(url) {
   } catch(e) { clearTimeout(t); throw e; }
 }
 
+/* ── COINBASE (Binance is geo-blocked in US) — returns Binance-kline-shaped
+   arrays [t_ms, open, high, low, close, vol]. Coinbase candle = [t_s,low,high,open,close,vol] newest-first. ── */
+async function _cbFetch(g, startS, endS){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(),8000);
+  try{
+    const r=await fetch(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${g}&start=${startS}&end=${endS}`,{signal:c.signal});
+    clearTimeout(t); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json();
+  }catch(e){ clearTimeout(t); throw e; }
+}
+async function coinbaseDaily(limitDays){
+  const G=86400; let endS=Math.floor(Date.now()/1000); const map=new Map(); let guard=0;
+  while(map.size<limitDays && guard<30){
+    guard++; const startS=endS-G*299;
+    let arr; try{ arr=await _cbFetch(G,startS,endS);}catch(e){break;}
+    if(!Array.isArray(arr)||!arr.length) break;
+    for(const k of arr) map.set(k[0],[k[0]*1000,k[3],k[2],k[1],k[4],k[5]]);
+    const newEnd=arr[arr.length-1][0]-G; if(newEnd>=endS) break; endS=newEnd;
+  }
+  return [...map.values()].sort((a,b)=>a[0]-b[0]);
+}
+async function coinbase4h(startMs){
+  const G=3600, B=14400; const startS0=Math.floor(startMs/1000); let endS=Math.floor(Date.now()/1000);
+  const map=new Map(); let guard=0;
+  while(endS>startS0 && guard<60){
+    guard++; const startS=Math.max(startS0, endS-G*299);
+    let arr; try{ arr=await _cbFetch(G,startS,endS);}catch(e){break;}
+    if(!Array.isArray(arr)||!arr.length) break;
+    for(const k of arr) map.set(k[0],k);
+    const newEnd=arr[arr.length-1][0]-G; if(newEnd>=endS||startS<=startS0) break; endS=newEnd;
+  }
+  const hourly=[...map.values()].sort((a,b)=>a[0]-b[0]);
+  const buckets=new Map();
+  for(const k of hourly){
+    const bt=Math.floor(k[0]/B)*B; let b=buckets.get(bt);
+    if(!b){ b={t:bt,o:k[3],h:k[2],l:k[1],c:k[4],v:k[5]}; buckets.set(bt,b); }
+    else { b.h=Math.max(b.h,k[2]); b.l=Math.min(b.l,k[1]); b.c=k[4]; b.v+=k[5]; }
+  }
+  return [...buckets.values()].sort((a,b)=>a.t-b.t).map(b=>[b.t*1000,b.o,b.h,b.l,b.c,b.v]);
+}
+
 /* ── TROUGH DETECTION (proven algorithm) ── */
 function detectTroughs(closes, hw) {
   const t = [];
@@ -529,8 +569,8 @@ function updateCards() {
 /* ── INIT ── */
 async function init() {
   try {
-    // Daily OHLC for trough detection
-    const daily = await api('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200');
+    // Daily OHLC for trough detection (Coinbase; Binance geo-blocked)
+    const daily = await coinbaseDaily(200);
     const kd = daily.map(k => ({ t:+k[0], h:+k[2], l:+k[3], c:+k[4] }));
     const closes = kd.map(k => k.c);
 
@@ -546,8 +586,8 @@ async function init() {
     S.troughTime = kd[ti].t;
     S.troughPrice = closes[ti];
 
-    // 4h klines from trough to now
-    const h4 = await api(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=${S.troughTime}&limit=1000`);
+    // 4h klines from trough to now (Coinbase 1h aggregated to 4h)
+    const h4 = await coinbase4h(S.troughTime);
     const msDay = 864e5;
 
     S.wave = h4.map(k => ({

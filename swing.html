@@ -174,9 +174,31 @@ function computeSwingData(data) {
 // ═══════════════════════════════════════════════
 // DATA FETCHING
 // ═══════════════════════════════════════════════
+// Coinbase daily candles → {date,price}. Binance geo-blocked in US; CoinGecko
+// free tier now caps at 365d (days=max → 401). Coinbase candle: [t_s,low,high,open,close,vol] newest-first.
+async function _coinbaseHistory(count){
+  const G=86400; let endS=Math.floor(Date.now()/1000); const map=new Map(); let guard=0;
+  while(map.size < count && guard < 30){
+    guard++; const startS=endS - G*299;
+    const c=new AbortController(), t=setTimeout(()=>c.abort(),8000);
+    let arr;
+    try{
+      const r=await fetch(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${G}&start=${startS}&end=${endS}`,{signal:c.signal});
+      clearTimeout(t); if(!r.ok) throw new Error('HTTP '+r.status); arr=await r.json();
+    }catch(e){ clearTimeout(t); break; }
+    if(!Array.isArray(arr) || !arr.length) break;
+    for(const k of arr) map.set(k[0], {date:new Date(k[0]*1000), price:k[4]});
+    const newEnd=arr[arr.length-1][0]-G; if(newEnd >= endS) break; endS=newEnd;
+  }
+  return [...map.values()].filter(x=>x.price>0).sort((a,b)=>a.date-b.date);
+}
 async function fetchBTCData() {
   try {
-    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max&interval=daily");
+    const d = await _coinbaseHistory(2000);
+    if (d.length > 100) return {data:d, source:"LIVE", detail:"Coinbase"};
+  } catch(e) { console.warn("Coinbase:",e); }
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily");
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
     const d = j.prices.map(([ts,p]) => ({date:new Date(ts),price:p}));
