@@ -194,11 +194,13 @@ let ws = null, wsRetry = 1000, poll = null;
 
 function connectWS() {
   try {
-    ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-    ws.onopen = () => { wsRetry = 1000; if (poll) { clearInterval(poll); poll = null; } };
+    ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+    ws.onopen = () => { wsRetry = 1000; if (poll) { clearInterval(poll); poll = null; } ws.send(JSON.stringify({ type: 'subscribe', product_ids: ['BTC-USD'], channels: ['ticker'] })); };
     ws.onmessage = e => {
       try {
-        S.live = parseFloat(JSON.parse(e.data).p);
+        const m = JSON.parse(e.data);
+        if (m.type !== 'ticker') return;
+        S.live = parseFloat(m.price);
         if (S.live < S.cLo) S.cLo = S.live;
         S.days = (Date.now() - S.troughTime) / 864e5;
         checkPhase();
@@ -213,7 +215,7 @@ function startPoll() {
   if (poll) return;
   poll = setInterval(async () => {
     try {
-      const d = await api('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+      const d = await api('https://api.exchange.coinbase.com/products/BTC-USD/ticker');
       S.live = parseFloat(d.price);
       if (S.live < S.cLo) S.cLo = S.live;
       S.days = (Date.now() - S.troughTime) / 864e5;

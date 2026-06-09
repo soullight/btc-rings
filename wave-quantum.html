@@ -80,9 +80,12 @@ async function init() {
 }
 
 function startWS() {
-  const ws = new WebSocket("wss://stream.binance.com:9443/ws/btcusdt@trade");
+  const ws = new WebSocket("wss://ws-feed.exchange.coinbase.com");
+  ws.onopen = () => ws.send(JSON.stringify({ type: "subscribe", product_ids: ["BTC-USD"], channels: ["ticker"] }));
   ws.onmessage = (e) => {
-    state.livePrice = parseFloat(JSON.parse(e.data).p);
+    const m = JSON.parse(e.data);
+    if (m.type !== "ticker") return;
+    state.livePrice = parseFloat(m.price);
 
     // Conservative Phase Detection (Prevents false red flashes)
     const drop = (state.cHi - state.livePrice) / state.cHi;

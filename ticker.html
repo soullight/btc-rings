@@ -432,12 +432,12 @@ function stopLive(){
 function startLive(ticker){
   stopLive();
   if(isCrypto(ticker)){
-    // Binance WebSocket — real-time, no key
-    const sym = normalizeCryptoTicker(ticker).toLowerCase();
+    // Coinbase WebSocket — real-time, no key (Binance geo-blocked in US)
+    const prod = coinbaseProduct(ticker);
     try{
-      ws = new WebSocket(`wss://stream.binance.com:9443/ws/${sym}@trade`);
-      ws.onopen = ()=>{wsRetry=1000;};
-      ws.onmessage = e=>{try{livePrice=parseFloat(JSON.parse(e.data).p);}catch(e){}};
+      ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+      ws.onopen = ()=>{wsRetry=1000; ws.send(JSON.stringify({type:'subscribe',product_ids:[prod],channels:['ticker']}));};
+      ws.onmessage = e=>{try{const m=JSON.parse(e.data);if(m.type==='ticker')livePrice=parseFloat(m.price);}catch(e){}};
       ws.onclose = ()=>{setTimeout(()=>startLive(ticker), wsRetry); wsRetry=Math.min(wsRetry*2,30000);};
       ws.onerror = ()=>ws.close();
     }catch(e){startPollFallback(ticker);}
@@ -449,10 +449,10 @@ function startLive(ticker){
 
 function startPollFallback(ticker){
   if(poll) return;
-  const sym = normalizeCryptoTicker(ticker);
+  const prod = coinbaseProduct(ticker);
   poll = setInterval(async()=>{
     try{
-      const d = await apiFetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`,5000);
+      const d = await apiFetch(`https://api.exchange.coinbase.com/products/${prod}/ticker`,5000);
       livePrice = parseFloat(d.price);
     }catch(e){}
   },5000);

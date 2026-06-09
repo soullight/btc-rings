@@ -88,7 +88,7 @@ canvas { border-radius:12px; display:block; }
   <div class="right-panel">
 
     <div class="hud-section" style="border-color:rgba(255,255,255,0.12)">
-      <div class="hud-label">LIVE PRICE (BINANCE)</div>
+      <div class="hud-label">LIVE PRICE (COINBASE)</div>
       <div class="hud-value" id="livePrice" style="font-size:26px;">—</div>
       <div class="hud-sub" id="liveSub"></div>
       <div id="regimeBadge" style="margin-top:8px;"></div>
@@ -450,11 +450,13 @@ canvas { border-radius:12px; display:block; }
 
   function connectWS() {
     try {
-      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+      ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } ws.send(JSON.stringify({ type: 'subscribe', product_ids: ['BTC-USD'], channels: ['ticker'] })); };
       ws.onmessage = (e) => {
         try {
-          S.livePrice = parseFloat(JSON.parse(e.data).p);
+          const m = JSON.parse(e.data);
+          if (m.type !== 'ticker') return;
+          S.livePrice = parseFloat(m.price);
           updatePositions();
           updateHUD();
         } catch (err) {}
@@ -468,7 +470,7 @@ canvas { border-radius:12px; display:block; }
     if (pollTimer) return;
     pollTimer = setInterval(async () => {
       try {
-        const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000);
+        const d = await fetchJSON('https://api.exchange.coinbase.com/products/BTC-USD/ticker', 5000);
         S.livePrice = parseFloat(d.price);
         updatePositions();
         updateHUD();

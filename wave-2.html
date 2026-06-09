@@ -229,9 +229,9 @@ canvas { display:block; border-radius:16px; }
   let ws = null, wsRetry = 1000, pollTimer = null;
   function connectWS() {
     try {
-      ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
-      ws.onmessage = (e) => { try { livePrice = parseFloat(JSON.parse(e.data).p); } catch (err) {} };
+      ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+      ws.onopen = () => { wsRetry = 1000; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } ws.send(JSON.stringify({ type: 'subscribe', product_ids: ['BTC-USD'], channels: ['ticker'] })); };
+      ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.type === 'ticker') livePrice = parseFloat(m.price); } catch (err) {} };
       ws.onclose = () => { setTimeout(connectWS, wsRetry); wsRetry = Math.min(wsRetry * 2, 30000); startPoll(); };
       ws.onerror = () => { ws.close(); };
     } catch (e) { startPoll(); }
@@ -239,7 +239,7 @@ canvas { display:block; border-radius:16px; }
   function startPoll() {
     if (pollTimer) return;
     pollTimer = setInterval(async () => {
-      try { const d = await fetchJSON('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', 5000); livePrice = parseFloat(d.price); } catch (e) {}
+      try { const d = await fetchJSON('https://api.exchange.coinbase.com/products/BTC-USD/ticker', 5000); livePrice = parseFloat(d.price); } catch (e) {}
     }, 3000);
   }
 

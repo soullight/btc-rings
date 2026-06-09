@@ -63,7 +63,7 @@
   </div>
 
   <div class="data-row" style="margin: 30px 0;">
-    <div class="label" style="color: #fff">LIVE PRICE (BINANCE WS)</div>
+    <div class="label" style="color: #fff">LIVE PRICE (COINBASE WS)</div>
     <div class="value" id="live-price-val">--</div>
     <div class="regime-badge" id="regime-badge">--</div>
   </div>
@@ -170,13 +170,18 @@ async function fetchMacroData() {
   requestAnimationFrame(render);
 }
 
-// ─── BINANCE LIVE WEBSOCKET ───
+// ─── COINBASE LIVE WEBSOCKET ───
 function startWebSocket() {
-  const ws = new WebSocket("wss://stream.binance.com:9443/ws/btcusdt@trade");
+  const ws = new WebSocket("wss://ws-feed.exchange.coinbase.com");
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "subscribe", product_ids: ["BTC-USD"], channels: ["ticker"] }));
+  };
 
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
-    currentPrice = parseFloat(msg.p);
+    if (msg.type !== "ticker") return;
+    currentPrice = parseFloat(msg.price);
 
     if (currentPrice > ema21w) {
       currentRegime = "EXPANSION (PRICE > 21W EMA)";
@@ -200,7 +205,7 @@ function startWebSocket() {
     console.error("WebSocket Error — falling back to polling");
     setInterval(async () => {
       try {
-        const r = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+        const r = await fetch("https://api.exchange.coinbase.com/products/BTC-USD/ticker");
         const d = await r.json();
         currentPrice = parseFloat(d.price);
 
