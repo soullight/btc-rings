@@ -7,16 +7,16 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0a0f; color: #fff;
+    background: #f2efe8; color:#1a2230;
     font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New', monospace;
     display: flex; flex-direction: column; align-items: center;
     min-height: 100vh; padding: 20px;
   }
   h1 { font-size: 22px; font-weight: 700; letter-spacing: 6px; }
-  .subtitle { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 3px; margin-top: 4px; }
+  .subtitle { font-size: 10px; color: rgba(26,34,48,0.25); letter-spacing: 3px; margin-top: 4px; }
   canvas { border-radius: 12px; margin-top: 14px; }
   .loading { text-align: center; padding: 100px 0; }
-  .loading-text { font-size: 14px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  .loading-text { font-size: 14px; color: rgba(26,34,48,0.5); letter-spacing: 2px; }
   .pulse-ring {
     width: 60px; height: 60px; border-radius: 50%; margin: 30px auto 0;
     border: 2px solid rgba(0,230,118,0.3); animation: pulse 1.5s ease-in-out infinite;
@@ -34,19 +34,19 @@
   }
   .panel {
     padding: 16px; border-radius: 8px;
-    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(26,34,48,0.025); border: 1px solid rgba(26,34,48,0.06);
   }
   .panel-title { font-size: 9px; letter-spacing: 2px; margin-bottom: 10px; }
   .panel .row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 11px; }
-  .panel .row .lbl { color: rgba(255,255,255,0.35); }
+  .panel .row .lbl { color: rgba(26,34,48,0.35); }
   .panel .row .val { font-weight: 700; }
   .translation-bar {
     width: 100%; height: 10px; border-radius: 5px;
-    background: rgba(255,255,255,0.06); margin: 8px 0; position: relative; overflow: visible;
+    background: rgba(26,34,48,0.06); margin: 8px 0; position: relative; overflow: visible;
   }
   .translation-bar .midline {
     position: absolute; left: 50%; top: -2px; width: 1px; height: 14px;
-    background: rgba(255,255,255,0.15);
+    background: rgba(26,34,48,0.15);
   }
   .translation-bar .crest-marker {
     position: absolute; top: -3px; width: 8px; height: 16px; border-radius: 4px;
@@ -55,7 +55,7 @@
   .translation-bar .fill {
     height: 100%; border-radius: 5px; transition: width 0.3s ease;
   }
-  .footer { margin-top: 14px; font-size: 9px; color: rgba(255,255,255,0.12); letter-spacing: 1px; text-align: center; }
+  .footer { margin-top: 14px; font-size: 9px; color: rgba(26,34,48,0.12); letter-spacing: 1px; text-align: center; }
   @media (max-width: 600px) { .panels { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -433,9 +433,9 @@ function draw() {
   const c20 = analysis.current20;
 
   // ── Background ──
-  ctx.fillStyle = "#0a0a0f"; ctx.fillRect(0,0,size,size);
+  ctx.fillStyle = "#f2efe8"; ctx.fillRect(0,0,size,size);
   const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,size/2);
-  bg.addColorStop(0,"rgba(15,15,30,0.5)"); bg.addColorStop(1,"rgba(10,10,15,0)");
+  bg.addColorStop(0,"rgba(0,0,0,0)"); bg.addColorStop(1,"rgba(10,10,15,0)");
   ctx.fillStyle = bg; ctx.fillRect(0,0,size,size);
 
   // ═════════════════════════════════════════════
@@ -465,7 +465,7 @@ function draw() {
 
   // ── Full circle ring — the REMAINING path (dim, dashed) ──
   ctx.beginPath(); ctx.arc(cx, cy, r60, progressAngle, startAngle + Math.PI * 2);
-  ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 8;
+  ctx.strokeStyle = "rgba(26,34,48,0.06)"; ctx.lineWidth = 8;
   ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
 
   // ── Bright arc — the ELAPSED time (solid, glowing) ──
@@ -496,8 +496,8 @@ function draw() {
   const midX = cx + r60 * Math.cos(midpointAngle);
   const midY = cy + r60 * Math.sin(midpointAngle);
   ctx.beginPath(); ctx.arc(midX, midY, 4, 0, Math.PI*2);
-  ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fill();
-  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(26,34,48,0.2)"; ctx.fill();
+  ctx.font = "7px monospace"; ctx.fillStyle = "rgba(26,34,48,0.25)"; ctx.textAlign = "center";
   ctx.fillText("MID", midX, midY + 14);
 
   // ── Trough marker at 12 o'clock ──
@@ -546,7 +546,7 @@ function draw() {
 
     // Remaining path (dim, dashed)
     ctx.beginPath(); ctx.arc(cx, cy, r20, progressAngle20, startAngle + Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,255,255,0.04)"; ctx.lineWidth = 5;
+    ctx.strokeStyle = "rgba(26,34,48,0.04)"; ctx.lineWidth = 5;
     ctx.setLineDash([2, 4]); ctx.stroke(); ctx.setLineDash([]);
 
     // Elapsed arc (solid, glowing)
@@ -583,7 +583,7 @@ function draw() {
     const mid20X = cx + r20 * Math.cos(midpointAngle);
     const mid20Y = cy + r20 * Math.sin(midpointAngle);
     ctx.beginPath(); ctx.arc(mid20X, mid20Y, 2, 0, Math.PI*2);
-    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fill();
+    ctx.fillStyle = "rgba(26,34,48,0.15)"; ctx.fill();
 
     // 20d current position marker
     const mx20 = cx + r20 * Math.cos(progressAngle20);
@@ -636,10 +636,10 @@ function draw() {
     const x2 = cx + (r60 + 3 + tickLen) * Math.cos(angle);
     const y2 = cy + (r60 + 3 + tickLen) * Math.sin(angle);
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
-    ctx.strokeStyle = isMajor ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.07)";
+    ctx.strokeStyle = isMajor ? "rgba(26,34,48,0.15)" : "rgba(26,34,48,0.07)";
     ctx.lineWidth = 1; ctx.stroke();
     if (isMajor) {
-      ctx.font = "8px monospace"; ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.font = "8px monospace"; ctx.fillStyle = "rgba(26,34,48,0.25)";
       const tx = cx + (r60 + 18) * Math.cos(angle);
       const ty = cy + (r60 + 18) * Math.sin(angle);
       ctx.fillText(`D${day}`, tx, ty + 3);
@@ -660,7 +660,7 @@ function draw() {
   ctx.font = "bold 36px monospace"; ctx.fillStyle = color60;
   ctx.fillText(`${c60.daysSinceTrough}`, cx, cy + 8);
 
-  ctx.font = "bold 9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.font = "bold 9px monospace"; ctx.fillStyle = "rgba(26,34,48,0.3)";
   ctx.fillText(`OF ~${Math.round(c60.avgLen)} DAYS`, cx, cy + 22);
 
   // Phase
@@ -670,7 +670,7 @@ function draw() {
 
   // Days until next trough
   if (c60.daysUntilNextTrough > 0) {
-    ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.font = "9px monospace"; ctx.fillStyle = "rgba(26,34,48,0.2)";
     ctx.fillText(`~${c60.daysUntilNextTrough}d TO NEXT LOW`, cx, cy + 36);
   } else {
     ctx.font = "bold 9px monospace"; ctx.fillStyle = RED; ctx.globalAlpha = 0.7;
@@ -720,7 +720,7 @@ function updatePanels(a) {
       <div class="row"><span class="lbl">NEXT LOW EST</span><span class="val">${c60.daysUntilNextTrough > 0 ? '~' + c60.daysUntilNextTrough + 'd' : 'OVERDUE'}</span></div>
       <div class="row"><span class="lbl">TRANSLATION</span><span class="val" style="color:${color60}">${c60.translation} · ${c60.translation === 'RIGHT' ? 'BULLISH' : 'BEARISH'}</span></div>
       <div style="margin-top:8px;">
-        <div style="font-size:8px;color:rgba(255,255,255,0.25);margin-bottom:4px">CREST POSITION (LEFT ← → RIGHT)</div>
+        <div style="font-size:8px;color:rgba(26,34,48,0.25);margin-bottom:4px">CREST POSITION (LEFT ← → RIGHT)</div>
         <div class="translation-bar">
           <div class="midline"></div>
           <div class="fill" style="width:${crestPct60}%;background:${color60};opacity:0.3"></div>
@@ -740,7 +740,7 @@ function updatePanels(a) {
         <div class="row"><span class="lbl">NEXT LOW EST</span><span class="val">${c20.daysUntilNextTrough > 0 ? '~' + c20.daysUntilNextTrough + 'd' : 'OVERDUE'}</span></div>
         <div class="row"><span class="lbl">TRANSLATION</span><span class="val" style="color:${color20}">${c20.translation} · ${c20.translation === 'RIGHT' ? 'BULLISH' : 'BEARISH'}</span></div>
         <div style="margin-top:8px;">
-          <div style="font-size:8px;color:rgba(255,255,255,0.25);margin-bottom:4px">CREST POSITION (LEFT ← → RIGHT)</div>
+          <div style="font-size:8px;color:rgba(26,34,48,0.25);margin-bottom:4px">CREST POSITION (LEFT ← → RIGHT)</div>
           <div class="translation-bar">
             <div class="midline"></div>
             <div class="fill" style="width:${crestPct20}%;background:${color20};opacity:0.3"></div>
@@ -749,7 +749,7 @@ function updatePanels(a) {
         </div>
         <div class="row"><span class="lbl">RECENT</span><span class="val">${hist20 || '—'}</span></div>
         <div class="row"><span class="lbl">BULL BIAS</span><span class="val">${Math.round(a.bullPct20 * 100)}%</span></div>
-      ` : '<div style="color:rgba(255,255,255,0.2);font-size:10px">Insufficient data</div>'}
+      ` : '<div style="color:rgba(26,34,48,0.2);font-size:10px">Insufficient data</div>'}
     </div>
   `;
 }
