@@ -1,5 +1,5 @@
 {
- "ts": "2026-08-07T20:20:01+00:00",
+ "ts": "2026-08-07T20:24:18+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-08-07",
@@ -50,23 +50,180 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 64975.47,
- "chg24h": 0.751,
- "vol24h": 11938.51276,
+ "price": 64975.9,
+ "chg24h": 0.75,
+ "vol24h": 11924.5949,
  "longs": 90464,
  "shorts": 227,
  "funding_apr": 0,
  "fear": 29,
  "fear_label": "Fear",
- "mempool_tx": 6494,
- "mempool_mb": 1.93,
+ "mempool_tx": 7257,
+ "mempool_mb": 2.11,
  "block": 961489,
- "pct_from_ath": -47.9,
+ "ibit": 36.8,
+ "ibit_ratio": 0.00056636,
+ "blood": {
+  "ath": 124728,
+  "spot": 64934,
+  "days_out": 76,
+  "methods": {
+   "200w_ma": {
+    "ratios": [
+     0.797,
+     1.004,
+     0.657
+    ],
+    "anchor": 66210,
+    "est": [
+     52769,
+     66468,
+     43472
+    ]
+   },
+   "4y_mean": {
+    "ratios": [
+     0.797,
+     1.043,
+     0.68
+    ],
+    "anchor": 64219,
+    "est": [
+     51182,
+     66996,
+     43682
+    ]
+   },
+   "prev_top_multiple": {
+    "ratios": [
+     2.81,
+     0.82
+    ],
+    "anchor": 67559,
+    "projected": 0.24,
+    "est": [
+     16239,
+     33307,
+     55511
+    ]
+   },
+   "drawdown_trend": {
+    "ratios": [
+     -84.9,
+     -83.4,
+     -76.7
+    ],
+    "anchor": 124728,
+    "projected_pct": -72.6,
+    "est": [
+     18886,
+     29107,
+     34218
+    ]
+   },
+   "path_shape": {
+    "ratios": [
+     0.281,
+     0.198,
+     0.243
+    ],
+    "anchor": 124728,
+    "day": 383,
+    "est": [
+     24648,
+     30341,
+     35074
+    ]
+   }
+  },
+  "estimates": [
+   16239,
+   18886,
+   24648,
+   29107,
+   30341,
+   33307,
+   34218,
+   35074,
+   43472,
+   43682,
+   51182,
+   52769,
+   55511,
+   66468,
+   66996
+  ],
+  "low": 16239,
+  "high": 66996,
+  "p25": 29107,
+  "median": 35074,
+  "p75": 52769,
+  "zone": [
+   29107,
+   52769
+  ],
+  "zone_pct": [
+   -77,
+   -58
+  ],
+  "median_pct": -72
+ },
  "blood_zone": [
-  24946,
-  37418
+  29107,
+  52769
  ],
  "in_blood_zone": false,
+ "ladder": [
+  {
+   "btc": 55500,
+   "ibit": 31.44,
+   "amount": 300000,
+   "pct_from_ath": -55
+  },
+  {
+   "btc": 51200,
+   "ibit": 28.99,
+   "amount": 300000,
+   "pct_from_ath": -59
+  },
+  {
+   "btc": 43500,
+   "ibit": 24.62,
+   "amount": 510000,
+   "pct_from_ath": -65
+  },
+  {
+   "btc": 34200,
+   "ibit": 19.38,
+   "amount": 510000,
+   "pct_from_ath": -73
+  },
+  {
+   "btc": 33300,
+   "ibit": 18.86,
+   "amount": 510000,
+   "pct_from_ath": -73
+  },
+  {
+   "btc": 29100,
+   "ibit": 16.49,
+   "amount": 390000,
+   "pct_from_ath": -77
+  },
+  {
+   "btc": 18900,
+   "ibit": 10.7,
+   "amount": 300000,
+   "pct_from_ath": -85
+  },
+  {
+   "btc": 16200,
+   "ibit": 9.2,
+   "amount": 180000,
+   "pct_from_ath": -87
+  }
+ ],
+ "pct_from_ath": -47.9,
  "ls_ratio": 399,
  "long_share_pct": 99.7,
  "history": [
@@ -99,7 +256,13 @@
    "p": 64975.47,
    "ls": 399.0,
    "f": 29
+  },
+  {
+   "ts": "2026-08-07T20:24:18+00:00",
+   "p": 64975.9,
+   "ls": 399.0,
+   "f": 29
   }
  ],
- "db_rows": 5
+ "db_rows": 6
 }
