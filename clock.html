@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CYCLE CLOCK</title>
+<style>
+:root{
+  --bg:#0a0a0f; --panel:#12131a; --sunk:#0d0e14; --rule:#22242e;
+  --ink:#e8eaf0; --ink2:#98a0b0; --ink3:#646c7c;
+  --gold:#d9a227; --red:#e1543a; --green:#3fa96b; --blue:#5b8fd6;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.wrap{max-width:1140px;margin:0 auto;padding:22px 18px 70px}
+h1{font-size:15px;letter-spacing:.28em;color:var(--ink3);font-weight:600;margin:0 0 4px}
+.stamp{font-size:11px;color:var(--ink3);letter-spacing:.08em;margin-bottom:26px}
+.stamp b{color:var(--green)}
+.stamp.stale b{color:var(--red)}
+
+/* HERO */
+.hero{background:var(--panel);border:1px solid var(--rule);padding:26px 26px 22px;margin-bottom:16px}
+.hero .lab{font-size:10.5px;letter-spacing:.22em;color:var(--ink3);margin-bottom:14px}
+.hero .big{font-size:clamp(38px,8vw,78px);font-weight:700;line-height:.98;letter-spacing:-.03em;color:var(--gold)}
+.hero .sub{font-size:14px;color:var(--ink2);margin-top:12px;line-height:1.65}
+.hero .sub b{color:var(--ink)}
+
+/* the runway */
+.runway{position:relative;height:96px;margin:26px 0 6px;background:var(--sunk);border:1px solid var(--rule);overflow:hidden}
+.runway .band{position:absolute;top:0;bottom:0;background:rgba(225,84,58,.16);border-left:1px solid var(--red);border-right:1px solid var(--red)}
+.runway .tick{position:absolute;top:0;bottom:0;width:1px;background:var(--rule)}
+.runway .mark{position:absolute;top:14px;width:2px;height:44px;background:var(--blue)}
+.runway .mark i{position:absolute;left:50%;transform:translateX(-50%);font-size:9.5px;color:var(--blue);white-space:nowrap;font-style:normal}
+.runway .now{position:absolute;top:0;bottom:0;width:3px;background:var(--gold);box-shadow:0 0 14px rgba(217,162,39,.7)}
+.runway .now i{position:absolute;bottom:6px;left:6px;font-size:10px;color:var(--gold);white-space:nowrap;font-style:normal;letter-spacing:.1em}
+.runway .cons{position:absolute;top:0;bottom:0;width:2px;background:var(--red)}
+.runway .cons i{position:absolute;bottom:24px;left:6px;font-size:10px;color:var(--red);white-space:nowrap;font-style:normal;letter-spacing:.1em}
+.axis{display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);letter-spacing:.06em}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:16px}
+.cell{background:var(--panel);padding:16px 17px 17px;min-height:104px}
+.cell .k{font-size:10px;letter-spacing:.18em;color:var(--ink3);margin-bottom:9px}
+.cell .v{font-size:25px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+.cell .n{font-size:11.5px;color:var(--ink2);margin-top:8px;line-height:1.55}
+.g{color:var(--green)}.r{color:var(--red)}.y{color:var(--gold)}.b{color:var(--blue)}.d{color:var(--ink3)}
+
+/* bars */
+.bar{height:7px;background:var(--sunk);margin-top:10px;position:relative;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;display:block}
+
+h2{font-size:10.5px;letter-spacing:.22em;color:var(--ink3);font-weight:600;margin:28px 0 10px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel);border:1px solid var(--rule)}
+th,td{padding:9px 13px;text-align:right;border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child{text-align:left}
+th{font-size:9.5px;letter-spacing:.16em;color:var(--ink3);font-weight:600}
+tr:last-child td{border-bottom:none}
+tr.hit td{background:rgba(217,162,39,.12)}
+tr.hit td:first-child{color:var(--gold)}
+.scroll{overflow-x:auto}
+footer{margin-top:34px;font-size:10.5px;color:var(--ink3);line-height:1.9}
+a{color:var(--ink3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CYCLE CLOCK</h1>
+  <div class="stamp" id="stamp">loading…</div>
+
+  <div class="hero">
+    <div class="lab">DAYS TO THE CONSENSUS LOW — three independent clocks</div>
+    <div class="big" id="dtc">—</div>
+    <div class="sub" id="herosub">—</div>
+
+    <div class="runway" id="runway"></div>
+    <div class="axis" id="axis"><span></span><span></span><span></span></div>
+  </div>
+
+  <div class="grid" id="top"></div>
+
+  <h2>THE THREE CLOCKS</h2>
+  <div class="scroll"><table id="clocks"></table></div>
+
+  <h2>LEVERAGE — who is offside</h2>
+  <div class="grid" id="lev"></div>
+
+  <h2>THE LADDER — where price sits against the rungs</h2>
+  <div class="scroll"><table id="ladder"></table></div>
+
+  <footer>
+    Collected server-side on the Nevada box every 20 minutes, 24/7 — Binance (price, volume), Bitfinex (margin longs/shorts, funding), alternative.me (Fear &amp; Greed), and the chain read straight off Lawrence's own full node. Stored in clock.db, published here as clock-data.json. If the stamp above goes red, the box stopped — not the market.
+    Cycle dates measured on real daily highs/lows: lows 18 Nov 2011 · 14 Jan 2015 · 15 Dec 2018 · 21 Nov 2022 · tops 30 Nov 2013 · 17 Dec 2017 · 10 Nov 2021 · 6 Oct 2025 · halvings 28 Nov 2012 · 9 Jul 2016 · 11 May 2020 · 19 Apr 2024.
+    Refreshes every 60s. Nothing here is a projection — it is where today sits between dated events.
+  </footer>
+</div>
+
+<script>
+/* Nothing is computed here. Nevada collects every source server-side every 20
+   minutes, writes it to clock.db, and publishes clock-data.json into this repo.
+   This page renders that file. No CORS, no relay, no browser doing work — if
+   the box is up, the page is right. */
+const fmt=n=>n==null?"—":n.toLocaleString("en-US",{maximumFractionDigits:0});
+const D=s=>new Date(s+"T00:00:00Z");
+const dstr=d=>d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"});
+const short=d=>d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",timeZone:"UTC"});
+const LADDER=[[50000,28.28,300000],[44000,24.89,300000],[37400,21.15,500000],[34478,19.50,500000],
+              [31200,17.65,500000],[28000,15.84,400000],[25000,14.14,300000],[22000,12.44,200000]];
+
+async function load(){
+  let d;
+  try{ d = await (await fetch("clock-data.json?t="+Date.now())).json(); }
+  catch(e){ document.getElementById("stamp").innerHTML='<b style="color:var(--red)">FEED DOWN</b> — Nevada has not published. Nothing below is current.'; return; }
+
+  const c=d.cycle, now=new Date(), age=(now-new Date(d.ts))/60000;
+  const st=document.getElementById("stamp");
+  st.className="stamp"+(age>75?" stale":"");
+  st.innerHTML=(age>75?"⚠ STALE — ":"LIVE · ")+"<b>"+d.ts.replace("T"," ").slice(0,16)+" UTC</b> · "+
+    Math.round(age)+" min old · Nevada, every 20 min · "+fmt(d.db_rows)+" rows stored";
+
+  document.getElementById("dtc").textContent=c.days_to_consensus+" days";
+  document.getElementById("herosub").innerHTML=
+    "Day <b>"+c.days_since_top+"</b> of this bear · <b>"+c.days_since_halving+"</b> days past the halving ("+
+    c.pct_through_4yr+"% through the four-year cycle)<br>All three clocks land between <b>"+
+    dstr(D(c.window_start))+"</b> and <b>"+dstr(D(c.window_end))+"</b> · middle <b>"+dstr(D(c.consensus))+"</b>";
+
+  /* runway */
+  const all=[...c.targets.bottom_to_bottom,...c.targets.top_to_bottom,...c.targets.halving_to_low].map(D).sort((a,b)=>a-b);
+  const DAY=864e5, t0=new Date(now-260*DAY), t1=new Date(D(c.window_end).getTime()+40*DAY), span=t1-t0;
+  const P=x=>((x-t0)/span*100);
+  document.getElementById("runway").innerHTML=
+    '<div class="band" style="left:'+P(D(c.window_start))+'%;width:'+(P(D(c.window_end))-P(D(c.window_start)))+'%"></div>'+
+    all.map((x,i)=>'<div class="mark" style="left:'+P(x)+'%"><i style="top:'+(-13+(i%3)*11)+'px">'+short(x)+'</i></div>').join('')+
+    '<div class="cons" style="left:'+P(D(c.consensus))+'%"><i>CONSENSUS '+short(D(c.consensus))+'</i></div>'+
+    '<div class="now" style="left:'+P(now)+'%"><i>TODAY</i></div>';
+  document.getElementById("axis").innerHTML="<span>"+short(t0)+"</span><span>"+short(D(c.consensus))+"</span><span>"+short(t1)+"</span>";
+
+  const cell=(k,v,n,cls)=>'<div class="cell"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div><div class="n">'+n+'</div></div>';
+  const bz=d.blood_zone||[0,0];
+  document.getElementById("top").innerHTML=
+    cell("BITCOIN","$"+fmt(d.price),(d.chg24h>=0?"▲ ":"▼ ")+(d.chg24h??0).toFixed(2)+"% 24h",d.chg24h>=0?"g":"r")+
+    cell("FROM THE TOP",(d.pct_from_ath??0)+"%","ring high $"+fmt(d.ring_ath),"r")+
+    cell("BLOOD ZONE","$"+fmt(bz[0])+"–"+fmt(bz[1]),
+      d.in_blood_zone?'<span class="g">IN IT</span>':'<span class="d">'+(d.price?((d.price/bz[1]-1)*100).toFixed(0)+"% above the top of it":"—")+'</span>')+
+    cell("FEAR & GREED",d.fear??"—",d.fear_label||"—",d.fear==null?"":(d.fear<25?"r":d.fear<45?"y":"g"))+
+    cell("CHAIN",fmt(d.mempool_tx)+" tx","block "+fmt(d.block)+" · "+(d.sources&&d.sources.chain||"—"),"b")+
+    cell("24H VOLUME",fmt(d.vol24h)+" ₿","Binance spot","d");
+
+  const row=(n,g,t,f)=>"<tr><td>"+n+"</td><td>"+g.join(" · ")+"</td><td>"+f+"</td><td>"+t.map(x=>dstr(D(x))).join("<br>")+"</td></tr>";
+  document.getElementById("clocks").innerHTML=
+    "<tr><th>clock</th><th>prior gaps (days)</th><th>measured from</th><th>lands on</th></tr>"+
+    row("bottom → bottom",c.gaps.bottom_to_bottom,c.targets.bottom_to_bottom,"last low 21 Nov 2022")+
+    row("top → bottom",c.gaps.top_to_bottom,c.targets.top_to_bottom,"this top 06 Oct 2025")+
+    row("halving → low",c.gaps.halving_to_low,c.targets.halving_to_low,"halving 19 Apr 2024");
+
+  document.getElementById("lev").innerHTML=
+    cell("LONGS",fmt(d.longs)+" ₿","margin longs on Bitfinex","g")+
+    cell("SHORTS",fmt(d.shorts)+" ₿","margin shorts","r")+
+    cell("RATIO",fmt(d.ls_ratio)+":1",
+      '<div class="bar"><i style="width:'+(d.long_share_pct||0)+'%;background:var(--gold)"></i></div>'+
+      (d.long_share_pct??"—")+"% of margin is long","y")+
+    cell("FUNDING",d.funding_apr?d.funding_apr+"%":"—",
+      d.funding_apr>0?"longs are PAYING to stay long":(d.funding_apr?"shorts are paying":"source not reporting"),d.funding_apr>0?"r":"d");
+
+  document.getElementById("ladder").innerHTML=
+    "<tr><th>bitcoin</th><th>from ring high</th><th>IBIT limit</th><th>amount</th><th>still to fall</th></tr>"+
+    LADDER.map(([b,i,a])=>{
+      const hit=d.price&&d.price<=b, away=d.price?((b/d.price-1)*100):null;
+      return '<tr class="'+(hit?'hit':'')+'"><td>$'+fmt(b)+'</td><td>'+((b/d.ring_ath-1)*100).toFixed(0)+
+        '%</td><td>$'+i.toFixed(2)+'</td><td>$'+fmt(a)+'</td><td>'+
+        (hit?'<span class="y">IN RANGE</span>':(away!=null?away.toFixed(1)+'%':'—'))+'</td></tr>';
+    }).join("");
+}
+load(); setInterval(load,60000);
+</script>
+</body>
+</html>
