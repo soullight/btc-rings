@@ -105,8 +105,8 @@ const fmt=n=>n==null?"—":n.toLocaleString("en-US",{maximumFractionDigits:0});
 const D=s=>new Date(s+"T00:00:00Z");
 const dstr=d=>d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"});
 const short=d=>d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",timeZone:"UTC"});
-const LADDER=[[50000,28.28,300000],[44000,24.89,300000],[37400,21.15,500000],[34478,19.50,500000],
-              [31200,17.65,500000],[28000,15.84,400000],[25000,14.14,300000],[22000,12.44,200000]];
+// THE LADDER IS NOT TYPED HERE. Nevada publishes it in clock-data.json,
+// straight from the locked plan (mission-bot/engine2_plan.json). One number, one place.
 
 async function load(){
   let d;
@@ -163,14 +163,19 @@ async function load(){
     cell("FUNDING",d.funding_apr?d.funding_apr+"%":"—",
       d.funding_apr>0?"longs are PAYING to stay long":(d.funding_apr?"shorts are paying":"source not reporting"),d.funding_apr>0?"r":"d");
 
-  document.getElementById("ladder").innerHTML=
-    "<tr><th>bitcoin</th><th>from ring high</th><th>IBIT limit</th><th>amount</th><th>still to fall</th></tr>"+
-    LADDER.map(([b,i,a])=>{
-      const hit=d.price&&d.price<=b, away=d.price?((b/d.price-1)*100):null;
-      return '<tr class="'+(hit?'hit':'')+'"><td>$'+fmt(b)+'</td><td>'+((b/d.ring_ath-1)*100).toFixed(0)+
-        '%</td><td>$'+i.toFixed(2)+'</td><td>$'+fmt(a)+'</td><td>'+
-        (hit?'<span class="y">IN RANGE</span>':(away!=null?away.toFixed(1)+'%':'—'))+'</td></tr>';
-    }).join("");
+  const L=d.ladder;
+  document.getElementById("ladder").innerHTML = !L
+    ? '<tr><td class="r">LADDER UNAVAILABLE — Nevada could not read the locked plan. '
+      + 'Showing nothing rather than something stale.</td></tr>'
+    : "<tr><th>bitcoin</th><th>from ring high</th><th>IBIT limit</th><th>amount</th><th>still to fall</th></tr>"+
+      L.map(g=>'<tr class="'+(g.hit?'hit':'')+'"><td>$'+fmt(g.btc)+
+        (g.note?' <span class="d">· '+g.note+'</span>':'')+'</td><td>'+g.pct_from_ath+
+        '%</td><td>$'+(g.ibit!=null?g.ibit.toFixed(2):'—')+'</td><td>$'+fmt(g.amount)+'</td><td>'+
+        (g.hit?'<span class="y">IN RANGE</span>'
+              :(g.pct_from_here!=null?g.pct_from_here.toFixed(1)+'%':'—'))+'</td></tr>').join("");
+  if(d.plan) document.getElementById("ladder").insertAdjacentHTML("beforeend",
+    '<tr><td colspan="5" class="d">$'+fmt(d.plan.deploy)+' deployed · $'+fmt(d.plan.held_back)+
+    ' held back · sell target $'+fmt(d.plan.sell_target)+' · source: '+d.plan.source+'</td></tr>');
 }
 load(); setInterval(load,60000);
 </script>
