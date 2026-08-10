@@ -52,6 +52,7 @@ canvas { display:block; border-radius:12px; }
   <div id="hud" class="hud"></div>
 </div>
 
+<script src="feed.js"></script>
 <script>
 (function(){
 'use strict';
@@ -146,11 +147,15 @@ async function fetch4h(startTime,endTime){
 }
 
 async function fetchATH(){
+  /* CoinGecko 429s under load and the page waited on it, rendering nothing.
+     Derive the ATH from the candles we already have — no extra request, no rate limit. */
   try{
-    const d=await api('https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false');
-    return d.market_data.ath.usd;
-  }catch(e){return null;}
+    const rows = await FEED.daily(4000);
+    if (rows && rows.length) return Math.max.apply(null, rows.map(function(r){return r.high;}));
+  }catch(e){}
+  return null;
 }
+
 
 /* ── BUILD ── */
 let segments=[];

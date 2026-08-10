@@ -22,6 +22,7 @@
 
 <canvas id="canvas"></canvas>
 
+<script src="feed.js"></script>
 <script>
 const GREEN = "rgba(0, 230, 118, 0.4)";
 const RED = "rgba(255, 23, 68, 0.4)";
@@ -30,51 +31,12 @@ let quantaBlocks =[];
 let globalMax = 0;
 
 async function fetchHistory() {
-  const NOV_2022_SEC = 1668988800;
-  // Coinbase PRIMARY (Binance geo-blocked in US). Candle: [t_s,low,high,open,close,vol] newest-first.
-  try {
-    const G = 86400; let endS = Math.floor(Date.now() / 1000); const map = new Map(); let guard = 0;
-    while (endS > NOV_2022_SEC && guard < 30) {
-      guard++; const startS = Math.max(NOV_2022_SEC, endS - G * 299);
-      const c = new AbortController(), t = setTimeout(() => c.abort(), 8000);
-      let arr;
-      try {
-        const r = await fetch(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=${G}&start=${startS}&end=${endS}`, { signal: c.signal });
-        clearTimeout(t); if (!r.ok) throw new Error('HTTP ' + r.status); arr = await r.json();
-      } catch (e) { clearTimeout(t); break; }
-      if (!Array.isArray(arr) || !arr.length) break;
-      for (const k of arr) map.set(k[0], k[4]);
-      const newEnd = arr[arr.length - 1][0] - G; if (newEnd >= endS || startS <= NOV_2022_SEC) break; endS = newEnd;
-    }
-    const closes = [...map.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]).filter(p => p > 0);
-    if (closes.length >= 365) return closes;
-  } catch (e) { console.warn("Coinbase failed:", e.message); }
-
-  // CryptoCompare: free, allows up to 2000 days of daily data
-  try {
-    const r = await fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=1400");
-    if (!r.ok) throw new Error("cc " + r.status);
-    const j = await r.json();
-    const rows = j.Data && j.Data.Data;
-    if (!rows || rows.length < 365) throw new Error("cc empty");
-    return rows.filter(d => d.time >= NOV_2022_SEC).map(d => d.close).filter(p => p > 0);
-  } catch (e) { console.warn("CryptoCompare failed:", e.message); }
-
-  // Binance fallback: chain two calls (limit 1000 each) to cover ~1250 days
-  try {
-    const startMs = NOV_2022_SEC * 1000;
-    const r1 = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${startMs}&limit=1000`);
-    const d1 = await r1.json();
-    if (!Array.isArray(d1) || !d1.length) throw new Error("binance1 empty");
-    const lastMs = d1[d1.length - 1][0] + 86400000;
-    const r2 = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${lastMs}&limit=1000`);
-    const d2 = await r2.json();
-    const all = d1.concat(Array.isArray(d2) ? d2 : []);
-    return all.map(k => Number(k[4])).filter(p => p > 0);
-  } catch (e) { console.warn("Binance failed:", e.message); }
-
-  throw new Error("All data sources failed");
+  /* was Coinbase(partial) -> CryptoCompare(401) -> Binance(451). FEED handles the chain. */
+  const rows = await FEED.daily(4000);
+  if (!rows) { FEED.noFeed('body'); return []; }
+  return rows.map(r => ({ t: new Date(r.date).getTime(), c: r.close, h: r.high, l: r.low }));
 }
+
 
 function showError(msg) {
   const ui = document.getElementById("ui");

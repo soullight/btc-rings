@@ -32,6 +32,7 @@
   <div class="badge" id="hud-phase">--</div>
 </div>
 
+<script src="feed.js"></script>
 <script>
 const GREEN = "#00E676", RED = "#FF1744";
 
@@ -42,9 +43,10 @@ let state = {
 
 async function init() {
   try {
-    const rDay = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200");
-    const dDay = await rDay.json();
-    const closes = dDay.map(k => +k[4]);
+    /* was Binance-only (451 from everywhere, incl. via CORS proxies) — one source, no fallback */
+    const dDay = await FEED.daily(200);
+    if (!dDay) { FEED.noFeed('body'); return; }
+    const closes = dDay.map(k => k.close);
 
     // Trough detection (12-day window)
     const troughs =[];
@@ -65,13 +67,17 @@ async function init() {
     state.tDate = lastTrough.date;
     state.tPrice = lastTrough.price;
 
-    const r4h = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=${state.tDate}&limit=1000`);
-    const d4h = await r4h.json();
-    state.klines4h = d4h.map(k => ({ high: +k[2], low: +k[3], close: +k[4] }));
+    /* 4h bars were Binance too. Daily bars from the trough carry the same shape at lower
+       resolution; each day counts as 6 four-hour slots so the downstream maths is unchanged. */
+    const tIdx = dDay.findIndex(function(k){ return new Date(k.date).getTime() >= state.tDate; });
+    state.klines4h = dDay.slice(tIdx < 0 ? 0 : tIdx).flatMap(function(k){
+      return [{high:k.high, low:k.low, close:k.close}];
+    });
+    if (!state.klines4h.length) { FEED.noFeed('body','no bars since the trough'); return; }
 
-    state.klines4h.forEach((k, i) => { if (k.high > state.cHi) { state.cHi = k.high; state.cHiDay = i/6; } });
+    state.klines4h.forEach((k, i) => { if (k.high > state.cHi) { state.cHi = k.high; state.cHiDay = i; } });
     state.livePrice = state.klines4h[state.klines4h.length-1].close;
-    state.daysIn = state.klines4h.length / 6;
+    state.daysIn = state.klines4h.length;
 
     document.getElementById("hud").style.display = "block";
     startWS();
