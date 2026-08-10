@@ -116,8 +116,10 @@
     if(o){var lo=Infinity;
      o.forEach(function(r){var d=new Date(+r.timestamp*1000).toISOString().slice(0,10);
       if(d>="2025-10-06"&&+r.low>0)lo=Math.min(lo,+r.low)});
+     /* Each row's multiple is the TRADE: the blood-low BEFORE that top, sold at that top.
+        2025's 8x is 2022's $15,480 -> $126,272 — it is NOT this cycle's low. Only the
+        forward row uses the low printed so far, because that is the entry still open. */
      if(isFinite(lo)){cy.trough=Math.round(lo);
-      cy.mult=(cy.peak/lo).toFixed(1)+"×"; cy.sub=fmt(Math.round(lo))+" → $126.3k";
       cycles[4].sub="~"+fmt(Math.round(lo))+" → ~$170k";
       cycles[4].mult="~"+(170000/lo).toFixed(1)+"×";}}
    }catch(e){}
