@@ -1,0 +1,91 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Trust Basket — where the blood actually is</title>
+<style>
+:root{--bg:#0A0B0E;--panel:#131519;--ink:#EDEBE4;--dim:#8B8981;--rule:#23262C;
+ --blood:#C4382A;--gold:#D9A63C;--ok:#5FB98A;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+ --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+ --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6}
+.wrap{max-width:880px;margin:0 auto;padding:30px 20px 60px}
+.head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;
+ border-bottom:1px solid var(--rule);padding-bottom:13px}
+h1{font-size:13px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--dim)}
+.date{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.lede{font-size:14.5px;color:#C9C7C0;margin:20px 0 8px;max-width:66ch}
+.lede b{color:var(--ink)}
+.row{display:grid;grid-template-columns:64px 74px 1fr 62px;gap:12px;align-items:center;
+ padding:11px 0;border-bottom:1px solid var(--rule)}
+.tk{font-family:var(--mono);font-size:15px;font-weight:600}
+.px{font-family:var(--mono);font-size:13px;color:var(--dim);text-align:right}
+.bar{position:relative;height:22px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+.fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.pos{font-family:var(--mono);font-size:13px;text-align:right}
+.legend{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;
+ letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:14px 0 4px;padding:0 0 0 150px}
+h2{font-family:var(--serif);font-size:1.15rem;margin:34px 0 6px}
+.note{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--blood);
+ padding:16px 18px;margin-top:20px;font-size:13.5px;color:#C9C7C0}
+.note b{color:var(--ink)}
+.spark{margin-top:6px}
+.foot{margin-top:28px;font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.85}
+.foot a{color:var(--gold)}
+</style></head><body><div class="wrap">
+<div class="head"><h1>The Trust Basket</h1><div class="date" id="d">—</div></div>
+<p class="lede">Where each Grayscale trust sits <b>between its own floor and its own high</b>.
+Left edge is the floor — that is where blood is. Right edge is the high — that is where a thing
+has already run. Nothing here is a NAV discount; see the note at the bottom.</p>
+<div class="legend"><span>◀ floor · blood</span><span>high · already run ▶</span></div>
+<div id="rows"></div>
+<h2>ZCSH — 30 days</h2>
+<canvas id="z" width="1600" height="220" style="width:100%;height:150px;display:block;
+ background:var(--panel);border:1px solid var(--rule);border-radius:6px;margin-top:10px"></canvas>
+<div class="note" id="zn"></div>
+<div class="note" style="border-left-color:var(--gold)">
+<b>What this is NOT.</b> The source column is named <code>premium_discount_pct</code>, but it is
+not a NAV premium or discount — it is price as a percentage of the trust's own high. The
+companion <code>nav</code> column holds an old high, not net asset value (FILG: price $1.22,
+"NAV" $395). A real NAV discount — buying the trust below the assets it holds — is
+<b>not currently measured anywhere</b>. Treat this page as range position only.
+</div>
+<div class="foot">
+Floor/high position from grayscale_trust_snapshots, collected daily 08:00 MST since 2026-02-21.
+State only — no recommendation, no target, no date.<br>
+Part of <a href="./">soullight.github.io/btc-rings</a>.
+</div></div>
+<script>
+fetch('./trusts.json?t='+Date.now()).then(r=>r.json()).then(D=>{
+ document.getElementById('d').textContent=D.date;
+ const host=document.getElementById('rows');
+ function col(p){const t=Math.max(0,Math.min(1,p/100));
+  const bl=[196,56,42],gd=[217,166,60];
+  return 'rgb('+Math.round(bl[0]+(gd[0]-bl[0])*t)+','+Math.round(bl[1]+(gd[1]-bl[1])*t)+','+Math.round(bl[2]+(gd[2]-bl[2])*t)+')'}
+ D.rows.forEach(r=>{
+  const d=document.createElement('div');d.className='row';
+  d.innerHTML='<div class="tk">'+r.t+'</div>'+
+   '<div class="px">$'+(r.price<10?r.price.toFixed(2):r.price.toFixed(0))+'</div>'+
+   '<div class="bar"><div class="fill" style="width:'+Math.max(1.5,r.pos)+'%;background:'+col(r.pos)+'"></div></div>'+
+   '<div class="pos" style="color:'+col(r.pos)+'">'+r.pos.toFixed(0)+'%</div>';
+  host.appendChild(d)});
+ const h=D.hist['ZCSH']||[];
+ if(h.length){
+  const c=document.getElementById('z'),x=c.getContext('2d'),W=1600,H=220,P=30;
+  const v=h.map(a=>a[2]),mn=Math.min(...v),mx=Math.max(...v);
+  x.fillStyle='#131519';x.fillRect(0,0,W,H);
+  const X=i=>P+(W-P*2)*(i/(h.length-1)),Y=q=>H-P-(H-P*2)*((q-mn)/((mx-mn)||1));
+  x.beginPath();h.forEach((a,i)=>i?x.lineTo(X(i),Y(a[2])):x.moveTo(X(i),Y(a[2])));
+  x.strokeStyle=col(v[v.length-1]);x.lineWidth=3;x.stroke();
+  x.beginPath();x.arc(X(h.length-1),Y(v[v.length-1]),6,0,7);x.fillStyle=col(v[v.length-1]);x.fill();
+  x.fillStyle='#8B8981';x.font='20px ui-monospace,Menlo,monospace';
+  x.fillText(h[0][0]+'  '+mn.toFixed(0)+'%',P,H-8);x.textAlign='right';
+  x.fillText(h[h.length-1][0]+'  '+mx.toFixed(0)+'%',W-P,H-8);
+  const first=v[0],last=v[v.length-1];
+  document.getElementById('zn').innerHTML='<b>ZCSH is the strongest thing in the basket, not the cheapest.</b> '+
+   'It has moved '+first.toFixed(0)+'% → '+last.toFixed(0)+'% of its floor-to-high range over these '+h.length+
+   ' readings, while most of the basket sits at 0–2%. The blood is in the trusts on the left of the chart above; '+
+   'ZCSH is where the blood already stopped.';
+ }
+});
+</script></body></html>
