@@ -33,8 +33,6 @@ h1{font-size:13px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;c
 .row{display:grid;grid-template-columns:96px 1fr;gap:14px;padding:11px 0;border-bottom:1px solid var(--rule)}
 .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);padding-top:4px}
 .v{font-size:14px}.v b{font-family:var(--mono);font-weight:600}
-.stamp{margin-top:16px;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
-.stamp.old{color:var(--gold)}
 canvas{width:100%;height:190px;display:block;background:var(--panel);border:1px solid var(--rule);
  border-radius:8px;margin-top:34px}
 h2{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin:34px 0 0}
@@ -47,7 +45,7 @@ td.n{font-family:var(--mono)}
 @media(max-width:700px){.stage{grid-template-columns:1fr}}
 </style></head><body>
 <div class="wrap">
- <div class="head"><h1>The Balloon · BTC</h1><div class="src" id="src"><span class="dot"></span>connecting…</div></div>
+ <div class="head"><h1>The Balloon · BTC</h1><div class="src" id="src"><span class="dot"></span>loading…</div></div>
  <div class="stage">
   <div class="track">
    <div class="tick" style="top:6%;transform:translateY(-50%)">GOLD · exhale</div>
@@ -63,7 +61,6 @@ td.n{font-family:var(--mono)}
     <div class="row"><div class="k">Where</div><div class="v" id="r1">—</div></div>
     <div class="row"><div class="k">Cycle</div><div class="v" id="r2">—</div></div>
    </div>
-   <div class="stamp" id="stamp"></div>
   </div>
  </div>
  <canvas id="h" width="1800" height="380"></canvas>
@@ -73,7 +70,7 @@ td.n{font-family:var(--mono)}
   Stretch is one number: how inflated bitcoin is relative to its own history. 0 is maximum
   contraction, 100 is maximum expansion. It describes a <b>state</b>, not a forecast — it says
   <b>where</b>, never <b>when</b>. Not advice.<br>
-  Price ticks live. The stretch reading carries its own timestamp above and turns amber when it ages.<br>
+  Computed live in your browser from full daily history. Nothing here is stored or stale.<br>
   Part of <a href="./">soullight.github.io/btc-rings</a>.
  </div>
 </div>
@@ -81,72 +78,124 @@ td.n{font-family:var(--mono)}
 function lp(a,b,t){return Math.round(a+(b-a)*t)}
 function col(t){var bl=[196,56,42],gd=[217,166,60];
  return 'rgb('+lp(bl[0],gd[0],t)+','+lp(bl[1],gd[1],t)+','+lp(bl[2],gd[2],t)+')'}
-
-/* live price — same source fallback sequence the other rings pages use */
-async function tryJSON(u,ms){const c=new AbortController();const k=setTimeout(()=>c.abort(),ms||9000);
- try{const r=await fetch(u,{signal:c.signal});clearTimeout(k);if(!r.ok)throw 0;return await r.json()}
+function iso(ms){return new Date(ms).toISOString().slice(0,10)}
+async function jget(u,ms){const c=new AbortController(),k=setTimeout(()=>c.abort(),ms||15000);
+ try{const r=await fetch(u,{signal:c.signal});clearTimeout(k);if(!r.ok)throw new Error(r.status);return await r.json()}
  catch(e){clearTimeout(k);throw e}}
-async function livePrice(){
- try{const j=await tryJSON("https://api.exchange.coinbase.com/products/BTC-USD/ticker",8000);
-  if(j&&j.price)return{p:+j.price,src:"Coinbase"}}catch(e){}
- try{const j=await tryJSON("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",9000);
-  if(j&&j.bitcoin)return{p:j.bitcoin.usd,chg:j.bitcoin.usd_24h_change,src:"CoinGecko"}}catch(e){}
- try{const j=await tryJSON("https://www.bitstamp.net/api/v2/ticker/btcusd/",9000);
-  if(j&&j.last)return{p:+j.last,chg:+j.percent_change_24,src:"Bitstamp"}}catch(e){}
- try{const j=await tryJSON("https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD",9000);
-  if(j&&j.USD)return{p:j.USD,src:"CryptoCompare"}}catch(e){}
+
+/* full daily history — Bitstamp paginated, then Coinbase, then CoinGecko.
+   CryptoCompare and CoinGecko days=max now require a key, so they are not primary. */
+async function history(){
+ try{
+  const m={}; let end=Math.floor(Date.now()/1000);
+  for(let i=0;i<7;i++){
+   const j=await jget(`https://www.bitstamp.net/api/v2/ohlc/btcusd/?step=86400&limit=1000&end=${end}`,20000);
+   const o=j&&j.data&&j.data.ohlc; if(!o||!o.length)break;
+   let oldest=end;
+   for(const r of o){const ts=+r.timestamp; if(+r.close>0)m[iso(ts*1000)]=+r.close; if(ts<oldest)oldest=ts;}
+   if(oldest>=end)break; end=oldest-86400; if(oldest<1300000000)break;
+  }
+  const d=Object.keys(m).sort();
+  if(d.length>2500)return{dates:d,close:d.map(k=>m[k]),src:"Bitstamp"};
+ }catch(e){}
+ try{
+  const m={}; let end=Date.now();
+  for(let i=0;i<12;i++){
+   const s=new Date(end-300*864e5).toISOString(), e2=new Date(end).toISOString();
+   const j=await jget(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400&start=${s}&end=${e2}`,20000);
+   if(!Array.isArray(j)||!j.length)break;
+   for(const c of j){if(c[4]>0)m[iso(c[0]*1000)]=c[4];}
+   end=Math.min.apply(null,j.map(c=>c[0]))*1000-864e5;
+  }
+  const d=Object.keys(m).sort();
+  if(d.length>2500)return{dates:d,close:d.map(k=>m[k]),src:"Coinbase"};
+ }catch(e){}
+ try{
+  const j=await jget("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily",20000);
+  if(j&&j.prices){const m={};j.prices.forEach(p=>m[iso(p[0])]=p[1]);
+   const d=Object.keys(m).sort();return{dates:d,close:d.map(k=>m[k]),src:"CoinGecko (short)"};}
+ }catch(e){}
  return null}
 
-var D=null;
+async function livePrice(){
+ try{const j=await jget("https://api.exchange.coinbase.com/products/BTC-USD/ticker",8000);
+  if(j&&j.price)return{p:+j.price,src:"Coinbase"}}catch(e){}
+ try{const j=await jget("https://www.bitstamp.net/api/v2/ticker/btcusd/",8000);
+  if(j&&j.last)return{p:+j.last,chg:+j.percent_change_24,src:"Bitstamp"}}catch(e){}
+ try{const j=await jget("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true",9000);
+  if(j&&j.bitcoin)return{p:j.bitcoin.usd,chg:j.bitcoin.usd_24h_change,src:"CoinGecko"}}catch(e){}
+ return null}
+
+/* stretch: where price sits relative to its own history. */
+var BASE=730,WIN=1460,BURN=730;
+function stretchSeries(close){
+ var n=close.length,lg=close.map(Math.log),dev=new Array(n).fill(null),run=0;
+ for(var i=0;i<n;i++){run+=lg[i];if(i>=BASE){run-=lg[i-BASE];dev[i]=lg[i]-run/BASE;}}
+ var buf=[],out=new Array(n).fill(null);
+ function bl(a,v){var lo=0,hi=a.length;while(lo<hi){var m=(lo+hi)>>1;if(a[m]<v)lo=m+1;else hi=m}return lo}
+ for(var i=0;i<n;i++){var v=dev[i];
+  if(v!==null){ if(i>=BURN&&buf.length)out[i]=100*bl(buf,v)/buf.length;
+   buf.splice(bl(buf,v),0,v);
+   if(buf.length>WIN){var o=dev[i-WIN];if(o!==null){var k=bl(buf,o);if(buf[k]===o)buf.splice(k,1)}}}}
+ return out}
+
+var MARKS={"2013-11-30":"top","2015-01-14":"bottom","2017-12-17":"top","2018-12-15":"bottom",
+           "2021-11-10":"top","2022-11-21":"bottom","2025-10-06":"top"};
+var ST=null,DT=null,CL=null;
+
 function paint(){
- if(!D)return;
- var t=Math.max(0,Math.min(1,D.stretch/100)),c=col(t);
+ var n=ST.length,last=n-1;while(last>0&&ST[last]===null)last--;
+ var val=ST[last],t=Math.max(0,Math.min(1,val/100)),c=col(t);
  var H=380,pad=28,u=H-pad*2,cf=pad+u*t,sz=60+142*t,b=document.getElementById('b');
  b.style.width=sz+'px';b.style.height=sz+'px';b.style.bottom=cf+'px';
  b.style.background='radial-gradient(circle at 38% 32%, rgba(255,255,255,.32), '+c+' 62%, '+c+')';
  b.style.boxShadow='0 0 44px 8px '+c.replace('rgb(','rgba(').replace(')',',.36)');
- var s=document.getElementById('st');s.textContent=D.stretch.toFixed(1);s.style.color=c;
- var z=D.stretch<10?'DEEP BLOOD':D.stretch<25?'BLOOD SIDE':D.stretch<45?'CONTRACTED':
-       D.stretch<55?'NEUTRAL':D.stretch<75?'EXPANDING':D.stretch<90?'GOLD SIDE':'DEEP GOLD';
+ var s=document.getElementById('st');s.textContent=val.toFixed(1);s.style.color=c;
+ var z=val<10?'DEEP BLOOD':val<25?'BLOOD SIDE':val<45?'CONTRACTED':val<55?'NEUTRAL':
+       val<75?'EXPANDING':val<90?'GOLD SIDE':'DEEP GOLD';
  var sd=document.getElementById('side');sd.textContent=z;sd.style.color=c;
- document.getElementById('r1').innerHTML='this low or lower on <b>'+D.pctile+'%</b> of all days since 2013';
- document.getElementById('r2').innerHTML='low so far <b>$'+D.cycle_low.toLocaleString()+'</b> ('+D.dd_low+
-   '% from the $'+D.cycle_top.toLocaleString()+' high) · <b>'+D.months_in+'</b> months in';
- var age=Math.floor((Date.now()-Date.parse(D.as_of+'T00:00:00Z'))/86400000);
- var el=document.getElementById('stamp');
- el.className='stamp'+(age>3?' old':'');
- el.textContent='stretch as of '+D.as_of+(age>0?'  ·  '+age+' day'+(age==1?'':'s')+' old':'  ·  today');
+ var live=ST.filter(function(x){return x!==null});
+ var below=live.filter(function(x){return x<=val}).length/live.length*100;
+ document.getElementById('r1').innerHTML='this low or lower on <b>'+below.toFixed(0)+'%</b> of all days since '+DT[ST.findIndex(function(x){return x!==null})].slice(0,4);
+ var ti=DT.indexOf("2025-10-06"),hi=ti>=0?Math.max.apply(null,CL.slice(Math.max(0,ti-5),ti+5)):null;
+ if(ti>=0){var lo=Math.min.apply(null,CL.slice(ti)),dd=(lo/hi-1)*100,
+  mo=((Date.parse(DT[last])-Date.parse("2025-10-06"))/864e5/30.44);
+  document.getElementById('r2').innerHTML='low so far <b>$'+Math.round(lo).toLocaleString()+
+   '</b> ('+dd.toFixed(1)+'% from the $'+Math.round(hi).toLocaleString()+' high) · <b>'+mo.toFixed(1)+'</b> months in';}
  var tb=document.getElementById('tb');tb.innerHTML='';
- D.extremes.forEach(function(e){var tr=document.createElement('tr');
-  tr.innerHTML='<td class="n">'+e[0]+'</td><td>'+e[1]+'</td><td class="n">$'+e[3].toLocaleString()+
-   '</td><td class="n" style="color:'+col(e[2]/100)+'">'+e[2].toFixed(1)+'</td>';tb.appendChild(tr)});
- var cv=document.getElementById('h'),x=cv.getContext('2d'),W=1800,Hh=380,P=36,ss=D.series;
- var X=function(i){return P+(W-P*1.5)*(i/(ss.length-1))},Y=function(v){return Hh-P-(Hh-P*1.9)*(v/100)};
+ Object.keys(MARKS).sort().forEach(function(d){var i=DT.indexOf(d);
+  if(i<0||ST[i]===null)return;var tr=document.createElement('tr');
+  tr.innerHTML='<td class="n">'+d+'</td><td>'+MARKS[d]+'</td><td class="n">$'+Math.round(CL[i]).toLocaleString()+
+   '</td><td class="n" style="color:'+col(ST[i]/100)+'">'+ST[i].toFixed(1)+'</td>';tb.appendChild(tr)});
+ var pts=[];for(var i=0;i<n;i++){if(ST[i]!==null&&(i%7===0||i===last))pts.push([DT[i],ST[i]])}
+ var cv=document.getElementById('h'),x=cv.getContext('2d'),W=1800,Hh=380,P=36;
+ var X=function(i){return P+(W-P*1.5)*(i/(pts.length-1))},Y=function(v){return Hh-P-(Hh-P*1.9)*(v/100)};
  x.fillStyle='#131519';x.fillRect(0,0,W,Hh);
  x.fillStyle='rgba(196,56,42,.10)';x.fillRect(P,Y(25),W-P*1.5,Y(0)-Y(25));
  x.fillStyle='rgba(217,166,60,.10)';x.fillRect(P,Y(100),W-P*1.5,Y(75)-Y(100));
  [0,50,100].forEach(function(g){x.beginPath();x.moveTo(P,Y(g));x.lineTo(W-P*.5,Y(g));
   x.strokeStyle='rgba(255,255,255,.07)';x.lineWidth=1;x.stroke();
   x.fillStyle='#8B8981';x.font='17px ui-monospace,Menlo,monospace';x.textAlign='right';x.fillText(g,P-9,Y(g)+6)});
- for(var i=1;i<ss.length;i++){x.beginPath();x.moveTo(X(i-1),Y(ss[i-1][1]));x.lineTo(X(i),Y(ss[i][1]));
-  x.strokeStyle=col((ss[i][1]+ss[i-1][1])/200);x.lineWidth=2.4;x.stroke()}
- x.beginPath();x.arc(X(ss.length-1),Y(ss[ss.length-1][1]),6,0,7);x.fillStyle=c;x.fill();
- x.fillStyle='#8B8981';x.font='16px ui-monospace,Menlo,monospace';x.textAlign='left';x.fillText(ss[0][0],P,Hh-12);
- x.textAlign='right';x.fillText(ss[ss.length-1][0],W-P*.5,Hh-12);
+ for(var i=1;i<pts.length;i++){x.beginPath();x.moveTo(X(i-1),Y(pts[i-1][1]));x.lineTo(X(i),Y(pts[i][1]));
+  x.strokeStyle=col((pts[i][1]+pts[i-1][1])/200);x.lineWidth=2.4;x.stroke()}
+ x.beginPath();x.arc(X(pts.length-1),Y(pts[pts.length-1][1]),6,0,7);x.fillStyle=c;x.fill();
+ x.fillStyle='#8B8981';x.font='16px ui-monospace,Menlo,monospace';x.textAlign='left';x.fillText(pts[0][0],P,Hh-12);
+ x.textAlign='right';x.fillText(pts[pts.length-1][0],W-P*.5,Hh-12);
 }
 async function tick(){
- var q=await livePrice();
- var el=document.getElementById('px'),sr=document.getElementById('src');
- if(!q){el.textContent='price unavailable';sr.innerHTML='<span class="dot" style="background:#C4382A"></span>no feed';return}
+ var q=await livePrice(),el=document.getElementById('px');
+ if(!q){el.textContent='price unavailable';return}
  el.innerHTML='$'+q.p.toLocaleString(undefined,{maximumFractionDigits:0})+
   (q.chg!=null?'<span class="chg" style="color:'+(q.chg>=0?'#5FB98A':'#C4382A')+'">'+
    (q.chg>=0?'+':'')+q.chg.toFixed(2)+'%</span>':'');
- sr.innerHTML='<span class="dot"></span>live · '+q.src+' · '+new Date().toLocaleTimeString();
 }
 (async function(){
- try{D=await tryJSON('./balloon.json?t='+Date.now(),12000);paint()}
- catch(e){document.getElementById('st').textContent='—';
-  document.getElementById('stamp').textContent='reading unavailable'}
+ var sr=document.getElementById('src');
+ var h=await history();
+ if(!h){sr.innerHTML='<span class="dot" style="background:#C4382A"></span>no data feed';
+  document.getElementById('st').textContent='—';return}
+ DT=h.dates;CL=h.close;ST=stretchSeries(CL);paint();
+ sr.innerHTML='<span class="dot"></span>live · '+h.src+' · '+DT.length.toLocaleString()+' days · '+DT[DT.length-1];
  tick();setInterval(tick,30000);
 })();
 </script></body></html>
