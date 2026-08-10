@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>The Stack in BTC</title>
+<style>
+:root{--bg:#0A0B0E;--panel:#131519;--ink:#EDEBE4;--dim:#8B8981;--rule:#23262C;
+ --blood:#C4382A;--gold:#D9A63C;--ok:#5FB98A;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--serif:"Iowan Old Style",Palatino,Georgia,serif;
+ --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6}
+.wrap{max-width:900px;margin:0 auto;padding:30px 20px 60px}
+.head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--rule);padding-bottom:13px}
+h1{font-size:13px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--dim)}
+.date{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.lede{font-size:14.5px;color:#C9C7C0;margin:20px 0;max-width:66ch}.lede b{color:var(--ink)}
+.big{font-family:var(--mono);font-size:56px;line-height:1;letter-spacing:-.03em;margin-top:8px}
+.sub{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:8px}
+canvas{width:100%;display:block;background:var(--panel);border:1px solid var(--rule);border-radius:6px;margin-top:20px}
+h2{font-family:var(--serif);font-size:1.15rem;margin:34px 0 4px}
+.row{display:grid;grid-template-columns:90px 1fr 90px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--rule)}
+.tk{font-family:var(--mono);font-size:13px}.bar{height:16px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+.fill{height:100%;background:var(--gold);border-radius:3px}.v{font-family:var(--mono);font-size:12px;text-align:right;color:var(--dim)}
+.foot{margin-top:26px;font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.85}.foot a{color:var(--gold)}
+</style></head><body><div class="wrap">
+<div class="head"><h1>The Stack · priced in BTC</h1><div class="date" id="d">—</div></div>
+<p class="lede">Dollars lie to you in a drawdown — everything looks like it is falling. Priced in
+<b>bitcoin</b>, the only question is whether a holding is buying you <b>more BTC or less</b>.
+That is the whole point of the ratio: sell what is rich in BTC terms, buy back what is cheap.</p>
+<div class="big" id="tot">—</div><div class="sub" id="sub"></div>
+<canvas id="c1" width="1700" height="420" style="height:230px"></canvas>
+<h2>ETH / BTC — where the ratio sits in its own history</h2>
+<canvas id="c2" width="1700" height="320" style="height:180px"></canvas>
+<div class="sub" id="rsub" style="margin-top:10px"></div>
+<h2>Holdings by weight</h2><div id="pos"></div>
+<div class="foot">relative_value_snapshots, daily 07:45 MST since 2026-02-21. State only — no target, no date.<br>
+Part of <a href="./">soullight.github.io/btc-rings</a>.</div></div>
+<script>
+fetch('./rv_vol.json?t='+Date.now()).then(r=>r.json()).then(D=>{
+ const rv=D.rv, last=rv[rv.length-1];
+ document.getElementById('d').textContent=last.d;
+ document.getElementById('tot').textContent=(last.btc||0).toFixed(3)+' BTC';
+ document.getElementById('tot').style.color='#D9A63C';
+ const first=rv[0], chg=((last.btc/first.btc-1)*100);
+ document.getElementById('sub').innerHTML='$'+Math.round(last.usd||0).toLocaleString()+
+  ' &nbsp;·&nbsp; stack '+(chg>=0?'+':'')+chg.toFixed(1)+'% in BTC terms since '+first.d;
+ function line(id,vals,labels,color,fmt){
+  const c=document.getElementById(id),x=c.getContext('2d'),W=c.width,H=c.height,P=44;
+  const mn=Math.min(...vals),mx=Math.max(...vals);
+  x.fillStyle='#131519';x.fillRect(0,0,W,H);
+  const X=i=>P+(W-P*1.6)*(i/(vals.length-1)),Y=v=>H-P-(H-P*2)*((v-mn)/((mx-mn)||1));
+  [0,.5,1].forEach(f=>{const y=H-P-(H-P*2)*f;x.beginPath();x.moveTo(P,y);x.lineTo(W-P*.6,y);
+   x.strokeStyle='rgba(255,255,255,.06)';x.lineWidth=1;x.stroke();
+   x.fillStyle='#8B8981';x.font='19px ui-monospace,Menlo,monospace';x.textAlign='right';
+   x.fillText(fmt(mn+(mx-mn)*f),P-8,y+6)});
+  x.beginPath();vals.forEach((v,i)=>i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v)));
+  x.strokeStyle=color;x.lineWidth=3;x.stroke();
+  x.beginPath();x.arc(X(vals.length-1),Y(vals[vals.length-1]),6,0,7);x.fillStyle=color;x.fill();
+  x.fillStyle='#8B8981';x.font='18px ui-monospace,Menlo,monospace';x.textAlign='left';
+  x.fillText(labels[0],P,H-12);x.textAlign='right';x.fillText(labels[labels.length-1],W-P*.6,H-12);
+ }
+ line('c1',rv.map(r=>r.btc),[first.d,last.d],'#D9A63C',v=>v.toFixed(1));
+ const ratios=rv.map(r=>r.ratio).filter(v=>v);
+ line('c2',ratios,[first.d,last.d],'#5FB98A',v=>v.toFixed(4));
+ const sorted=[...ratios].sort((a,b)=>a-b), cur=ratios[ratios.length-1];
+ const p=100*sorted.filter(v=>v<=cur).length/sorted.length;
+ document.getElementById('rsub').innerHTML='ETH/BTC <b style="color:#EDEBE4">'+cur.toFixed(5)+
+  '</b> = <b style="color:#EDEBE4">'+p.toFixed(0)+'th percentile</b> of its own '+sorted.length+
+  '-day history &nbsp;·&nbsp; range '+sorted[0].toFixed(5)+' – '+sorted[sorted.length-1].toFixed(5)+
+  '<br>Upper half means ETH is the richer side of the pair right now — the side you sell FROM, not into.';
+ const host=document.getElementById('pos');
+ const ps=(D.positions||[]).map(p=>({t:p.symbol||p.ticker||'?',u:p.usd||p.value_usd||0}))
+   .filter(p=>p.u>0).sort((a,b)=>b.u-a.u).slice(0,12);
+ const mxu=ps.length?ps[0].u:1;
+ ps.forEach(p=>{const d=document.createElement('div');d.className='row';
+  d.innerHTML='<div class="tk">'+p.t+'</div><div class="bar"><div class="fill" style="width:'+
+   Math.max(2,p.u/mxu*100)+'%"></div></div><div class="v">$'+Math.round(p.u).toLocaleString()+'</div>';
+  host.appendChild(d)});
+ if(!ps.length)host.innerHTML='<div class="sub">position detail not present in the snapshot</div>';
+});
+</script></body></html>

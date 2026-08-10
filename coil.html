@@ -1,0 +1,69 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>The Coil — realised volatility</title>
+<style>
+:root{--bg:#0A0B0E;--panel:#131519;--ink:#EDEBE4;--dim:#8B8981;--rule:#23262C;
+ --blood:#C4382A;--gold:#D9A63C;--ok:#5FB98A;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--serif:"Iowan Old Style",Palatino,Georgia,serif;
+ --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6}
+.wrap{max-width:900px;margin:0 auto;padding:30px 20px 60px}
+.head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--rule);padding-bottom:13px}
+h1{font-size:13px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--dim)}
+.date{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.lede{font-size:14.5px;color:#C9C7C0;margin:20px 0;max-width:66ch}.lede b{color:var(--ink)}
+.big{font-family:var(--mono);font-size:62px;line-height:1;letter-spacing:-.03em}
+.zone{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;margin-top:10px}
+.sub{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:10px}
+canvas{width:100%;display:block;background:var(--panel);border:1px solid var(--rule);border-radius:6px;margin-top:22px}
+.note{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--gold);padding:16px 18px;margin-top:22px;font-size:13.5px;color:#C9C7C0}
+.note b{color:var(--ink)}
+.foot{margin-top:26px;font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.85}.foot a{color:var(--gold)}
+</style></head><body><div class="wrap">
+<div class="head"><h1>The Coil · realised volatility</h1><div class="date" id="d">—</div></div>
+<p class="lede">Volatility is just <b>how much price moves day to day</b>. When it collapses, the
+market has gone quiet — no panic, no euphoria, nobody being forced to do anything. Quiet never
+lasts. This is the one measurement that says whether the violence is over.</p>
+<div class="big" id="v">—</div><div class="zone" id="z"></div><div class="sub" id="s"></div>
+<canvas id="c" width="1700" height="440" style="height:250px"></canvas>
+<div class="note" id="n"></div>
+<div class="foot">7-day realised volatility, annualised, computed from the 5-minute price collector
+(market_snapshots). State only — no forecast, no direction, no date.<br>
+Part of <a href="./">soullight.github.io/btc-rings</a>.</div></div>
+<script>
+fetch('./rv_vol.json?t='+Date.now()).then(r=>r.json()).then(D=>{
+ const V=D.vol,S=V.series;
+ document.getElementById('d').textContent=S[S.length-1].d;
+ const p=V.pctile;
+ const col=p<15?'#C4382A':(p>80?'#D9A63C':'#8B8981');
+ document.getElementById('v').textContent=V.cur.toFixed(1)+'%';
+ document.getElementById('v').style.color=col;
+ const zone=p<10?'DEAD QUIET':(p<25?'COMPRESSED':(p<75?'NORMAL':'VIOLENT'));
+ document.getElementById('z').textContent=zone+'  ·  '+p.toFixed(0)+'TH PERCENTILE';
+ document.getElementById('z').style.color=col;
+ document.getElementById('s').innerHTML='range over '+V.n+' days: <b style="color:#EDEBE4">'+
+  V.min.toFixed(1)+'%</b> to <b style="color:#EDEBE4">'+V.max.toFixed(1)+'%</b>';
+ const c=document.getElementById('c'),x=c.getContext('2d'),W=c.width,H=c.height,P=48;
+ const vals=S.map(r=>r.hv7),mn=Math.min(...vals),mx=Math.max(...vals);
+ x.fillStyle='#131519';x.fillRect(0,0,W,H);
+ const X=i=>P+(W-P*1.6)*(i/(vals.length-1)),Y=v=>H-P-(H-P*2)*((v-mn)/((mx-mn)||1));
+ const q=[...vals].sort((a,b)=>a-b), q25=q[Math.floor(q.length*.25)];
+ x.fillStyle='rgba(196,56,42,.10)';x.fillRect(P,Y(q25),W-P*1.6,H-P-Y(q25));
+ [0,.25,.5,.75,1].forEach(f=>{const y=H-P-(H-P*2)*f;x.beginPath();x.moveTo(P,y);x.lineTo(W-P*.6,y);
+  x.strokeStyle='rgba(255,255,255,.06)';x.lineWidth=1;x.stroke();
+  x.fillStyle='#8B8981';x.font='19px ui-monospace,Menlo,monospace';x.textAlign='right';
+  x.fillText((mn+(mx-mn)*f).toFixed(0)+'%',P-8,y+6)});
+ x.beginPath();vals.forEach((v,i)=>i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v)));
+ x.strokeStyle='#5FB98A';x.lineWidth=2.6;x.stroke();
+ x.beginPath();x.arc(X(vals.length-1),Y(vals[vals.length-1]),7,0,7);x.fillStyle=col;x.fill();
+ x.fillStyle='#8B8981';x.font='18px ui-monospace,Menlo,monospace';x.textAlign='left';
+ x.fillText(S[0].d,P,H-12);x.textAlign='right';x.fillText(S[S.length-1].d,W-P*.6,H-12);
+ x.textAlign='left';x.fillStyle='rgba(196,56,42,.75)';x.fillText('quiet quartile',P+8,Y(q25)-8);
+ document.getElementById('n').innerHTML='<b>What this means.</b> Realised volatility is at the <b>'+
+  p.toFixed(0)+'th percentile</b> of the last '+V.n+' days — the market is '+zone.toLowerCase()+
+  '. Forced sellers have finished; nobody is being liquidated into anybody. That is what the END of '+
+  'selling pressure looks like from the inside.<br><br><b>What it does not say:</b> direction. A coil at '+
+  'the bottom of a range can release either way. It says the violence has stopped, and violence is what '+
+  'hurts an accumulator.';
+});
+</script></body></html>
