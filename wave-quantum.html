@@ -43,10 +43,10 @@ let state = {
 
 async function init() {
   try {
-    /* was Binance-only (451 from everywhere, incl. via CORS proxies) — one source, no fallback */
+    /* was Binance-only (451 everywhere, incl. via CORS proxies) — one source, no fallback */
     const dDay = await FEED.daily(200);
     if (!dDay) { FEED.noFeed('body'); return; }
-    const closes = dDay.map(k => k.close);
+    const closes = dDay.map(function(k){ return k.close; });
 
     // Trough detection (12-day window)
     const troughs =[];
@@ -68,11 +68,10 @@ async function init() {
     state.tPrice = lastTrough.price;
 
     /* 4h bars were Binance too. Daily bars from the trough carry the same shape at lower
-       resolution; each day counts as 6 four-hour slots so the downstream maths is unchanged. */
+       resolution, so each bar is one day rather than a sixth of one. */
     const tIdx = dDay.findIndex(function(k){ return new Date(k.date).getTime() >= state.tDate; });
-    state.klines4h = dDay.slice(tIdx < 0 ? 0 : tIdx).flatMap(function(k){
-      return [{high:k.high, low:k.low, close:k.close}];
-    });
+    state.klines4h = dDay.slice(tIdx < 0 ? 0 : tIdx).map(function(k){
+      return { high: k.high, low: k.low, close: k.close }; });
     if (!state.klines4h.length) { FEED.noFeed('body','no bars since the trough'); return; }
 
     state.klines4h.forEach((k, i) => { if (k.high > state.cHi) { state.cHi = k.high; state.cHiDay = i; } });

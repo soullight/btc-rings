@@ -147,15 +147,14 @@ async function fetch4h(startTime,endTime){
 }
 
 async function fetchATH(){
-  /* CoinGecko 429s under load and the page waited on it, rendering nothing.
-     Derive the ATH from the candles we already have — no extra request, no rate limit. */
+  /* CoinGecko 429s under load and the page WAITED on it, so nothing rendered.
+     Derive the ATH from candles already fetched — no extra request, no rate limit. */
   try{
     const rows = await FEED.daily(4000);
-    if (rows && rows.length) return Math.max.apply(null, rows.map(function(r){return r.high;}));
+    if (rows && rows.length) return Math.max.apply(null, rows.map(function(r){ return r.high; }));
   }catch(e){}
   return null;
 }
-
 
 /* ── BUILD ── */
 let segments=[];

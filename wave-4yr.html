@@ -31,12 +31,11 @@ let quantaBlocks =[];
 let globalMax = 0;
 
 async function fetchHistory() {
-  /* was Coinbase(partial) -> CryptoCompare(401) -> Binance(451). FEED handles the chain. */
+  /* was Coinbase(partial) -> CryptoCompare(401) -> Binance(451). */
   const rows = await FEED.daily(4000);
   if (!rows) { FEED.noFeed('body'); return []; }
-  return rows.map(r => ({ t: new Date(r.date).getTime(), c: r.close, h: r.high, l: r.low }));
+  return rows.map(function(r){ return { t: new Date(r.date).getTime(), c: r.close, h: r.high, l: r.low }; });
 }
-
 
 function showError(msg) {
   const ui = document.getElementById("ui");

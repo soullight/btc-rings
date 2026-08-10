@@ -95,14 +95,15 @@ let ema21w = 0;
 let currentRegime = "CALIBRATING";
 let regimeColor = "#ffffff";
 
-/async function fetchMacroData() {
+// ─── FETCH HISTORICAL DATA ───
+async function fetchMacroData() {
   /* was Binance(451) -> CoinGecko(401) -> CryptoCompare(401): all three dead 2026-08-10.
-     FEED is the chain that answers — Bitstamp full history, then Coinbase, then Kraken. */
+     FEED is the chain that answers: Bitstamp full history, then Coinbase, then Kraken. */
   const rows = await FEED.daily(500);
   if (!rows) { FEED.noFeed('body'); return { closes: [], highest: 0 }; }
-  const closes = rows.map(r => r.close);
+  const closes = rows.map(function(r){ return r.close; });
   const highest = Math.max.apply(null, closes);
-requestAnimationFrame(render);
+  return { closes: closes, highest: highest };
 }
 
 // ─── COINBASE LIVE WEBSOCKET ───

@@ -145,14 +145,17 @@ function prepareData(data) {
       regime: regimeState,
       color: color,
       isMonthClose: i % 30 === 0
+    });
+  }
+  return result;
+}
+
 async function fetchData() {
   /* was CoinGecko days=max(401) -> Binance(451) -> CryptoCompare(401): all dead 2026-08-10. */
   const rows = await FEED.daily(4000);
   if (!rows) { FEED.noFeed('body'); return { data: [], source: "none" }; }
-  const data = rows.map(r => ({ date: new Date(r.date), price: r.close }));
-  return { data: data, source: "Bitstamp/Coinbase" };
-}
-estAnimationFrame(renderLoop);
+  return { data: rows.map(function(r){ return { date: new Date(r.date), price: r.close }; }),
+           source: "Bitstamp/Coinbase" };
 }
 
 const canvas = document.getElementById("canvas");
