@@ -74,6 +74,7 @@
   </div>
 </div>
 
+<script src="feed.js"></script>
 <script>
 // ═══════════════════════════════════════════════
 // USER CONFIGURATION
@@ -99,41 +100,13 @@ async function fetchMacroData() {
   let closes = [];
   let highest = 0;
 
-  // Try Binance first
-  try {
-    const res = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=500");
-    if (res.ok) {
-      const data = await res.json();
-      data.forEach(candle => {
-        const close = parseFloat(candle[4]);
-        closes.push(close);
-        if (close > highest) highest = close;
-      });
-    }
-  } catch(e) { console.warn("Binance daily failed:", e); }
-
-  // Fallback: CoinGecko
-  if (closes.length < 100) {
-    try {
-      const res = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=500&interval=daily");
-      if (res.ok) {
-        const j = await res.json();
-        closes = j.prices.map(p => p[1]);
-        highest = Math.max(...closes);
-      }
-    } catch(e) { console.warn("CoinGecko failed:", e); }
-  }
-
-  // Fallback: CryptoCompare
-  if (closes.length < 100) {
-    try {
-      const res = await fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=500");
-      if (res.ok) {
-        const j = await res.json();
-        closes = j.Data.Data.map(d => d.close).filter(c => c > 0);
-        highest = Math.max(...closes);
-      }
-    } catch(e) { console.warn("CryptoCompare failed:", e); }
+  /* Binance(451, geo) -> CoinGecko(401 on history) -> CryptoCompare(401): all three dead
+     as of 2026-08-10, which is why this page rendered nothing. feed.js carries the chain
+     that still answers: Bitstamp full history, then Coinbase, then Kraken. */
+  const rows = await FEED.daily(500);
+  if (rows) {
+    closes = rows.map(function(r){ return r.close; });
+    highest = Math.max.apply(null, closes);
   }
 
   if (closes.length < 100) {
