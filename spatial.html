@@ -74,7 +74,6 @@
   </div>
 </div>
 
-<script src="feed.js"></script>
 <script>
 // ═══════════════════════════════════════════════
 // USER CONFIGURATION
@@ -97,13 +96,78 @@ let regimeColor = "#ffffff";
 
 // ─── FETCH HISTORICAL DATA ───
 async function fetchMacroData() {
-  /* was Binance(451) -> CoinGecko(401) -> CryptoCompare(401): all three dead 2026-08-10.
-     FEED is the chain that answers: Bitstamp full history, then Coinbase, then Kraken. */
-  const rows = await FEED.daily(500);
-  if (!rows) { FEED.noFeed('body'); return { closes: [], highest: 0 }; }
-  const closes = rows.map(function(r){ return r.close; });
-  const highest = Math.max.apply(null, closes);
-  return { closes: closes, highest: highest };
+  let closes = [];
+  let highest = 0;
+
+  // Try Binance first
+  try {
+    const res = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=500");
+    if (res.ok) {
+      const data = await res.json();
+      data.forEach(candle => {
+        const close = parseFloat(candle[4]);
+        closes.push(close);
+        if (close > highest) highest = close;
+      });
+    }
+  } catch(e) { console.warn("Binance daily failed:", e); }
+
+  // Fallback: CoinGecko
+  if (closes.length < 100) {
+    try {
+      const res = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=500&interval=daily");
+      if (res.ok) {
+        const j = await res.json();
+        closes = j.prices.map(p => p[1]);
+        highest = Math.max(...closes);
+      }
+    } catch(e) { console.warn("CoinGecko failed:", e); }
+  }
+
+  // Fallback: CryptoCompare
+  if (closes.length < 100) {
+    try {
+      const res = await fetch("https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=500");
+      if (res.ok) {
+        const j = await res.json();
+        closes = j.Data.Data.map(d => d.close).filter(c => c > 0);
+        highest = Math.max(...closes);
+      }
+    } catch(e) { console.warn("CryptoCompare failed:", e); }
+  }
+
+  if (closes.length < 100) {
+    document.getElementById("loading").innerText = "ALL DATA SOURCES FAILED";
+    return;
+  }
+
+  athPrice = highest;
+
+  // Calculate 21-Week EMA (approx 147 days)
+  const N = 147;
+  const k = 2 / (N + 1);
+  let initialSma = 0;
+  for (let i = 0; i < Math.min(N, closes.length); i++) initialSma += closes[i];
+  initialSma = initialSma / Math.min(N, closes.length);
+
+  let currentEma = initialSma;
+  for (let i = N; i < closes.length; i++) {
+    currentEma = (closes[i] * k) + (currentEma * (1 - k));
+  }
+  ema21w = currentEma;
+
+  document.getElementById("top-val").innerText = `$${TARGET_TOP.toLocaleString()}`;
+  document.getElementById("ath-val").innerText = `$${athPrice.toLocaleString()}`;
+  document.getElementById("bottom-val").innerText = `$${TARGET_BOTTOM.toLocaleString()}`;
+
+  currentPrice = closes[closes.length - 1];
+  displayedPrice = currentPrice;
+
+  startWebSocket();
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("hud").style.display = "block";
+  requestAnimationFrame(render);
 }
 
 // ─── COINBASE LIVE WEBSOCKET ───
