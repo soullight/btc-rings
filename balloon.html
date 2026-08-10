@@ -82,7 +82,7 @@ function lp(a,b,t){return Math.round(a+(b-a)*t)}
 function col(t){var bl=[196,56,42],gd=[217,166,60];
  return 'rgb('+lp(bl[0],gd[0],t)+','+lp(bl[1],gd[1],t)+','+lp(bl[2],gd[2],t)+')'}
 
-/* live price — same fallback chain the other rings pages use */
+/* live price — same source fallback sequence the other rings pages use */
 async function tryJSON(u,ms){const c=new AbortController();const k=setTimeout(()=>c.abort(),ms||9000);
  try{const r=await fetch(u,{signal:c.signal});clearTimeout(k);if(!r.ok)throw 0;return await r.json()}
  catch(e){clearTimeout(k);throw e}}
