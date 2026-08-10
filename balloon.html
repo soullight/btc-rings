@@ -111,6 +111,12 @@ async function history(){
   if(d.length>2500)return{dates:d,close:d.map(k=>m[k]),src:"Coinbase"};
  }catch(e){}
  try{
+  const j=await jget("https://api.kraken.com/0/public/OHLC?pair=XXBTZUSD&interval=1440",20000);
+  if(j&&j.result){const k=Object.keys(j.result).filter(x=>x!=="last")[0],r=j.result[k],m={};
+   r.forEach(c=>{if(+c[4]>0)m[iso(c[0]*1000)]=+c[4]});
+   const d=Object.keys(m).sort(); if(d.length>2500)return{dates:d,close:d.map(x=>m[x]),src:"Kraken"};}
+ }catch(e){}
+ try{
   const j=await jget("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily",20000);
   if(j&&j.prices){const m={};j.prices.forEach(p=>m[iso(p[0])]=p[1]);
    const d=Object.keys(m).sort();return{dates:d,close:d.map(k=>m[k]),src:"CoinGecko (short)"};}
@@ -118,6 +124,9 @@ async function history(){
  return null}
 
 async function livePrice(){
+ try{const j=await jget("https://api.kraken.com/0/public/Ticker?pair=XXBTZUSD",8000);
+  if(j&&j.result){const k=Object.keys(j.result)[0],r=j.result[k];
+   return{p:+r.c[0],chg:(+r.c[0]/+r.o-1)*100,src:"Kraken"}}}catch(e){}
  try{const j=await jget("https://api.exchange.coinbase.com/products/BTC-USD/ticker",8000);
   if(j&&j.price)return{p:+j.price,src:"Coinbase"}}catch(e){}
  try{const j=await jget("https://www.bitstamp.net/api/v2/ticker/btcusd/",8000);
