@@ -39,6 +39,29 @@ Left edge is the floor — that is where blood is. Right edge is the high — th
 has already run. Nothing here is a NAV discount; see the note at the bottom.</p>
 <div class="legend"><span>◀ floor · blood</span><span>high · already run ▶</span></div>
 <div id="rows"></div>
+<h2>True NAV premium / discount</h2>
+<p class="lede" style="margin:6px 0 4px">This is the number the report above could never give you:
+<b>market price against the assets each trust actually holds</b>. Holdings and share counts come
+from each trust's own 10-Q; the discount is price &divide; (holdings-per-share &times; spot) &minus; 1.
+Negative means you buy a dollar of coin for less than a dollar.</p>
+<div class="legend"><span>&#9664; discount &middot; cheap</span><span>premium &middot; overpaying &#9654;</span></div>
+<div id="nav"></div>
+<div class="note" style="border-left-color:var(--blood)">
+<b>Two of these are traps.</b> GLNK and GXLM trade at <b>+74%</b> and <b>+69%</b> over the Chainlink
+and Stellar they hold &mdash; pay $1.74 for a dollar of LINK. Both sit at 0&ndash;2% on the range
+chart above, indistinguishable from the genuinely beaten-down names. Range position and value are
+different questions and the first one cannot answer the second.<br><br>
+<b>BCHG and LTCN each did a 7.5:1 share split.</b> Using the balance-sheet share count instead of
+the current one reports them at &minus;88%, which is not real &mdash; no Grayscale trust has ever
+traded below ETHE's record &minus;59%. Corrected here against post-split shares.
+</div>
+<div class="note">
+<b>What a discount is worth.</b> $100,000 into ETCG buys about <b>$149,000</b> of Ethereum Classic.
+Against that, every trust charges <b>2.5%/yr</b> and the coin-per-share shrinks accordingly &mdash;
+a 33% discount is roughly 13 years of fee, a 6% discount about two. The discount closes for real
+only if the trust converts to an ETF, which is what GBTC did in January 2024 and what ZCSH has
+filed to do on NYSE Arca.
+</div>
 <h2>ZCSH — 30 days</h2>
 <canvas id="z" width="1600" height="220" style="width:100%;height:150px;display:block;
  background:var(--panel);border:1px solid var(--rule);border-radius:6px;margin-top:10px"></canvas>
@@ -87,5 +110,19 @@ fetch('./trusts.json?t='+Date.now()).then(r=>r.json()).then(D=>{
    ' readings, while most of the basket sits at 0–2%. The blood is in the trusts on the left of the chart above; '+
    'ZCSH is where the blood already stopped.';
  }
+});
+
+fetch('./nav_discounts.json?t='+Date.now()).then(r=>r.json()).then(R=>{
+ const h=document.getElementById('nav'); if(!h) return;
+ const mx=Math.max(...R.map(r=>Math.abs(r.disc)));
+ R.forEach(r=>{const d=document.createElement('div');d.className='row';
+  const neg=r.disc<0, col=neg?'#5FB98A':(r.disc>20?'#C4382A':'#8B8981');
+  const w=Math.max(2,Math.abs(r.disc)/mx*50);
+  d.innerHTML='<div class="tk">'+r.t+'</div>'+
+   '<div class="px">$'+r.px.toFixed(2)+'</div>'+
+   '<div class="bar" style="position:relative"><div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.18)"></div>'+
+   '<div class="fill" style="left:'+(neg?50-w:50)+'%;width:'+w+'%;background:'+col+'"></div></div>'+
+   '<div class="pos" style="color:'+col+'">'+(r.disc>0?'+':'')+r.disc.toFixed(0)+'%</div>';
+  h.appendChild(d)});
 });
 </script></body></html>
