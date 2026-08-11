@@ -1,5 +1,5 @@
 {
- "ts": "2026-08-11T08:00:01+00:00",
+ "ts": "2026-08-11T08:20:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-08-11",
@@ -50,21 +50,22 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 64070.0,
- "chg24h": -1.737,
- "vol24h": 13753.39834,
- "longs": 90448,
+ "price": 64049.7,
+ "chg24h": -1.884,
+ "vol24h": 13697.95757,
+ "longs": 90447,
  "shorts": 222,
+ "funding_apr": 0.12,
  "fear": 29,
  "fear_label": "Fear",
- "mempool_tx": 973,
- "mempool_mb": 0.23,
- "block": 961980,
+ "mempool_tx": 617,
+ "mempool_mb": 0.19,
+ "block": 961982,
  "ibit": 36.23,
- "ibit_ratio": 0.00056548,
+ "ibit_ratio": 0.00056565,
  "blood": {
   "ath": 124728,
-  "spot": 64000,
+  "spot": 63985,
   "days_out": 72,
   "methods": {
    "200w_ma": {
@@ -73,10 +74,10 @@
      1.004,
      0.657
     ],
-    "anchor": 66161,
+    "anchor": 66160,
     "est": [
-     52730,
-     66418,
+     52729,
+     66417,
      43439
     ]
    },
@@ -86,9 +87,9 @@
      1.043,
      0.68
     ],
-    "anchor": 64172,
+    "anchor": 64171,
     "est": [
-     51145,
+     51144,
      66946,
      43649
     ]
@@ -146,20 +147,20 @@
    35074,
    43439,
    43649,
-   51145,
-   52730,
+   51144,
+   52729,
    55511,
-   66418,
+   66417,
    66946
   ],
   "low": 16239,
   "high": 66946,
   "p25": 29107,
   "median": 35074,
-  "p75": 52730,
+  "p75": 52729,
   "zone": [
    29107,
-   52730
+   52729
   ],
   "zone_pct": [
    -77,
@@ -169,24 +170,24 @@
  },
  "blood_zone": [
   29107,
-  52730
+  52729
  ],
  "in_blood_zone": false,
  "blood_zone_note": "the ZONE is derived; the LADDER is not - see engine2_plan.json",
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.27,
+   "ibit": 28.28,
    "amount": 300000,
    "shares": 10608,
    "note": null,
    "pct_from_ath": -60,
-   "pct_from_here": -22.0,
+   "pct_from_here": -21.9,
    "hit": false
   },
   {
    "btc": 44000,
-   "ibit": 24.88,
+   "ibit": 24.89,
    "amount": 300000,
    "shares": 12053,
    "note": null,
@@ -196,7 +197,7 @@
   },
   {
    "btc": 37400,
-   "ibit": 21.15,
+   "ibit": 21.16,
    "amount": 500000,
    "shares": 23641,
    "note": null,
@@ -216,7 +217,7 @@
   },
   {
    "btc": 31200,
-   "ibit": 17.64,
+   "ibit": 17.65,
    "amount": 500000,
    "shares": 28329,
    "note": "ring base target",
@@ -226,7 +227,7 @@
   },
   {
    "btc": 28000,
-   "ibit": 15.83,
+   "ibit": 15.84,
    "amount": 400000,
    "shares": 25253,
    "note": null,
@@ -1818,7 +1819,13 @@
    "p": 64070.0,
    "ls": 407.0,
    "f": 29
+  },
+  {
+   "ts": "2026-08-11T08:20:01+00:00",
+   "p": 64049.7,
+   "ls": 407.0,
+   "f": 29
   }
  ],
- "db_rows": 259
+ "db_rows": 260
 }
