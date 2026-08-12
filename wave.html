@@ -147,11 +147,30 @@ function detectTroughs(closes, hw) {
 }
 
 function filterTroughs(raw, closes, minGap) {
+  /* BRESSERT: the cycle low is the TURN that ended the decline — never merely the
+     cheapest print. A new cycle low must clear BOTH tests:
+       (1) it sits >= minGap days after the previous cycle low   (timing window)
+       (2) it is the LOWEST close since that previous low        (it ended the decline)
+     A lower low inside the window is a FAILED RETEST and does not move the anchor.
+
+     The old code had `else if (closes[i] < closes[anchor]) anchor = i` — a cheaper
+     later print stole the cycle start. That is why 2026-06-29 ($58,524) overwrote the
+     2026-06-05 turn ($60,850) and showed day 43 while Loukas read day 67.
+
+     Test (2) is load-bearing, not decoration: the 2026-07-31 low sits 56 days after
+     Jun 5, so every timing gap from 30 to 55 admits it and resets CYCLE DAY to 12.
+     It fails (2) — the lowest close since Jun 5 is Jun 29's $58,524 — so it is
+     correctly read as a retest. Self-correcting: the real low WILL be the lowest
+     close since the last one, and anchors itself the moment it confirms. */
   if (!raw.length) return raw;
   const f = [raw[0]];
   for (let i = 1; i < raw.length; i++) {
-    if (raw[i] - f[f.length-1] >= minGap) f.push(raw[i]);
-    else if (closes[raw[i]] < closes[f[f.length-1]]) f[f.length-1] = raw[i];
+    const prev = f[f.length-1];
+    if (raw[i] - prev < minGap) continue;
+    let lowestSince = Infinity;
+    for (let j = prev + 1; j <= raw[i]; j++) if (closes[j] < lowestSince) lowestSince = closes[j];
+    if (closes[raw[i]] > lowestSince) continue;
+    f.push(raw[i]);
   }
   return f;
 }
