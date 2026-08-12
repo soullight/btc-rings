@@ -578,10 +578,14 @@ async function init() {
 
     // Detect troughs
     let troughs = detectTroughs(closes, 12);
-    troughs = filterTroughs(troughs, closes, 30);
+    // minGap = 0.75 * NOM. A 60-day cycle's lows sit ~a cycle apart; admitting a new
+    // low only 30 days on promotes a mid-cycle pullback to a cycle start and resets
+    // CYCLE DAY to near zero. Measured 2026-08-11: at 30 this page was one day from
+    // jumping day 43 -> day 12 on the 2026-07-31 low. 36..55 all give the same answer.
+    troughs = filterTroughs(troughs, closes, Math.round(NOM * 0.75));
     if (troughs.length < 1) {
       troughs = detectTroughs(closes, 8);
-      troughs = filterTroughs(troughs, closes, 36);
+      troughs = filterTroughs(troughs, closes, Math.round(NOM * 0.6));
     }
 
     const ti = troughs.length ? troughs[troughs.length-1] : 0;
