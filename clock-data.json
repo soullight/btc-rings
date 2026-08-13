@@ -1,5 +1,5 @@
 {
- "ts": "2026-08-13T09:20:01+00:00",
+ "ts": "2026-08-13T09:40:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-08-13",
@@ -50,22 +50,22 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 63666.0,
- "chg24h": -0.466,
- "vol24h": 12861.36019,
+ "price": 63674.3,
+ "chg24h": -0.602,
+ "vol24h": 12673.42558,
  "longs": 90456,
  "shorts": 237,
  "funding_apr": 0,
  "fear": 29,
  "fear_label": "Fear",
- "mempool_tx": 888,
- "mempool_mb": 0.25,
- "block": 962268,
+ "mempool_tx": 1560,
+ "mempool_mb": 0.5,
+ "block": 962270,
  "ibit": 35.89,
- "ibit_ratio": 0.00056372,
+ "ibit_ratio": 0.00056365,
  "blood": {
   "ath": 124728,
-  "spot": 63604,
+  "spot": 63622,
   "days_out": 70,
   "methods": {
    "200w_ma": {
@@ -74,10 +74,10 @@
      1.004,
      0.657
     ],
-    "anchor": 66140,
+    "anchor": 66141,
     "est": [
-     52713,
-     66397,
+     52714,
+     66398,
      43426
     ]
    },
@@ -87,10 +87,10 @@
      1.043,
      0.68
     ],
-    "anchor": 64152,
+    "anchor": 64153,
     "est": [
      51129,
-     66925,
+     66926,
      43636
     ]
    },
@@ -148,19 +148,19 @@
    43426,
    43636,
    51129,
-   52713,
+   52714,
    55511,
-   66397,
-   66925
+   66398,
+   66926
   ],
   "low": 16239,
-  "high": 66925,
+  "high": 66926,
   "p25": 29107,
   "median": 35074,
-  "p75": 52713,
+  "p75": 52714,
   "zone": [
    29107,
-   52713
+   52714
   ],
   "zone_pct": [
    -77,
@@ -170,14 +170,14 @@
  },
  "blood_zone": [
   29107,
-  52713
+  52714
  ],
  "in_blood_zone": false,
  "blood_zone_note": "the ZONE is derived; the LADDER is not - see engine2_plan.json",
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.19,
+   "ibit": 28.18,
    "amount": 300000,
    "shares": 10608,
    "note": null,
@@ -207,12 +207,12 @@
   },
   {
    "btc": 34478,
-   "ibit": 19.44,
+   "ibit": 19.43,
    "amount": 500000,
    "shares": 25641,
    "note": "his existing order",
    "pct_from_ath": -72,
-   "pct_from_here": -45.8,
+   "pct_from_here": -45.9,
    "hit": false
   },
   {
@@ -262,7 +262,7 @@
   "sell_target": 249456,
   "source": "engine2_plan.json (LOCKED 2026-08-07)"
  },
- "pct_from_ath": -49.0,
+ "pct_from_ath": -48.9,
  "ls_ratio": 382,
  "long_share_pct": 99.7,
  "history": [
@@ -2707,7 +2707,13 @@
    "p": 63666.0,
    "ls": 382.0,
    "f": 29
+  },
+  {
+   "ts": "2026-08-13T09:40:01+00:00",
+   "p": 63674.3,
+   "ls": 382.0,
+   "f": 29
   }
  ],
- "db_rows": 407
+ "db_rows": 408
 }
