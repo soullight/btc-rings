@@ -1,5 +1,5 @@
 {
- "ts": "2026-08-23T00:20:01+00:00",
+ "ts": "2026-08-23T00:21:24+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-08-23",
@@ -47,25 +47,28 @@
  },
  "sources": {
   "price": "binance",
+  "price_crosscheck": "kraken",
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 77104.04,
- "chg24h": -1.237,
- "vol24h": 18259.99347,
+ "price": 77098.0,
+ "chg24h": -1.265,
+ "vol24h": 18258.66319,
+ "price_kraken": 77110.5,
+ "price_spread_bps": 1.6,
  "longs": 90307,
  "shorts": 179,
  "funding_apr": 11.47,
  "fear": 66,
  "fear_label": "Greed",
- "mempool_tx": 3399,
- "mempool_mb": 1.0,
+ "mempool_tx": 3554,
+ "mempool_mb": 1.04,
  "block": 963647,
  "ibit": 43.68,
- "ibit_ratio": 0.00056651,
+ "ibit_ratio": 0.00056655,
  "blood": {
   "ath": 124728,
-  "spot": 77087,
+  "spot": 77100,
   "days_out": 60,
   "methods": {
    "200w_ma": {
@@ -74,7 +77,7 @@
      1.004,
      0.657
     ],
-    "anchor": 66758,
+    "anchor": 66759,
     "est": [
      53206,
      67018,
@@ -89,8 +92,8 @@
     ],
     "anchor": 64745,
     "est": [
-     51601,
-     67544,
+     51602,
+     67545,
      44039
     ]
    },
@@ -147,14 +150,14 @@
    35074,
    43832,
    44039,
-   51601,
+   51602,
    53206,
    55511,
    67018,
-   67544
+   67545
   ],
   "low": 16239,
-  "high": 67544,
+  "high": 67545,
   "p25": 29107,
   "median": 35074,
   "p75": 53206,
@@ -182,7 +185,7 @@
    "shares": 10608,
    "note": null,
    "pct_from_ath": -60,
-   "pct_from_here": -35.2,
+   "pct_from_here": -35.1,
    "hit": false
   },
   {
@@ -266,6 +269,7 @@
  "ls_ratio": 505,
  "long_share_pct": 99.8,
  "missing_required": [],
+ "quality_issues": [],
  "data_quality": "COMPLETE",
  "history": [
   {
@@ -6885,7 +6889,13 @@
    "p": 77104.04,
    "ls": 505.0,
    "f": 66
+  },
+  {
+   "ts": "2026-08-23T00:21:24+00:00",
+   "p": 77098.0,
+   "ls": 505.0,
+   "f": 66
   }
  ],
- "db_rows": 1103
+ "db_rows": 1104
 }
