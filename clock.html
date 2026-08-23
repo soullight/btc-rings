@@ -115,6 +115,12 @@ async function load(){
 
   const c=d.cycle, now=new Date(), age=(now-new Date(d.ts))/60000;
   const st=document.getElementById("stamp");
+  if(d.data_quality !== "COMPLETE") {
+    const missing = (d.missing_required || []).join(", ") || "unresolved source mismatch";
+    st.className = "stamp stale";
+    st.innerHTML = '<b>DATA INCOMPLETE</b> — no decision read. Missing or invalid: ' + missing;
+    return;
+  }
   st.className="stamp"+(age>75?" stale":"");
   st.innerHTML=(age>75?"⚠ STALE — ":"LIVE · ")+"<b>"+d.ts.replace("T"," ").slice(0,16)+" UTC</b> · "+
     Math.round(age)+" min old · Nevada, every 20 min · "+fmt(d.db_rows)+" rows stored";
