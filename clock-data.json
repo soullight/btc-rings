@@ -1,5 +1,5 @@
 {
- "ts": "2026-08-26T19:20:01+00:00",
+ "ts": "2026-08-26T19:40:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-08-26",
@@ -51,24 +51,24 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 78411.35,
- "chg24h": -1.036,
- "vol24h": 15285.60179,
- "price_kraken": 78397.0,
- "price_spread_bps": 1.8,
+ "price": 78406.0,
+ "chg24h": -0.614,
+ "vol24h": 15255.97996,
+ "price_kraken": 78410.5,
+ "price_spread_bps": 0.6,
  "longs": 90555,
  "shorts": 161,
  "funding_apr": 0,
  "fear": 65,
  "fear_label": "Greed",
- "mempool_tx": 397,
- "mempool_mb": 0.1,
+ "mempool_tx": 4661,
+ "mempool_mb": 1.35,
  "block": 964188,
- "ibit": 44.42,
- "ibit_ratio": 0.0005665,
+ "ibit": 44.4,
+ "ibit_ratio": 0.00056628,
  "blood": {
   "ath": 124728,
-  "spot": 78401,
+  "spot": 78392,
   "days_out": 57,
   "methods": {
    "200w_ma": {
@@ -77,9 +77,9 @@
      1.004,
      0.657
     ],
-    "anchor": 66816,
+    "anchor": 66815,
     "est": [
-     53252,
+     53251,
      67075,
      43869
     ]
@@ -90,7 +90,7 @@
      1.043,
      0.68
     ],
-    "anchor": 64800,
+    "anchor": 64799,
     "est": [
      51645,
      67601,
@@ -151,7 +151,7 @@
    43869,
    44076,
    51645,
-   53252,
+   53251,
    55511,
    67075,
    67601
@@ -160,10 +160,10 @@
   "high": 67601,
   "p25": 29107,
   "median": 35074,
-  "p75": 53252,
+  "p75": 53251,
   "zone": [
    29107,
-   53252
+   53251
   ],
   "zone_pct": [
    -77,
@@ -173,14 +173,14 @@
  },
  "blood_zone": [
   29107,
-  53252
+  53251
  ],
  "in_blood_zone": false,
  "blood_zone_note": "the ZONE is derived; the LADDER is not - see engine2_plan.json",
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.32,
+   "ibit": 28.31,
    "amount": 300000,
    "shares": 10608,
    "note": null,
@@ -190,7 +190,7 @@
   },
   {
    "btc": 44000,
-   "ibit": 24.93,
+   "ibit": 24.92,
    "amount": 300000,
    "shares": 12053,
    "note": null,
@@ -200,7 +200,7 @@
   },
   {
    "btc": 37400,
-   "ibit": 21.19,
+   "ibit": 21.18,
    "amount": 500000,
    "shares": 23641,
    "note": null,
@@ -210,7 +210,7 @@
   },
   {
    "btc": 34478,
-   "ibit": 19.53,
+   "ibit": 19.52,
    "amount": 500000,
    "shares": 25641,
    "note": "his existing order",
@@ -8533,7 +8533,13 @@
    "p": 78411.35,
    "ls": 562.0,
    "f": 65
+  },
+  {
+   "ts": "2026-08-26T19:40:01+00:00",
+   "p": 78406.0,
+   "ls": 562.0,
+   "f": 65
   }
  ],
- "db_rows": 1377
+ "db_rows": 1378
 }
