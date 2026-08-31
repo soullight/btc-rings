@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BTC Now · Bitcoin Rings</title>
+<style>
+:root{--bg:#090a0b;--panel:#121417;--line:#262b30;--muted:#a4abb2;--text:#f6f7f3;--gold:#e1b85a;--green:#57d996;--red:#ff7373;--amber:#f4c461}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 500px at 50% -130px,#273127 0%,var(--bg) 58%);color:var(--text);font:16px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:1120px;margin:auto;padding:28px 22px 54px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:48px}.brand{font-size:12px;font-weight:800;letter-spacing:.16em}.brand a{color:inherit;text-decoration:none}.live{font-size:11px;color:var(--muted);letter-spacing:.08em}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-right:7px}.dot.on{background:var(--green);box-shadow:0 0 12px var(--green)}
+.eyebrow{color:var(--gold);font-size:12px;font-weight:800;letter-spacing:.14em;text-align:center}.state{font-size:clamp(46px,10vw,104px);line-height:.94;letter-spacing:-.075em;text-align:center;margin:12px 0 14px;font-weight:850}.state.green{color:var(--green)}.state.red{color:var(--red)}.state.amber{color:var(--amber)}.sub{text-align:center;color:var(--muted);font-size:clamp(16px,2vw,20px);margin:0 auto;max-width:680px}.context{display:inline-block;color:var(--text);border:1px solid var(--line);border-radius:100px;padding:8px 15px;font-size:13px;font-weight:700;margin-top:18px}.center{text-align:center}
+.meter{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:46px auto 32px;max-width:880px}.meter div{border:1px solid var(--line);border-radius:7px;padding:10px 8px;color:#697077;font-size:10px;font-weight:800;letter-spacing:.05em;text-align:center}.meter .active{color:#101214;border-color:transparent}.meter .strongoff{background:var(--red)}.meter .mildoff{background:#d98878}.meter .caution{background:var(--amber)}.meter .mildon{background:#91d17b}.meter .strongon{background:var(--green)}
+.price-row{display:flex;gap:28px;justify-content:center;margin:0 auto 50px;text-align:center}.price-row>div{min-width:170px}.label{font-size:10px;letter-spacing:.12em;font-weight:800;color:var(--muted);margin-bottom:5px}.value{font-size:25px;font-weight:780;letter-spacing:-.04em}.small{font-size:14px;color:var(--muted)}
+.evidence{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}.card{background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018));border:1px solid var(--line);border-radius:14px;padding:22px}.card .num{font-size:34px;font-weight:800;letter-spacing:-.055em;margin:5px 0}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--amber)}
+.chart-card{padding:20px 20px 14px;margin-top:12px}.chart-head{display:flex;justify-content:space-between;align-items:baseline}.chart-head h2{margin:0;font-size:15px;letter-spacing:.04em}.chart-head span{color:var(--muted);font-size:12px}svg{width:100%;height:220px;display:block;margin-top:15px}.chart-line{fill:none;stroke:var(--gold);stroke-width:2.25;vector-effect:non-scaling-stroke}.chart-fill{fill:url(#fade)}.chart-grid{stroke:#23282d;stroke-width:1}.chart-label{fill:#9aa2a9;font-size:10px}
+.read{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:12px}.read h2{font-size:16px;margin:0 0 9px}.read p{margin:0;color:var(--muted)}.read strong{color:var(--text)}.links{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}.links a{color:var(--text);font-size:12px;font-weight:750;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:9px 11px}.links a:hover{border-color:var(--gold);color:var(--gold)}footer{text-align:center;color:#6e767d;font-size:11px;margin-top:37px}footer a{color:inherit}
+@media(max-width:650px){.wrap{padding:20px 15px 38px}.top{margin-bottom:34px}.meter{gap:3px;margin:34px 0 29px}.meter div{font-size:8px;padding:8px 3px}.price-row{gap:8px;justify-content:space-between}.price-row>div{min-width:0}.value{font-size:20px}.evidence,.read{grid-template-columns:1fr}.card .num{font-size:31px}.chart-card{padding:16px}svg{height:175px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div class="brand"><a href="nav.html">₿ BITCOIN RINGS</a></div>
+    <div class="live"><i class="dot" id="dot"></i><span id="health">LOADING LIVE DATA</span></div>
+  </header>
+
+  <section aria-live="polite">
+    <div class="eyebrow">BTC · DUAL MOMENTUM STATE</div>
+    <h1 class="state amber" id="state">READING MARKET</h1>
+    <p class="sub" id="subtitle">Retrieving daily BTC-USD candles from Coinbase.</p>
+    <div class="center"><span class="context" id="context">No trend context until the data loads</span></div>
+
+    <div class="meter" aria-label="Trend-state scale">
+      <div class="strongoff" data-bucket="STRONG-OFF">STRONG-OFF</div>
+      <div class="mildoff" data-bucket="MILD-OFF">MILD-OFF</div>
+      <div class="caution" data-bucket="CAUTION">CAUTION</div>
+      <div class="mildon" data-bucket="MILD-ON">MILD-ON</div>
+      <div class="strongon" data-bucket="STRONG-ON">STRONG-ON</div>
+    </div>
+
+    <div class="price-row">
+      <div><div class="label">BTC PRICE</div><div class="value" id="price">—</div></div>
+      <div><div class="label">LAST CONFIRMATION</div><div class="value" id="confirmed">—</div><div class="small" id="confirmed-state"></div></div>
+      <div><div class="label">DAILY CANDLES</div><div class="value" id="candles">—</div><div class="small">used in this read</div></div>
+    </div>
+  </section>
+
+  <section class="evidence" aria-label="Evidence">
+    <article class="card"><div class="label">20-DAY MOMENTUM</div><div class="num" id="m20">—</div><div class="small" id="m20note">Current close vs. 20 days ago</div></article>
+    <article class="card"><div class="label">60-DAY MOMENTUM</div><div class="num" id="m60">—</div><div class="small" id="m60note">Current close vs. 60 days ago</div></article>
+    <article class="card"><div class="label">TREND ALIGNMENT</div><div class="num" id="alignment">—</div><div class="small" id="alignment-note">Price vs. 20D and 60D average</div></article>
+  </section>
+
+  <section class="card chart-card">
+    <div class="chart-head"><h2>90-DAY PRICE CONTEXT</h2><span id="range">—</span></div>
+    <svg viewBox="0 0 1000 220" role="img" aria-label="Bitcoin price over the last 90 daily candles">
+      <defs><linearGradient id="fade" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#e1b85a" stop-opacity=".20"/><stop offset="1" stop-color="#e1b85a" stop-opacity="0"/></linearGradient></defs>
+      <line class="chart-grid" x1="0" y1="18" x2="1000" y2="18"/><line class="chart-grid" x1="0" y1="110" x2="1000" y2="110"/><line class="chart-grid" x1="0" y1="202" x2="1000" y2="202"/>
+      <path id="area" class="chart-fill"></path><polyline id="line" class="chart-line" points=""></polyline>
+      <text class="chart-label" id="high-label" x="5" y="14"></text><text class="chart-label" id="low-label" x="5" y="216"></text>
+    </svg>
+  </section>
+
+  <section class="read">
+    <article class="card"><h2>How to read this</h2><p>This is one transparent trend read: <strong>both 20D and 60D momentum must agree for five daily closes</strong> before it confirms. It reports conditions; it does not replace your pattern recognition.</p></article>
+    <article class="card"><h2>Evidence, not a black box</h2><p id="method">The state is calculated in your browser from public Coinbase BTC-USD daily candles. Refreshing reruns the same visible rule.</p><div class="links"><a href="signal.html">Full signal engine</a><a href="kronos.html">Kronos confirmation</a><a href="rings.html">The rings</a></div></article>
+  </section>
+  <footer>PUBLIC DATA · CLIENT-SIDE CALCULATION · <span id="updated">WAITING FOR DATA</span></footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
+const pct=n=>`${n>=0?'+':''}${(n*100).toFixed(1)}%`;
+const shortDate=t=>new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}).format(new Date(t*1000));
+const average=xs=>xs.reduce((a,b)=>a+b,0)/xs.length;
+
+function calculate(data){
+  if(data.length<66) throw new Error('Not enough daily candles returned');
+  let raw=0, candidate=0, streak=0, lastChange=null, lastChangeState='';
+  for(let i=60;i<data.length;i++){
+    const close=data[i].close, m20=close/data[i-20].close-1, m60=close/data[i-60].close-1;
+    const dir=(m20>0&&m60>0)?1:(m20<0||m60<0)?-1:0;
+    if(dir===candidate) streak++; else {candidate=dir;streak=1;}
+    if(dir!==0&&dir!==raw&&streak>=5){raw=dir;lastChange=data[i].time;lastChangeState=raw>0?'trend on':'trend off';}
+  }
+  const i=data.length-1, close=data[i].close, m20=close/data[i-20].close-1, m60=close/data[i-60].close-1;
+  const sma20=average(data.slice(-20).map(d=>d.close)), sma60=average(data.slice(-60).map(d=>d.close));
+  let bucket='CAUTION';
+  if(raw>0) bucket=(m20>=.10&&m60>=.20)?'STRONG-ON':'MILD-ON';
+  if(raw<0) bucket=(m20<=-.10&&m60<=-.20)?'STRONG-OFF':'MILD-OFF';
+  return {raw,bucket,close,m20,m60,sma20,sma60,lastChange,lastChangeState};
+}
+
+function setNumber(id,n){const el=$(id);el.textContent=pct(n);el.className='num '+(n>0?'up':n<0?'down':'flat')}
+function chart(data){
+  const points=data.slice(-90), vals=points.map(d=>d.close), min=Math.min(...vals), max=Math.max(...vals), span=max-min||1;
+  const coords=vals.map((v,i)=>`${(i/(vals.length-1)*1000).toFixed(1)},${(202-(v-min)/span*174).toFixed(1)}`).join(' ');
+  $('line').setAttribute('points',coords);$('area').setAttribute('d',`M 0,202 L ${coords.replace(/ /g,' L ')} L 1000,202 Z`);
+  $('high-label').textContent=money(max);$('low-label').textContent=money(min);$('range').textContent=`${money(min)} — ${money(max)}`;
+}
+function render(data){
+  const r=calculate(data), positive=r.raw>0, negative=r.raw<0, color=positive?'green':negative?'red':'amber';
+  const title=positive?'TREND ON':negative?'TREND OFF':'CAUTION';
+  $('state').textContent=title;$('state').className='state '+color;
+  $('subtitle').textContent=positive?'20D and 60D momentum have confirmed upward.':negative?'At least one momentum window has confirmed lower.':'The momentum windows are not yet confirmed together.';
+  $('context').textContent=positive?'Context: trend engaged — examine your pattern.':negative?'Context: trend defensive — preserve clarity.':'Context: no confirmed trend — wait for evidence.';
+  document.querySelectorAll('.meter div').forEach(el=>el.classList.toggle('active',el.dataset.bucket===r.bucket));
+  $('price').textContent=money(r.close);$('candles').textContent=data.length;
+  $('confirmed').textContent=r.lastChange?shortDate(r.lastChange):'No change';
+  $('confirmed-state').textContent=r.lastChange? r.lastChangeState : 'inside this data window';
+  setNumber('m20',r.m20);setNumber('m60',r.m60);
+  const aligned=(r.close>=r.sma20?1:0)+(r.close>=r.sma60?1:0);
+  $('alignment').textContent=`${aligned} / 2`;$('alignment').className='num '+(aligned===2?'up':aligned===0?'down':'flat');
+  $('alignment-note').textContent=`Price is ${r.close>=r.sma20?'above':'below'} 20D and ${r.close>=r.sma60?'above':'below'} 60D averages`;
+  chart(data);$('dot').classList.add('on');$('health').textContent='LIVE DAILY DATA';
+  $('updated').textContent='UPDATED '+new Intl.DateTimeFormat('en-US',{dateStyle:'medium',timeStyle:'short'}).format(new Date()).toUpperCase();
+}
+async function load(){
+  const end=new Date(), start=new Date(end.getTime()-130*86400000);
+  const url=`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400&start=${start.toISOString()}&end=${end.toISOString()}`;
+  const res=await fetch(url,{headers:{Accept:'application/json'}});
+  if(!res.ok) throw new Error(`Coinbase returned ${res.status}`);
+  const rows=await res.json();
+  const data=rows.map(r=>({time:r[0],close:r[4]})).sort((a,b)=>a.time-b.time);
+  render(data);
+}
+load().catch(err=>{$('state').textContent='DATA UNAVAILABLE';$('state').className='state red';$('subtitle').textContent='The dashboard failed closed: no trend state is shown until public price data returns.';$('context').textContent='Try refresh — '+err.message;$('health').textContent='DATA CHECK NEEDED';$('updated').textContent='NO SIGNAL DISPLAYED';});
+</script>
+</body>
+</html>
