@@ -139,3 +139,25 @@ If the dashboard is flashing one of these, you can lean in:
 The router is your institutional second opinion. It doesn't trade for you. It tells you what Chris sees automatically and you have to read deliberately. Over time, you'll internalize these patterns and the doc becomes optional.
 
 Until then: open this when the conflict list fires, find the row, take the action.
+
+---
+
+## KRONOS FRAGMENT — FOUNDATION-MODEL FORECAST (CONFIRMATION · NON-VOTING)
+
+*Added 2026-06-09. Full spec: `KRONOS_SPEC.md`. Dashboard: `kronos.html`.*
+
+Kronos is an AAAI-2026 foundation model (pre-trained on 12B K-lines from 45 exchanges) that forecasts the next 24h of BTC/ETH/SOL/ZEC by Monte-Carlo sampling probable price paths. It runs **locally** on the Mac (`python3 kronos/kronos_forecast.py`) and writes `kronos/kronos_signals.json`.
+
+**It is a fragment, not a vote.** Like momentum/pillars/trend/quiet, it re-states a probabilistic read of the same tape. It does **not** enter the composite score. Per the top-priority trading principle — *pattern wins, the rule doesn't get a vote* — Kronos is data the way a weather forecast is data: useful prior, never a command. Edge is the call.
+
+| Kronos read | upside prob (24h) | How to use it |
+|---|---|---|
+| **BULLISH CONFIRM** | ≥ 65% | If edge agrees → conviction confirmed. If edge disagrees → it's a flag to re-read your setup, not a reason to override edge. |
+| **LEAN BULLISH** | 55-65% | Mild tailwind. Confirmation only. |
+| **NEUTRAL** | 45-55% | Kronos has no edge here. Ignore. |
+| **LEAN BEARISH** | 35-45% | Mild headwind. Confirmation only. |
+| **BEARISH CONFIRM** | ≤ 35% | If edge is EXIT/LEAN EXIT → confirmed. If edge is BUY → flag, re-read; pattern still wins. |
+
+**Volatility amplification** (separate gauge): if > 70%, Kronos expects vol to expand vs recent realized — **widen stops / size down regardless of direction.**
+
+**Trust gate:** only weight Kronos as much as its walk-forward validation earns (`kronos/kronos_validation.json`, shown on the dashboard). If `hit_rate` isn't beating `base_rate_up` and `brier_skill` isn't positive for an asset, treat that asset's Kronos read as noise. Re-validate periodically. The forecast is decision *support*; edge + pattern decide.

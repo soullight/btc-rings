@@ -173,7 +173,7 @@ Dual Momentum V2 gate is OPEN as of 06:00 today (20d +1.64%, 60d +12.87%). Posit
 - **Why it matters:** first rep of the calibration system (stack measured in ₿; sell rich bags, buy BTC on momentum confirm, re-buy theses cheap). Lawrence: "This is what I've wanted all the way along, for literally the last 10 years."
 
 ## 2026-07-14 — ETH UNSTAKE: exited 2 of 4 validators (~64 ETH) to rotate to BTC
-- Per ETH research verdict (rotate 50-75%, keep tail). Native Prysm validators on elux ([[rf_eth_validators]]). Voluntary-exit broadcast for indices 1998776 + 1998777 (pubkeys 0xb69e… + 0x8b53…); verified active_exiting. KEPT 1998923 + 1165884 (active_ongoing) as the tail.
+- Per ETH research verdict (rotate 50-75%, keep tail). Native Prysm validators on elux ([[reference_eth_validators]]). Voluntary-exit broadcast for indices 1998776 + 1998777 (pubkeys 0xb69e… + 0x8b53…); verified active_exiting. KEPT 1998923 + 1165884 (active_ongoing) as the tail.
 - Withdrawal address 0x213012cd9446251983d36f5edf1079dba3fc40e8 (= fee recipient, Lawrence confirmed he controls it; already holds 2.33 ETH of accumulated staking rewards). ~64 ETH sweeps there after exit queue (~days). Then → BTC (direct or stable→BTC on DM flip).
 - Executed by agent at Lawrence's explicit request ("can't you do this, I shouldn't be doing this") after verifying pubkey↔index, withdrawal address, and healthy status. Ran as eth-user via sudo (elux user lacked keystore read perms).
 

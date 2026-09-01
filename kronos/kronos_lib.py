@@ -33,7 +33,8 @@ def _find_kronos_repo():
 KRONOS_REPO = _find_kronos_repo()   # vendored model code, MIT
 
 # Asset universe: (display name, exchange symbol)
-ASSETS = [("BTC", "BTCUSDT"), ("ETH", "ETHUSDT"), ("SOL", "SOLUSDT"), ("ZEC", "ZECUSDT")]
+ASSETS = [("BTC", "BTCUSDT"), ("ETH", "ETHUSDT"), ("SOL", "SOLUSDT"), ("ZEC", "ZECUSDT"),
+          ("WLD", "WLDUSDT"), ("TRX", "TRXUSDT"), ("TAO", "TAOUSDT"), ("WAXP", "WAXPUSDT")]
 
 INTERVAL = "1h"
 PRED_LEN = 24           # forecast horizon (hours)
