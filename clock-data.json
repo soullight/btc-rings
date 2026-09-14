@@ -1,5 +1,5 @@
 {
- "ts": "2026-09-14T19:20:01+00:00",
+ "ts": "2026-09-14T19:40:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-09-14",
@@ -51,24 +51,24 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 79208.12,
- "chg24h": 2.535,
- "vol24h": 14433.49175,
- "price_kraken": 79198.8,
- "price_spread_bps": 1.2,
- "longs": 90325,
+ "price": 78966.03,
+ "chg24h": 2.24,
+ "vol24h": 14586.1409,
+ "price_kraken": 79000.0,
+ "price_spread_bps": 4.3,
+ "longs": 90336,
  "shorts": 135,
  "funding_apr": 0.89,
  "fear": 57,
  "fear_label": "Greed",
- "mempool_tx": 3450,
- "mempool_mb": 1.16,
+ "mempool_tx": 7469,
+ "mempool_mb": 2.21,
  "block": 967016,
- "ibit": 44.86,
- "ibit_ratio": 0.00056636,
+ "ibit": 44.73,
+ "ibit_ratio": 0.00056645,
  "blood": {
   "ath": 124728,
-  "spot": 79206,
+  "spot": 78970,
   "days_out": 38,
   "methods": {
    "200w_ma": {
@@ -77,11 +77,11 @@
      1.004,
      0.657
     ],
-    "anchor": 66839,
+    "anchor": 66832,
     "est": [
-     53270,
-     67099,
-     43885
+     53265,
+     67092,
+     43880
     ]
    },
    "4y_mean": {
@@ -90,11 +90,11 @@
      1.043,
      0.68
     ],
-    "anchor": 64822,
+    "anchor": 64816,
     "est": [
-     51663,
-     67625,
-     44092
+     51658,
+     67618,
+     44087
     ]
    },
    "prev_top_multiple": {
@@ -148,22 +148,22 @@
    33307,
    34218,
    35074,
-   43885,
-   44092,
-   51663,
-   53270,
+   43880,
+   44087,
+   51658,
+   53265,
    55511,
-   67099,
-   67625
+   67092,
+   67618
   ],
   "low": 16239,
-  "high": 67625,
+  "high": 67618,
   "p25": 29107,
   "median": 35074,
-  "p75": 53270,
+  "p75": 53265,
   "zone": [
    29107,
-   53270
+   53265
   ],
   "zone_pct": [
    -77,
@@ -173,7 +173,7 @@
  },
  "blood_zone": [
   29107,
-  53270
+  53265
  ],
  "in_blood_zone": false,
  "blood_zone_note": "the ZONE is derived; the LADDER is not - see engine2_plan.json",
@@ -185,7 +185,7 @@
    "shares": 10608,
    "note": null,
    "pct_from_ath": -60,
-   "pct_from_here": -36.9,
+   "pct_from_here": -36.7,
    "hit": false
   },
   {
@@ -195,17 +195,17 @@
    "shares": 12053,
    "note": null,
    "pct_from_ath": -65,
-   "pct_from_here": -44.5,
+   "pct_from_here": -44.3,
    "hit": false
   },
   {
    "btc": 37400,
-   "ibit": 21.18,
+   "ibit": 21.19,
    "amount": 500000,
    "shares": 23641,
    "note": null,
    "pct_from_ath": -70,
-   "pct_from_here": -52.8,
+   "pct_from_here": -52.6,
    "hit": false
   },
   {
@@ -215,7 +215,7 @@
    "shares": 25641,
    "note": "his existing order",
    "pct_from_ath": -72,
-   "pct_from_here": -56.5,
+   "pct_from_here": -56.3,
    "hit": false
   },
   {
@@ -225,7 +225,7 @@
    "shares": 28329,
    "note": "ring base target",
    "pct_from_ath": -75,
-   "pct_from_here": -60.6,
+   "pct_from_here": -60.5,
    "hit": false
   },
   {
@@ -235,7 +235,7 @@
    "shares": 25253,
    "note": null,
    "pct_from_ath": -78,
-   "pct_from_here": -64.7,
+   "pct_from_here": -64.5,
    "hit": false
   },
   {
@@ -245,7 +245,7 @@
    "shares": 21216,
    "note": null,
    "pct_from_ath": -80,
-   "pct_from_here": -68.4,
+   "pct_from_here": -68.3,
    "hit": false
   },
   {
@@ -255,7 +255,7 @@
    "shares": 16077,
    "note": null,
    "pct_from_ath": -82,
-   "pct_from_here": -72.2,
+   "pct_from_here": -72.1,
    "hit": false
   }
  ],
@@ -265,7 +265,7 @@
   "sell_target": 249456,
   "source": "engine2_plan.json (LOCKED 2026-08-07)"
  },
- "pct_from_ath": -36.5,
+ "pct_from_ath": -36.7,
  "ls_ratio": 669,
  "long_share_pct": 99.9,
  "missing_required": [],
@@ -16741,7 +16741,13 @@
    "p": 79208.12,
    "ls": 669.0,
    "f": 57
+  },
+  {
+   "ts": "2026-09-14T19:40:01+00:00",
+   "p": 78966.03,
+   "ls": 669.0,
+   "f": 57
   }
  ],
- "db_rows": 2745
+ "db_rows": 2746
 }
