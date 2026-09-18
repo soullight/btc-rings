@@ -1,5 +1,5 @@
 {
- "ts": "2026-09-18T15:40:02+00:00",
+ "ts": "2026-09-18T16:00:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-09-18",
@@ -51,24 +51,23 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 80769.23,
- "chg24h": 5.318,
- "vol24h": 20855.24305,
- "price_kraken": 80727.9,
- "price_spread_bps": 5.1,
+ "price": 80761.39,
+ "chg24h": 5.185,
+ "vol24h": 21058.21214,
+ "price_kraken": 80693.6,
+ "price_spread_bps": 8.4,
  "longs": 90346,
  "shorts": 142,
- "funding_apr": 1.83,
  "fear": 56,
  "fear_label": "Greed",
- "mempool_tx": 1877,
- "mempool_mb": 0.56,
- "block": 967573,
- "ibit": 45.77,
+ "mempool_tx": 4373,
+ "mempool_mb": 1.16,
+ "block": 967574,
+ "ibit": 45.76,
  "ibit_ratio": 0.00056661,
  "blood": {
   "ath": 124728,
-  "spot": 80737,
+  "spot": 80695,
   "days_out": 34,
   "methods": {
    "200w_ma": {
@@ -77,11 +76,11 @@
      1.004,
      0.657
     ],
-    "anchor": 66870,
+    "anchor": 66869,
     "est": [
-     53295,
-     67130,
-     43905
+     53294,
+     67129,
+     43904
     ]
    },
    "4y_mean": {
@@ -90,11 +89,11 @@
      1.043,
      0.68
     ],
-    "anchor": 64851,
+    "anchor": 64850,
     "est": [
      51686,
-     67655,
-     44112
+     67654,
+     44111
     ]
    },
    "prev_top_multiple": {
@@ -148,22 +147,22 @@
    33307,
    34218,
    35074,
-   43905,
-   44112,
+   43904,
+   44111,
    51686,
-   53295,
+   53294,
    55511,
-   67130,
-   67655
+   67129,
+   67654
   ],
   "low": 16239,
-  "high": 67655,
+  "high": 67654,
   "p25": 29107,
   "median": 35074,
-  "p75": 53295,
+  "p75": 53294,
   "zone": [
    29107,
-   53295
+   53294
   ],
   "zone_pct": [
    -77,
@@ -173,7 +172,7 @@
  },
  "blood_zone": [
   29107,
-  53295
+  53294
  ],
  "in_blood_zone": false,
  "blood_zone_note": "the ZONE is derived; the LADDER is not - see engine2_plan.json",
@@ -268,9 +267,11 @@
  "pct_from_ath": -35.2,
  "ls_ratio": 636,
  "long_share_pct": 99.8,
- "missing_required": [],
+ "missing_required": [
+  "funding_apr"
+ ],
  "quality_issues": [],
- "data_quality": "COMPLETE",
+ "data_quality": "INCOMPLETE",
  "history": [
   {
    "ts": "2026-08-07T19:29:08+00:00",
@@ -18403,7 +18404,13 @@
    "p": 80769.23,
    "ls": 636.0,
    "f": 56
+  },
+  {
+   "ts": "2026-09-18T16:00:01+00:00",
+   "p": 80761.39,
+   "ls": 636.0,
+   "f": 56
   }
  ],
- "db_rows": 3022
+ "db_rows": 3023
 }
