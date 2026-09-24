@@ -171,6 +171,7 @@ Dual Momentum V2 gate is OPEN as of 06:00 today (20d +1.64%, 60d +12.87%). Posit
 | 2026-09-19 | WAIT → LEAN BUY | $81,622 | +30 | 1/3 | 20D cycle just troughed (day 4) · 60D troughs making higher lows · Late 4-year cycle | |
 | 2026-09-21 | LEAN BUY → WAIT | $85,941 | +5 | 0/3 | 60D troughs making higher lows · Late 4-year cycle | |
 | 2026-09-23 | WAIT → LEAN EXIT | $83,983 | -25 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 60D past midpoint, price declining from crest | |
+| 2026-09-24 | LEAN EXIT → WAIT | $84,423 | -5 | 0/3 | 60D troughs making higher lows · Late 4-year cycle · 20D cycle in topping zone (day 9) | |
 
 
 ## 2026-07-11 — SOLD 45,000 TRX → 14,894.08 USDT (SunSwap, TRC-20)
