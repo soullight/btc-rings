@@ -1,5 +1,5 @@
 {
- "ts": "2026-09-25T10:20:01+00:00",
+ "ts": "2026-09-25T10:40:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-09-25",
@@ -51,24 +51,24 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 84460.01,
- "chg24h": 1.387,
- "vol24h": 16957.00219,
- "price_kraken": 84442.2,
- "price_spread_bps": 2.1,
+ "price": 84707.2,
+ "chg24h": 1.606,
+ "vol24h": 16921.59935,
+ "price_kraken": 84690.3,
+ "price_spread_bps": 2.0,
  "longs": 90298,
  "shorts": 142,
  "funding_apr": 4.77,
  "fear": 71,
  "fear_label": "Greed",
- "mempool_tx": 1309,
- "mempool_mb": 0.36,
+ "mempool_tx": 4869,
+ "mempool_mb": 1.39,
  "block": 968539,
  "ibit": 47.81,
- "ibit_ratio": 0.00056607,
+ "ibit_ratio": 0.00056441,
  "blood": {
   "ath": 124728,
-  "spot": 84443,
+  "spot": 84689,
   "days_out": 27,
   "methods": {
    "200w_ma": {
@@ -77,11 +77,11 @@
      1.004,
      0.657
     ],
-    "anchor": 66958,
+    "anchor": 66963,
     "est": [
-     53365,
-     67218,
-     43963
+     53369,
+     67223,
+     43966
     ]
    },
    "4y_mean": {
@@ -90,11 +90,11 @@
      1.043,
      0.68
     ],
-    "anchor": 64936,
+    "anchor": 64941,
     "est": [
-     51754,
-     67744,
-     44169
+     51757,
+     67749,
+     44172
     ]
    },
    "prev_top_multiple": {
@@ -148,22 +148,22 @@
    33307,
    34218,
    35074,
-   43963,
-   44169,
-   51754,
-   53365,
+   43966,
+   44172,
+   51757,
+   53369,
    55511,
-   67218,
-   67744
+   67223,
+   67749
   ],
   "low": 16239,
-  "high": 67744,
+  "high": 67749,
   "p25": 29107,
   "median": 35074,
-  "p75": 53365,
+  "p75": 53369,
   "zone": [
    29107,
-   53365
+   53369
   ],
   "zone_pct": [
    -77,
@@ -173,84 +173,84 @@
  },
  "blood_zone": [
   29107,
-  53365
+  53369
  ],
  "in_blood_zone": false,
  "blood_zone_note": "the ZONE is derived; the LADDER is not - see engine2_plan.json",
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.3,
+   "ibit": 28.22,
    "amount": 300000,
    "shares": 10608,
    "note": null,
    "pct_from_ath": -60,
-   "pct_from_here": -40.8,
+   "pct_from_here": -41.0,
    "hit": false
   },
   {
    "btc": 44000,
-   "ibit": 24.91,
+   "ibit": 24.83,
    "amount": 300000,
    "shares": 12053,
    "note": null,
    "pct_from_ath": -65,
-   "pct_from_here": -47.9,
+   "pct_from_here": -48.1,
    "hit": false
   },
   {
    "btc": 37400,
-   "ibit": 21.17,
+   "ibit": 21.11,
    "amount": 500000,
    "shares": 23641,
    "note": null,
    "pct_from_ath": -70,
-   "pct_from_here": -55.7,
+   "pct_from_here": -55.8,
    "hit": false
   },
   {
    "btc": 34478,
-   "ibit": 19.52,
+   "ibit": 19.46,
    "amount": 500000,
    "shares": 25641,
    "note": "his existing order",
    "pct_from_ath": -72,
-   "pct_from_here": -59.2,
+   "pct_from_here": -59.3,
    "hit": false
   },
   {
    "btc": 31200,
-   "ibit": 17.66,
+   "ibit": 17.61,
    "amount": 500000,
    "shares": 28329,
    "note": "ring base target",
    "pct_from_ath": -75,
-   "pct_from_here": -63.1,
+   "pct_from_here": -63.2,
    "hit": false
   },
   {
    "btc": 28000,
-   "ibit": 15.85,
+   "ibit": 15.8,
    "amount": 400000,
    "shares": 25253,
    "note": null,
    "pct_from_ath": -78,
-   "pct_from_here": -66.8,
+   "pct_from_here": -66.9,
    "hit": false
   },
   {
    "btc": 25000,
-   "ibit": 14.15,
+   "ibit": 14.11,
    "amount": 300000,
    "shares": 21216,
    "note": null,
    "pct_from_ath": -80,
-   "pct_from_here": -70.4,
+   "pct_from_here": -70.5,
    "hit": false
   },
   {
    "btc": 22000,
-   "ibit": 12.45,
+   "ibit": 12.42,
    "amount": 200000,
    "shares": 16077,
    "note": null,
@@ -265,7 +265,7 @@
   "sell_target": 249456,
   "source": "engine2_plan.json (LOCKED 2026-08-07)"
  },
- "pct_from_ath": -32.3,
+ "pct_from_ath": -32.1,
  "ls_ratio": 636,
  "long_share_pct": 99.8,
  "missing_required": [],
@@ -21331,7 +21331,13 @@
    "p": 84460.01,
    "ls": 636.0,
    "f": 71
+  },
+  {
+   "ts": "2026-09-25T10:40:01+00:00",
+   "p": 84707.2,
+   "ls": 636.0,
+   "f": 71
   }
  ],
- "db_rows": 3510
+ "db_rows": 3511
 }
