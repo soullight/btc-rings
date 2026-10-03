@@ -1,5 +1,5 @@
 {
- "ts": "2026-10-03T00:00:01+00:00",
+ "ts": "2026-10-03T00:20:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-10-03",
@@ -51,23 +51,24 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 84521.09,
- "chg24h": -0.423,
- "vol24h": 26499.37732,
- "price_kraken": 84504.7,
+ "price": 84536.0,
+ "chg24h": -0.476,
+ "vol24h": 26127.28407,
+ "price_kraken": 84520.1,
  "price_spread_bps": 1.9,
  "longs": 89763,
  "shorts": 140,
+ "funding_apr": 0,
  "fear": 67,
  "fear_label": "Greed",
- "mempool_tx": 4624,
- "mempool_mb": 1.27,
- "block": 969646,
+ "mempool_tx": 151,
+ "mempool_mb": 0.04,
+ "block": 969649,
  "ibit": 47.73,
- "ibit_ratio": 0.00056471,
+ "ibit_ratio": 0.00056461,
  "blood": {
   "ath": 124728,
-  "spot": 84506,
+  "spot": 84524,
   "days_out": 19,
   "methods": {
    "200w_ma": {
@@ -78,8 +79,8 @@
     ],
     "anchor": 66957,
     "est": [
-     53364,
-     67217,
+     53365,
+     67218,
      43962
     ]
    },
@@ -150,19 +151,19 @@
    43962,
    44169,
    51753,
-   53364,
+   53365,
    55511,
-   67217,
+   67218,
    67743
   ],
   "low": 16239,
   "high": 67743,
   "p25": 29107,
   "median": 35074,
-  "p75": 53364,
+  "p75": 53365,
   "zone": [
    29107,
-   53364
+   53365
   ],
   "zone_pct": [
    -77,
@@ -172,29 +173,29 @@
  },
  "blood_zone": [
   29107,
-  53364
+  53365
  ],
  "in_blood_zone": false,
  "blood_zone_note": "the ZONE is derived; the LADDER is not - see engine2_plan.json",
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.24,
+   "ibit": 28.23,
    "amount": 300000,
    "shares": 10608,
    "note": null,
    "pct_from_ath": -60,
-   "pct_from_here": -40.8,
+   "pct_from_here": -40.9,
    "hit": false
   },
   {
    "btc": 44000,
-   "ibit": 24.85,
+   "ibit": 24.84,
    "amount": 300000,
    "shares": 12053,
    "note": null,
    "pct_from_ath": -65,
-   "pct_from_here": -47.9,
+   "pct_from_here": -48.0,
    "hit": false
   },
   {
@@ -267,11 +268,9 @@
  "pct_from_ath": -32.2,
  "ls_ratio": 641,
  "long_share_pct": 99.8,
- "missing_required": [
-  "funding_apr"
- ],
+ "missing_required": [],
  "quality_issues": [],
- "data_quality": "INCOMPLETE",
+ "data_quality": "COMPLETE",
  "history": [
   {
    "ts": "2026-08-07T19:29:08+00:00",
@@ -24602,7 +24601,13 @@
    "p": 84521.09,
    "ls": 641.0,
    "f": 67
+  },
+  {
+   "ts": "2026-10-03T00:20:01+00:00",
+   "p": 84536.0,
+   "ls": 641.0,
+   "f": 67
   }
  ],
- "db_rows": 4055
+ "db_rows": 4056
 }
