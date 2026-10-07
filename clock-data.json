@@ -1,5 +1,5 @@
 {
- "ts": "2026-10-07T16:00:01+00:00",
+ "ts": "2026-10-07T16:20:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-10-07",
@@ -51,24 +51,24 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 83450.76,
- "chg24h": -2.659,
- "vol24h": 20666.7066,
- "price_kraken": 83415.5,
- "price_spread_bps": 4.2,
+ "price": 83610.99,
+ "chg24h": -2.549,
+ "vol24h": 20603.91896,
+ "price_kraken": 83567.2,
+ "price_spread_bps": 5.2,
  "longs": 89645,
  "shorts": 214,
- "funding_apr": 0,
+ "funding_apr": 2.83,
  "fear": 71,
  "fear_label": "Greed",
- "mempool_tx": 4174,
- "mempool_mb": 1.03,
- "block": 970357,
- "ibit": 47.21,
- "ibit_ratio": 0.00056567,
+ "mempool_tx": 1356,
+ "mempool_mb": 0.31,
+ "block": 970362,
+ "ibit": 47.31,
+ "ibit_ratio": 0.00056583,
  "blood": {
   "ath": 124728,
-  "spot": 83402,
+  "spot": 83565,
   "days_out": 15,
   "methods": {
    "200w_ma": {
@@ -77,11 +77,11 @@
      1.004,
      0.657
     ],
-    "anchor": 66948,
+    "anchor": 66949,
     "est": [
-     53357,
-     67208,
-     43956
+     53358,
+     67210,
+     43957
     ]
    },
    "4y_mean": {
@@ -90,11 +90,11 @@
      1.043,
      0.68
     ],
-    "anchor": 64926,
+    "anchor": 64928,
     "est": [
-     51746,
-     67733,
-     44163
+     51747,
+     67735,
+     44164
     ]
    },
    "prev_top_multiple": {
@@ -148,22 +148,22 @@
    33307,
    34218,
    35074,
-   43956,
-   44163,
-   51746,
-   53357,
+   43957,
+   44164,
+   51747,
+   53358,
    55511,
-   67208,
-   67733
+   67210,
+   67735
   ],
   "low": 16239,
-  "high": 67733,
+  "high": 67735,
   "p25": 29107,
   "median": 35074,
-  "p75": 53357,
+  "p75": 53358,
   "zone": [
    29107,
-   53357
+   53358
   ],
   "zone_pct": [
    -77,
@@ -173,29 +173,29 @@
  },
  "blood_zone": [
   29107,
-  53357
+  53358
  ],
  "in_blood_zone": false,
  "blood_zone_note": "the ZONE is derived; the LADDER is not - see engine2_plan.json",
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.28,
+   "ibit": 28.29,
    "amount": 300000,
    "shares": 10608,
    "note": null,
    "pct_from_ath": -60,
-   "pct_from_here": -40.1,
+   "pct_from_here": -40.2,
    "hit": false
   },
   {
    "btc": 44000,
-   "ibit": 24.89,
+   "ibit": 24.9,
    "amount": 300000,
    "shares": 12053,
    "note": null,
    "pct_from_ath": -65,
-   "pct_from_here": -47.3,
+   "pct_from_here": -47.4,
    "hit": false
   },
   {
@@ -205,17 +205,17 @@
    "shares": 23641,
    "note": null,
    "pct_from_ath": -70,
-   "pct_from_here": -55.2,
+   "pct_from_here": -55.3,
    "hit": false
   },
   {
    "btc": 34478,
-   "ibit": 19.5,
+   "ibit": 19.51,
    "amount": 500000,
    "shares": 25641,
    "note": "his existing order",
    "pct_from_ath": -72,
-   "pct_from_here": -58.7,
+   "pct_from_here": -58.8,
    "hit": false
   },
   {
@@ -225,7 +225,7 @@
    "shares": 28329,
    "note": "ring base target",
    "pct_from_ath": -75,
-   "pct_from_here": -62.6,
+   "pct_from_here": -62.7,
    "hit": false
   },
   {
@@ -235,27 +235,27 @@
    "shares": 25253,
    "note": null,
    "pct_from_ath": -78,
-   "pct_from_here": -66.4,
+   "pct_from_here": -66.5,
    "hit": false
   },
   {
    "btc": 25000,
-   "ibit": 14.14,
+   "ibit": 14.15,
    "amount": 300000,
    "shares": 21216,
    "note": null,
    "pct_from_ath": -80,
-   "pct_from_here": -70.0,
+   "pct_from_here": -70.1,
    "hit": false
   },
   {
    "btc": 22000,
-   "ibit": 12.44,
+   "ibit": 12.45,
    "amount": 200000,
    "shares": 16077,
    "note": null,
    "pct_from_ath": -82,
-   "pct_from_here": -73.6,
+   "pct_from_here": -73.7,
    "hit": false
   }
  ],
@@ -265,19 +265,13 @@
   "sell_target": 249456,
   "source": "engine2_plan.json (LOCKED 2026-08-07)"
  },
- "pct_from_ath": -33.1,
+ "pct_from_ath": -33.0,
  "ls_ratio": 419,
  "long_share_pct": 99.8,
  "missing_required": [],
  "quality_issues": [],
  "data_quality": "COMPLETE",
  "history": [
-  {
-   "ts": "2026-08-08T17:40:02+00:00",
-   "p": 65135.79,
-   "ls": 395.0,
-   "f": 30
-  },
   {
    "ts": "2026-08-08T18:00:01+00:00",
    "p": 65119.74,
@@ -26191,7 +26185,13 @@
    "p": 83450.76,
    "ls": 419.0,
    "f": 71
+  },
+  {
+   "ts": "2026-10-07T16:20:01+00:00",
+   "p": 83610.99,
+   "ls": 419.0,
+   "f": 71
   }
  ],
- "db_rows": 4391
+ "db_rows": 4392
 }
