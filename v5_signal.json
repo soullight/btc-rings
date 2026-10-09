@@ -1,0 +1,93 @@
+{
+ "schema": "v5_signal/1",
+ "state": "DEPLOY",
+ "state_source": "manual override",
+ "reason": "Oct 7-8 high-volume flush inside the new bull (4-year low Jul 1 at $57,735). Buy in stages; the reserve is for a late-Nov/Dec low if the 60-day cycle fails.",
+ "posture": "Staged entries, keep a reserve. No leverage.",
+ "override": {
+  "active": true,
+  "set_by": "Grok Bot for Lawrence (doctrine + Capital Signal + Loukas cross-check)",
+  "set_at": "2026-10-09",
+  "expires": "2026-10-23"
+ },
+ "auto": {
+  "state": "DEPLOY",
+  "reason": "Selling flush inside the bull: 2026-10-08 heavy volume (1.44x), -8.0% off the 60-day high.",
+  "evidence": {
+   "high_60d": 87363.76,
+   "close": 81676.34,
+   "off_high_pct": -6.5,
+   "bull_above_4y_low": true,
+   "flush": {
+    "date": "2026-10-08",
+    "low": 80336.91,
+    "vol_x": 1.44,
+    "off_high_pct": -8.0
+   },
+   "effort_no_result": null,
+   "near_top": false
+  }
+ },
+ "logic_label": "Our rule (Grok Bot, Oct 9 2026) for Lawrence's TAKE PROFITS -> WAIT IN CASH -> DEPLOY. Not Loukas's. No action authority.",
+ "btc": {
+  "price": 82631.37,
+  "price_source": "api.coinbase.com",
+  "price_at": "2026-10-09T18:00:26+00:00",
+  "last_daily_close": 81676.34,
+  "daily_bars_through": "2026-10-08"
+ },
+ "cycle": {
+  "day": 11,
+  "band": [
+   50,
+   75
+  ],
+  "anchor_date": "2026-09-28",
+  "anchor_low": 82570.72,
+  "anchor_source": "override",
+  "label": "FAILED-CYCLE WATCH \u2014 anchor low broken",
+  "failed_cycle_note": "Anchor low broken 2026-10-08 ($80,337): potential failed 60-day cycle; alt = long cycle from 2026-08-01, low on day 68 (in band)",
+  "four_year_low": {
+   "date": "2026-07-01",
+   "price": 57735.0
+  }
+ },
+ "levels": [
+  {
+   "price": 98000,
+   "label": "Loukas next push target"
+  },
+  {
+   "price": 87000,
+   "label": "Cycle high zone / trim into strength (Sep 21 $87.4k, Oct 2 $87.2k)"
+  },
+  {
+   "price": 82800,
+   "label": "Reclaim zone $82.6-83k (Sep 28 low / Loukas $82.8k)"
+  },
+  {
+   "price": 80308,
+   "label": "Oct 8 flush low"
+  },
+  {
+   "price": 74913,
+   "label": "WARNING: Sep 15 low; a break = larger-cycle warning"
+  },
+  {
+   "price": 57735,
+   "label": "4-year cycle low (Jul 1 2026)"
+  }
+ ],
+ "loukas": {
+  "date": "2026-10-09",
+  "line": "Potential failed 60-day cycle, or a long cycle closing. Weekly still fine; dips are to be bought; next target $98k.",
+  "source": "Bitcoin Live members' posts (paraphrase, not a quote)"
+ },
+ "updated_at": "2026-10-09T18:00:26+00:00",
+ "freshness": {
+  "daily_bars_age_days": 1,
+  "live_price": true,
+  "stale_after_minutes": 180
+ },
+ "public_url": "https://soullight.github.io/btc-rings/v5_signal.json"
+}
