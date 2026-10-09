@@ -1,5 +1,5 @@
 {
- "ts": "2026-10-09T08:00:01+00:00",
+ "ts": "2026-10-09T08:20:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-10-09",
@@ -51,23 +51,24 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 82648.0,
- "chg24h": -0.418,
- "vol24h": 19582.13972,
- "price_kraken": 82589.6,
- "price_spread_bps": 7.1,
+ "price": 82648.56,
+ "chg24h": -0.455,
+ "vol24h": 19558.19775,
+ "price_kraken": 82571.5,
+ "price_spread_bps": 9.3,
  "longs": 89630,
- "shorts": 216,
+ "shorts": 215,
+ "funding_apr": 2.43,
  "fear": 59,
  "fear_label": "Greed",
- "mempool_tx": 871,
- "mempool_mb": 0.39,
- "block": 970599,
+ "mempool_tx": 1990,
+ "mempool_mb": 0.8,
+ "block": 970600,
  "ibit": 46.26,
  "ibit_ratio": 0.00055972,
  "blood": {
   "ath": 124728,
-  "spot": 82571,
+  "spot": 82567,
   "days_out": 13,
   "methods": {
    "200w_ma": {
@@ -265,20 +266,12 @@
   "source": "engine2_plan.json (LOCKED 2026-08-07)"
  },
  "pct_from_ath": -33.7,
- "ls_ratio": 415,
+ "ls_ratio": 417,
  "long_share_pct": 99.8,
- "missing_required": [
-  "funding_apr"
- ],
+ "missing_required": [],
  "quality_issues": [],
- "data_quality": "INCOMPLETE",
+ "data_quality": "COMPLETE",
  "history": [
-  {
-   "ts": "2026-08-10T09:40:01+00:00",
-   "p": 65079.2,
-   "ls": 395.0,
-   "f": 30
-  },
   {
    "ts": "2026-08-10T10:00:01+00:00",
    "p": 64967.24,
@@ -26192,7 +26185,13 @@
    "p": 82648.0,
    "ls": 415.0,
    "f": 59
+  },
+  {
+   "ts": "2026-10-09T08:20:01+00:00",
+   "p": 82648.56,
+   "ls": 417.0,
+   "f": 59
   }
  ],
- "db_rows": 4511
+ "db_rows": 4512
 }
