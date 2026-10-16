@@ -25,9 +25,9 @@
  },
  "logic_label": "Our rule (Grok Bot, Oct 9 2026) for Lawrence's TAKE PROFITS -> WAIT IN CASH -> DEPLOY. Not Loukas's. No action authority.",
  "btc": {
-  "price": 80979.8,
+  "price": 81553.88,
   "price_source": "api.coinbase.com",
-  "price_at": "2026-10-16T19:07:05+00:00",
+  "price_at": "2026-10-16T20:07:04+00:00",
   "last_daily_close": 82141.46,
   "daily_bars_through": "2026-10-15"
  },
@@ -78,7 +78,7 @@
   "line": "Potential failed 60-day cycle, or a long cycle closing. Weekly still fine; dips are to be bought; next target $98k.",
   "source": "Bitcoin Live members' posts (paraphrase, not a quote)"
  },
- "updated_at": "2026-10-16T19:07:05+00:00",
+ "updated_at": "2026-10-16T20:07:04+00:00",
  "freshness": {
   "daily_bars_age_days": 1,
   "live_price": true,
@@ -86,7 +86,7 @@
  },
  "public_url": "https://soullight.github.io/btc-rings/v5_signal.json",
  "provenance": {
-  "published_at": "2026-10-16T19:07:05+00:00",
+  "published_at": "2026-10-16T20:07:04+00:00",
   "daily_bars_through": "2026-10-15",
   "latest_completed_utc_day": "2026-10-15",
   "daily_freshness": "CURRENT",
@@ -98,5 +98,76 @@
   "manual_clock_precision": "day",
   "price_clock": "Producer collection time; provider quote timestamp unavailable",
   "note": "Publication time does not refresh the manual instruction or the underlying daily bars. No predictive or allocation validation implied."
+ },
+ "lrwgr_plan": {
+  "rule": "LRWGR hybrid, no stops (25% reserve at -10%/-20%), LRWGR trims, backtested 2026-10-16",
+  "status": "NO LOW-IS-IN SIGNAL: levels armed; buy only on red closes at the levels below",
+  "as_of_close": "2026-10-15",
+  "close": 82141.46,
+  "swing_low": {
+   "date": "2026-09-16",
+   "price": 74995.52
+  },
+  "above_low_pct": 9.5,
+  "low_is_in_signal": {
+   "fired": false,
+   "date": null,
+   "days_since": null
+  },
+  "late": true,
+  "entry": [
+   {
+    "pct": 33,
+    "trigger": "first red daily close after the signal"
+   },
+   {
+    "pct": 14.0,
+    "trigger": "limit (day after signal on)",
+    "price": 78745.0
+   },
+   {
+    "pct": 14.0,
+    "trigger": "limit (day after signal on)",
+    "price": 77620.0
+   },
+   {
+    "pct": 14.0,
+    "trigger": "limit (day after signal on)",
+    "price": 76495.0
+   }
+  ],
+  "fallback": {
+   "after_days": 15,
+   "trigger": "red daily close at or below",
+   "price": 82495.0,
+   "note": "buy whatever limits are still unfilled"
+  },
+  "reserve": [
+   {
+    "pct": 12.5,
+    "trigger": "red daily close at or below",
+    "price": 67496.0,
+    "depth_below_low_pct": 10
+   },
+   {
+    "pct": 12.5,
+    "trigger": "red daily close at or below",
+    "price": 59996.0,
+    "depth_below_low_pct": 20
+   }
+  ],
+  "trims": {
+   "rule": "LRWGR BTC: trim 25% on a close +300% above the wave low; then 25% more at each green close 50% above the last trim",
+   "wave_low": 74995.52,
+   "ladder": [
+    299982.0,
+    449973.0,
+    674960.0,
+    1012440.0
+   ],
+   "proceeds": "25% to living money, 75% stacked as cash",
+   "buyback": "stacked cash buys back on a red daily close at or below -65% from the high after the trims (wave low); then the wave resets"
+  },
+  "risk_control": "tranches + 25% cash reserve + LRWGR trims into strength; no stops by design"
  }
 }
