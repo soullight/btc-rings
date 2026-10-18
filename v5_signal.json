@@ -1,11 +1,11 @@
 {
  "schema": "v5_signal/1",
- "state": "DEPLOY",
- "state_source": "manual override",
- "reason": "Oct 7-8 high-volume flush inside the new bull (4-year low Jul 1 at $57,735). Buy in stages; the reserve is for a late-Nov/Dec low if the 60-day cycle fails.",
- "posture": "Staged entries, keep a reserve. No leverage.",
+ "state": "WAIT IN CASH",
+ "state_source": "auto (our rule)",
+ "reason": "No selling flush and no top signal. Cash is prepared buying power.",
+ "posture": null,
  "override": {
-  "active": true,
+  "active": false,
   "set_by": "Grok Bot for Lawrence (doctrine + Capital Signal + Loukas cross-check)",
   "set_at": "2026-10-09",
   "expires": "2026-10-23"
@@ -25,9 +25,9 @@
  },
  "logic_label": "Our rule (Grok Bot, Oct 9 2026) for Lawrence's TAKE PROFITS -> WAIT IN CASH -> DEPLOY. Not Loukas's. No action authority.",
  "btc": {
-  "price": 81620.45,
+  "price": 81663.51,
   "price_source": "api.coinbase.com",
-  "price_at": "2026-10-18T06:07:00+00:00",
+  "price_at": "2026-10-18T07:07:05+00:00",
   "last_daily_close": 81500.8,
   "daily_bars_through": "2026-10-16"
  },
@@ -78,7 +78,7 @@
   "line": "Potential failed 60-day cycle, or a long cycle closing. Weekly still fine; dips are to be bought; next target $98k.",
   "source": "Bitcoin Live members' posts (paraphrase, not a quote)"
  },
- "updated_at": "2026-10-18T06:07:00+00:00",
+ "updated_at": "2026-10-18T07:07:05+00:00",
  "freshness": {
   "daily_bars_age_days": 2,
   "live_price": true,
@@ -86,16 +86,16 @@
  },
  "public_url": "https://soullight.github.io/btc-rings/v5_signal.json",
  "provenance": {
-  "published_at": "2026-10-18T06:07:00+00:00",
+  "published_at": "2026-10-18T07:07:05+00:00",
   "daily_bars_through": "2026-10-16",
   "latest_completed_utc_day": "2026-10-17",
   "daily_freshness": "HISTORICAL",
   "bar_count": 4413,
   "daily_quality": "INSUFFICIENT",
   "automatic_state_quality": "INSUFFICIENT",
-  "state_basis": "DATED_MANUAL_INSTRUCTION",
-  "manual_set_date": "2026-10-09",
-  "manual_clock_precision": "day",
+  "state_basis": "AUTOMATIC_RESEARCH_RULE",
+  "manual_set_date": null,
+  "manual_clock_precision": "unknown",
   "price_clock": "Producer collection time; provider quote timestamp unavailable",
   "note": "Publication time does not refresh the manual instruction or the underlying daily bars. No predictive or allocation validation implied."
  },
