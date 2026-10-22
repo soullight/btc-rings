@@ -1,5 +1,5 @@
 {
- "ts": "2026-10-22T16:00:01+00:00",
+ "ts": "2026-10-22T16:20:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-10-22",
@@ -51,23 +51,24 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 81700.71,
- "chg24h": -3.377,
- "vol24h": 20949.74218,
- "price_kraken": 81628.7,
- "price_spread_bps": 8.8,
- "longs": 89678,
+ "price": 81664.03,
+ "chg24h": -3.574,
+ "vol24h": 20944.8315,
+ "price_kraken": 81568.7,
+ "price_spread_bps": 11.7,
+ "longs": 89676,
  "shorts": 174,
+ "funding_apr": 2.85,
  "fear": 68,
  "fear_label": "Greed",
- "mempool_tx": 7305,
- "mempool_mb": 2.44,
- "block": 972627,
- "ibit": 46.19,
- "ibit_ratio": 0.00056536,
+ "mempool_tx": 8414,
+ "mempool_mb": 2.79,
+ "block": 972628,
+ "ibit": 46.15,
+ "ibit_ratio": 0.00056512,
  "blood": {
   "ath": 124728,
-  "spot": 81621,
+  "spot": 81567,
   "days_out": 0,
   "methods": {
    "200w_ma": {
@@ -179,7 +180,7 @@
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.27,
+   "ibit": 28.26,
    "amount": 300000,
    "shares": 10608,
    "note": null,
@@ -189,7 +190,7 @@
   },
   {
    "btc": 44000,
-   "ibit": 24.88,
+   "ibit": 24.87,
    "amount": 300000,
    "shares": 12053,
    "note": null,
@@ -209,7 +210,7 @@
   },
   {
    "btc": 34478,
-   "ibit": 19.49,
+   "ibit": 19.48,
    "amount": 500000,
    "shares": 25641,
    "note": "his existing order",
@@ -219,7 +220,7 @@
   },
   {
    "btc": 31200,
-   "ibit": 17.64,
+   "ibit": 17.63,
    "amount": 500000,
    "shares": 28329,
    "note": "ring base target",
@@ -229,7 +230,7 @@
   },
   {
    "btc": 28000,
-   "ibit": 15.83,
+   "ibit": 15.82,
    "amount": 400000,
    "shares": 25253,
    "note": null,
@@ -249,7 +250,7 @@
   },
   {
    "btc": 22000,
-   "ibit": 12.44,
+   "ibit": 12.43,
    "amount": 200000,
    "shares": 16077,
    "note": null,
@@ -267,18 +268,10 @@
  "pct_from_ath": -34.5,
  "ls_ratio": 515,
  "long_share_pct": 99.8,
- "missing_required": [
-  "funding_apr"
- ],
+ "missing_required": [],
  "quality_issues": [],
- "data_quality": "INCOMPLETE",
+ "data_quality": "COMPLETE",
  "history": [
-  {
-   "ts": "2026-08-23T16:20:02+00:00",
-   "p": 77238.89,
-   "ls": 496.0,
-   "f": 66
-  },
   {
    "ts": "2026-08-23T16:40:01+00:00",
    "p": 77389.67,
@@ -26192,7 +26185,13 @@
    "p": 81700.71,
    "ls": 515.0,
    "f": 68
+  },
+  {
+   "ts": "2026-10-22T16:20:01+00:00",
+   "p": 81664.03,
+   "ls": 515.0,
+   "f": 68
   }
  ],
- "db_rows": 5471
+ "db_rows": 5472
 }
