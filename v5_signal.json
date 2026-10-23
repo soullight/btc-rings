@@ -1,8 +1,8 @@
 {
  "schema": "v5_signal/1",
- "state": "WAIT IN CASH",
+ "state": "DEPLOY",
  "state_source": "auto (our rule)",
- "reason": "No selling flush and no top signal. Cash is prepared buying power.",
+ "reason": "Selling flush inside the bull: 2026-10-22 heavy volume (1.46x), -7.5% off the 60-day high.",
  "posture": null,
  "override": {
   "active": false,
@@ -11,25 +11,34 @@
   "expires": "2026-10-23"
  },
  "auto": {
-  "state": "WAIT IN CASH",
-  "reason": "No selling flush and no top signal. Cash is prepared buying power.",
+  "state": "DEPLOY",
+  "reason": "Selling flush inside the bull: 2026-10-22 heavy volume (1.46x), -7.5% off the 60-day high.",
   "evidence": {
    "high_60d": 87363.76,
-   "close": 84011.97,
-   "off_high_pct": -3.8,
+   "close": 81307.16,
+   "off_high_pct": -6.9,
    "bull_above_4y_low": true,
-   "flush": null,
-   "effort_no_result": null,
-   "near_top": true
+   "flush": {
+    "date": "2026-10-22",
+    "low": 80789.61,
+    "vol_x": 1.46,
+    "off_high_pct": -7.5
+   },
+   "effort_no_result": {
+    "date": "2026-10-22",
+    "vol_x": 1.46,
+    "close_in_range_pct": 15
+   },
+   "near_top": false
   }
  },
  "logic_label": "Our rule (Grok Bot, Oct 9 2026) for Lawrence's TAKE PROFITS -> WAIT IN CASH -> DEPLOY. Not Loukas's. No action authority.",
  "btc": {
-  "price": 81203.96,
+  "price": 81283.07,
   "price_source": "api.coinbase.com",
-  "price_at": "2026-10-23T00:07:05+00:00",
-  "last_daily_close": 84011.97,
-  "daily_bars_through": "2026-10-21"
+  "price_at": "2026-10-23T01:07:05+00:00",
+  "last_daily_close": 81307.16,
+  "daily_bars_through": "2026-10-22"
  },
  "cycle": {
   "day": 8,
@@ -78,21 +87,21 @@
   "line": "Potential failed 60-day cycle, or a long cycle closing. Weekly still fine; dips are to be bought; next target $98k.",
   "source": "Bitcoin Live members' posts (paraphrase, not a quote)"
  },
- "updated_at": "2026-10-23T00:07:05+00:00",
+ "updated_at": "2026-10-23T01:07:05+00:00",
  "freshness": {
-  "daily_bars_age_days": 2,
+  "daily_bars_age_days": 1,
   "live_price": true,
   "stale_after_minutes": 180
  },
  "public_url": "https://soullight.github.io/btc-rings/v5_signal.json",
  "provenance": {
-  "published_at": "2026-10-23T00:07:05+00:00",
-  "daily_bars_through": "2026-10-21",
+  "published_at": "2026-10-23T01:07:05+00:00",
+  "daily_bars_through": "2026-10-22",
   "latest_completed_utc_day": "2026-10-22",
-  "daily_freshness": "HISTORICAL",
-  "bar_count": 4418,
-  "daily_quality": "INSUFFICIENT",
-  "automatic_state_quality": "INSUFFICIENT",
+  "daily_freshness": "CURRENT",
+  "bar_count": 4419,
+  "daily_quality": "MEASURED",
+  "automatic_state_quality": "DERIVED",
   "state_basis": "AUTOMATIC_RESEARCH_RULE",
   "manual_set_date": null,
   "manual_clock_precision": "unknown",
@@ -102,13 +111,13 @@
  "lrwgr_plan": {
   "rule": "LRWGR hybrid, no stops (25% reserve at -10%/-20%), LRWGR trims, backtested 2026-10-16",
   "status": "NO LOW-IS-IN SIGNAL: levels armed; buy only on red closes at the levels below",
-  "as_of_close": "2026-10-21",
-  "close": 84011.97,
+  "as_of_close": "2026-10-22",
+  "close": 81307.16,
   "swing_low": {
    "date": "2026-10-15",
    "price": 79735.86
   },
-  "above_low_pct": 5.4,
+  "above_low_pct": 2.0,
   "low_is_in_signal": {
    "fired": false,
    "date": null,
