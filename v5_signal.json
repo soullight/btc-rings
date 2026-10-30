@@ -1,8 +1,8 @@
 {
  "schema": "v5_signal/1",
- "state": "WAIT IN CASH",
+ "state": "DEPLOY",
  "state_source": "auto (our rule)",
- "reason": "No selling flush and no top signal. Cash is prepared buying power.",
+ "reason": "Selling flush inside the bull: 2026-10-29 heavy volume (2.09x), -11.1% off the 60-day high.",
  "posture": null,
  "override": {
   "active": false,
@@ -11,25 +11,34 @@
   "expires": "2026-10-23"
  },
  "auto": {
-  "state": "WAIT IN CASH",
-  "reason": "No selling flush and no top signal. Cash is prepared buying power.",
+  "state": "DEPLOY",
+  "reason": "Selling flush inside the bull: 2026-10-29 heavy volume (2.09x), -11.1% off the 60-day high.",
   "evidence": {
    "high_60d": 87363.76,
-   "close": 81267.59,
-   "off_high_pct": -7.0,
+   "close": 77780.33,
+   "off_high_pct": -11.0,
    "bull_above_4y_low": true,
-   "flush": null,
-   "effort_no_result": null,
+   "flush": {
+    "date": "2026-10-29",
+    "low": 77699.0,
+    "vol_x": 2.09,
+    "off_high_pct": -11.1
+   },
+   "effort_no_result": {
+    "date": "2026-10-29",
+    "vol_x": 2.09,
+    "close_in_range_pct": 2
+   },
    "near_top": false
   }
  },
  "logic_label": "Our rule (Grok Bot, Oct 9 2026) for Lawrence's TAKE PROFITS -> WAIT IN CASH -> DEPLOY. Not Loukas's. No action authority.",
  "btc": {
-  "price": 78020.38,
+  "price": 76914.99,
   "price_source": "api.coinbase.com",
-  "price_at": "2026-10-30T00:07:05+00:00",
-  "last_daily_close": 81267.59,
-  "daily_bars_through": "2026-10-28"
+  "price_at": "2026-10-30T01:07:05+00:00",
+  "last_daily_close": 77780.33,
+  "daily_bars_through": "2026-10-29"
  },
  "cycle": {
   "day": 15,
@@ -41,7 +50,7 @@
   "anchor_low": 79735.86,
   "anchor_source": "override",
   "label": "FAILED-CYCLE WATCH \u2014 anchor low broken",
-  "failed_cycle_note": "Anchor low broken 2026-10-24 ($79,146): potential failed 60-day cycle; alt = long cycle from 2026-08-03, low on day 82",
+  "failed_cycle_note": "Anchor low broken 2026-10-29 ($77,699): potential failed 60-day cycle; alt = long cycle from 2026-08-03, low on day 87",
   "four_year_low": {
    "date": "2026-07-01",
    "price": 57735.0
@@ -78,21 +87,21 @@
   "line": "Potential failed 60-day cycle, or a long cycle closing. Weekly still fine; dips are to be bought; next target $98k.",
   "source": "Bitcoin Live members' posts (paraphrase, not a quote)"
  },
- "updated_at": "2026-10-30T00:07:05+00:00",
+ "updated_at": "2026-10-30T01:07:05+00:00",
  "freshness": {
-  "daily_bars_age_days": 2,
+  "daily_bars_age_days": 1,
   "live_price": true,
   "stale_after_minutes": 180
  },
  "public_url": "https://soullight.github.io/btc-rings/v5_signal.json",
  "provenance": {
-  "published_at": "2026-10-30T00:07:05+00:00",
-  "daily_bars_through": "2026-10-28",
+  "published_at": "2026-10-30T01:07:05+00:00",
+  "daily_bars_through": "2026-10-29",
   "latest_completed_utc_day": "2026-10-29",
-  "daily_freshness": "HISTORICAL",
-  "bar_count": 4425,
-  "daily_quality": "INSUFFICIENT",
-  "automatic_state_quality": "INSUFFICIENT",
+  "daily_freshness": "CURRENT",
+  "bar_count": 4426,
+  "daily_quality": "MEASURED",
+  "automatic_state_quality": "DERIVED",
   "state_basis": "AUTOMATIC_RESEARCH_RULE",
   "manual_set_date": null,
   "manual_clock_precision": "unknown",
@@ -102,13 +111,13 @@
  "lrwgr_plan": {
   "rule": "LRWGR hybrid, no stops (25% reserve at -10%/-20%), LRWGR trims, backtested 2026-10-16",
   "status": "NO LOW-IS-IN SIGNAL: levels armed; buy only on red closes at the levels below",
-  "as_of_close": "2026-10-28",
-  "close": 81267.59,
+  "as_of_close": "2026-10-29",
+  "close": 77780.33,
   "swing_low": {
-   "date": "2026-10-24",
-   "price": 79145.54
+   "date": "2026-10-29",
+   "price": 77699.0
   },
-  "above_low_pct": 2.7,
+  "above_low_pct": 0.1,
   "low_is_in_signal": {
    "fired": false,
    "date": null,
@@ -138,24 +147,24 @@
    {
     "pct": 12.5,
     "trigger": "red daily close at or below",
-    "price": 71231.0,
+    "price": 69929.0,
     "depth_below_low_pct": 10
    },
    {
     "pct": 12.5,
     "trigger": "red daily close at or below",
-    "price": 63316.0,
+    "price": 62159.0,
     "depth_below_low_pct": 20
    }
   ],
   "trims": {
    "rule": "LRWGR BTC: trim 25% on a close +300% above the wave low; then 25% more at each green close 50% above the last trim",
-   "wave_low": 79145.54,
+   "wave_low": 77699.0,
    "ladder": [
-    316582.0,
-    474873.0,
-    712310.0,
-    1068465.0
+    310796.0,
+    466194.0,
+    699291.0,
+    1048936.0
    ],
    "proceeds": "25% to living money, 75% stacked as cash",
    "buyback": "stacked cash buys back on a red daily close at or below -65% from the high after the trims (wave low); then the wave resets"
