@@ -1,5 +1,5 @@
 {
- "ts": "2026-10-30T15:40:01+00:00",
+ "ts": "2026-10-30T16:00:01+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-10-30",
@@ -51,24 +51,23 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 77618.72,
- "chg24h": -4.848,
- "vol24h": 34417.63564,
- "price_kraken": 77425.0,
- "price_spread_bps": 25.0,
- "longs": 89751,
+ "price": 77608.36,
+ "chg24h": -5.124,
+ "vol24h": 34244.19064,
+ "price_kraken": 77479.4,
+ "price_spread_bps": 16.6,
+ "longs": 89752,
  "shorts": 199,
- "funding_apr": 0,
  "fear": 30,
  "fear_label": "Fear",
- "mempool_tx": 4546,
- "mempool_mb": 2.38,
- "block": 973839,
- "ibit": 43.79,
- "ibit_ratio": 0.00056417,
+ "mempool_tx": 7777,
+ "mempool_mb": 4.21,
+ "block": 973840,
+ "ibit": 43.8,
+ "ibit_ratio": 0.00056444,
  "blood": {
   "ath": 124728,
-  "spot": 77445,
+  "spot": 77450,
   "days_out": -8,
   "methods": {
    "200w_ma": {
@@ -180,7 +179,7 @@
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.21,
+   "ibit": 28.22,
    "amount": 300000,
    "shares": 10608,
    "note": null,
@@ -190,7 +189,7 @@
   },
   {
    "btc": 44000,
-   "ibit": 24.82,
+   "ibit": 24.84,
    "amount": 300000,
    "shares": 12053,
    "note": null,
@@ -200,7 +199,7 @@
   },
   {
    "btc": 37400,
-   "ibit": 21.1,
+   "ibit": 21.11,
    "amount": 500000,
    "shares": 23641,
    "note": null,
@@ -210,7 +209,7 @@
   },
   {
    "btc": 34478,
-   "ibit": 19.45,
+   "ibit": 19.46,
    "amount": 500000,
    "shares": 25641,
    "note": "his existing order",
@@ -220,7 +219,7 @@
   },
   {
    "btc": 31200,
-   "ibit": 17.6,
+   "ibit": 17.61,
    "amount": 500000,
    "shares": 28329,
    "note": "ring base target",
@@ -240,7 +239,7 @@
   },
   {
    "btc": 25000,
-   "ibit": 14.1,
+   "ibit": 14.11,
    "amount": 300000,
    "shares": 21216,
    "note": null,
@@ -250,7 +249,7 @@
   },
   {
    "btc": 22000,
-   "ibit": 12.41,
+   "ibit": 12.42,
    "amount": 200000,
    "shares": 16077,
    "note": null,
@@ -268,16 +267,12 @@
  "pct_from_ath": -37.8,
  "ls_ratio": 451,
  "long_share_pct": 99.8,
- "missing_required": [],
+ "missing_required": [
+  "funding_apr"
+ ],
  "quality_issues": [],
- "data_quality": "COMPLETE",
+ "data_quality": "INCOMPLETE",
  "history": [
-  {
-   "ts": "2026-08-31T16:00:01+00:00",
-   "p": 78583.99,
-   "ls": 520.0,
-   "f": 62
-  },
   {
    "ts": "2026-08-31T16:20:01+00:00",
    "p": 78716.0,
@@ -26191,7 +26186,13 @@
    "p": 77618.72,
    "ls": 451.0,
    "f": 30
+  },
+  {
+   "ts": "2026-10-30T16:00:01+00:00",
+   "p": 77608.36,
+   "ls": 451.0,
+   "f": 30
   }
  ],
- "db_rows": 6046
+ "db_rows": 6047
 }
