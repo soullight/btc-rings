@@ -2,7 +2,7 @@
  "schema": "v5_signal/1",
  "state": "DEPLOY",
  "state_source": "auto (our rule)",
- "reason": "Selling flush inside the bull: 2026-11-05 heavy volume (2.95x), -14.1% off the 60-day high.",
+ "reason": "Selling flush inside the bull: 2026-11-05 heavy volume (1.93x), -14.0% off the 60-day high.",
  "posture": null,
  "override": {
   "active": false,
@@ -12,32 +12,32 @@
  },
  "auto": {
   "state": "DEPLOY",
-  "reason": "Selling flush inside the bull: 2026-11-05 heavy volume (2.95x), -14.1% off the 60-day high.",
+  "reason": "Selling flush inside the bull: 2026-11-05 heavy volume (1.93x), -14.0% off the 60-day high.",
   "evidence": {
    "high_60d": 87363.76,
-   "close": 75969.06,
-   "off_high_pct": -13.0,
+   "close": 75942.12,
+   "off_high_pct": -13.1,
    "bull_above_4y_low": true,
    "flush": {
     "date": "2026-11-05",
-    "low": 75035.1,
-    "vol_x": 2.95,
-    "off_high_pct": -14.1
+    "low": 75114.29,
+    "vol_x": 1.93,
+    "off_high_pct": -14.0
    },
    "effort_no_result": {
     "date": "2026-11-05",
-    "vol_x": 2.95,
-    "close_in_range_pct": 16
+    "vol_x": 1.93,
+    "close_in_range_pct": 14
    },
    "near_top": false
   }
  },
  "logic_label": "Our rule (Grok Bot, Oct 9 2026) for Lawrence's TAKE PROFITS -> WAIT IN CASH -> DEPLOY. Not Loukas's. No action authority.",
  "btc": {
-  "price": 75049.37,
+  "price": 75581.69,
   "price_source": "api.coinbase.com",
-  "price_at": "2026-11-06T15:07:05+00:00",
-  "last_daily_close": 75969.06,
+  "price_at": "2026-11-06T16:07:05+00:00",
+  "last_daily_close": 75942.12,
   "daily_bars_through": "2026-11-05"
  },
  "cycle": {
@@ -50,7 +50,7 @@
   "anchor_low": 79735.86,
   "anchor_source": "override",
   "label": "FAILED-CYCLE WATCH \u2014 anchor low broken",
-  "failed_cycle_note": "Anchor low broken 2026-11-05 ($75,035): potential failed 60-day cycle; alt = long cycle from 2026-08-03, low on day 94",
+  "failed_cycle_note": "Anchor low broken 2026-11-05 ($75,114): potential failed 60-day cycle; alt = long cycle from 2026-08-03, low on day 94",
   "four_year_low": {
    "date": "2026-07-01",
    "price": 57735.0
@@ -87,7 +87,7 @@
   "line": "Potential failed 60-day cycle, or a long cycle closing. Weekly still fine; dips are to be bought; next target $98k.",
   "source": "Bitcoin Live members' posts (paraphrase, not a quote)"
  },
- "updated_at": "2026-11-06T15:07:05+00:00",
+ "updated_at": "2026-11-06T16:07:05+00:00",
  "freshness": {
   "daily_bars_age_days": 1,
   "live_price": true,
@@ -95,7 +95,7 @@
  },
  "public_url": "https://soullight.github.io/btc-rings/v5_signal.json",
  "provenance": {
-  "published_at": "2026-11-06T15:07:05+00:00",
+  "published_at": "2026-11-06T16:07:05+00:00",
   "daily_bars_through": "2026-11-05",
   "latest_completed_utc_day": "2026-11-05",
   "daily_freshness": "CURRENT",
@@ -112,12 +112,12 @@
   "rule": "LRWGR hybrid, no stops (25% reserve at -10%/-20%), LRWGR trims, backtested 2026-10-16",
   "status": "NO LOW-IS-IN SIGNAL: levels armed; buy only on red closes at the levels below",
   "as_of_close": "2026-11-05",
-  "close": 75969.06,
+  "close": 75942.12,
   "swing_low": {
    "date": "2026-11-05",
-   "price": 75035.1
+   "price": 75114.29
   },
-  "above_low_pct": 1.2,
+  "above_low_pct": 1.1,
   "low_is_in_signal": {
    "fired": false,
    "date": null,
@@ -147,24 +147,24 @@
    {
     "pct": 12.5,
     "trigger": "red daily close at or below",
-    "price": 67532.0,
+    "price": 67603.0,
     "depth_below_low_pct": 10
    },
    {
     "pct": 12.5,
     "trigger": "red daily close at or below",
-    "price": 60028.0,
+    "price": 60091.0,
     "depth_below_low_pct": 20
    }
   ],
   "trims": {
    "rule": "LRWGR BTC: trim 25% on a close +300% above the wave low; then 25% more at each green close 50% above the last trim",
-   "wave_low": 75035.1,
+   "wave_low": 75114.29,
    "ladder": [
-    300140.0,
-    450211.0,
-    675316.0,
-    1012974.0
+    300457.0,
+    450686.0,
+    676029.0,
+    1014043.0
    ],
    "proceeds": "25% to living money, 75% stacked as cash",
    "buyback": "stacked cash buys back on a red daily close at or below -65% from the high after the trims (wave low); then the wave resets"
