@@ -1,5 +1,5 @@
 {
- "ts": "2026-11-11T23:00:01+00:00",
+ "ts": "2026-11-11T23:20:02+00:00",
  "ring_ath": 124728,
  "cycle": {
   "today": "2026-11-11",
@@ -51,24 +51,24 @@
   "leverage": "bitfinex",
   "chain": "rune (his own node)"
  },
- "price": 73931.21,
- "chg24h": 0.325,
- "vol24h": 16073.2692,
- "price_kraken": 73854.8,
- "price_spread_bps": 10.3,
- "longs": 90812,
- "shorts": 177,
+ "price": 73700.01,
+ "chg24h": -0.065,
+ "vol24h": 16184.80898,
+ "price_kraken": 73643.5,
+ "price_spread_bps": 7.7,
+ "longs": 90813,
+ "shorts": 178,
  "funding_apr": 0,
  "fear": 29,
  "fear_label": "Fear",
- "mempool_tx": 2129,
- "mempool_mb": 0.7,
- "block": 975485,
+ "mempool_tx": 1200,
+ "mempool_mb": 0.48,
+ "block": 975489,
  "ibit": 42.24,
- "ibit_ratio": 0.00057134,
+ "ibit_ratio": 0.00057313,
  "blood": {
   "ath": 124728,
-  "spot": 73841,
+  "spot": 73620,
   "days_out": -20,
   "methods": {
    "200w_ma": {
@@ -77,11 +77,11 @@
      1.004,
      0.657
     ],
-    "anchor": 67805,
+    "anchor": 67804,
     "est": [
      54040,
      68068,
-     44519
+     44518
     ]
    },
    "4y_mean": {
@@ -90,10 +90,10 @@
      1.043,
      0.68
     ],
-    "anchor": 65710,
+    "anchor": 65709,
     "est": [
      52370,
-     68551,
+     68550,
      44695
     ]
    },
@@ -148,16 +148,16 @@
    33307,
    34218,
    35074,
-   44519,
+   44518,
    44695,
    52370,
    54040,
    55511,
    68068,
-   68551
+   68550
   ],
   "low": 16239,
-  "high": 68551,
+  "high": 68550,
   "p25": 29107,
   "median": 35074,
   "p75": 54040,
@@ -180,82 +180,82 @@
  "ladder": [
   {
    "btc": 50000,
-   "ibit": 28.57,
+   "ibit": 28.66,
    "amount": 300000,
    "shares": 10608,
    "note": null,
    "pct_from_ath": -60,
-   "pct_from_here": -32.4,
+   "pct_from_here": -32.2,
    "hit": false
   },
   {
    "btc": 44000,
-   "ibit": 25.14,
+   "ibit": 25.22,
    "amount": 300000,
    "shares": 12053,
    "note": null,
    "pct_from_ath": -65,
-   "pct_from_here": -40.5,
+   "pct_from_here": -40.3,
    "hit": false
   },
   {
    "btc": 37400,
-   "ibit": 21.37,
+   "ibit": 21.44,
    "amount": 500000,
    "shares": 23641,
    "note": null,
    "pct_from_ath": -70,
-   "pct_from_here": -49.4,
+   "pct_from_here": -49.3,
    "hit": false
   },
   {
    "btc": 34478,
-   "ibit": 19.7,
+   "ibit": 19.76,
    "amount": 500000,
    "shares": 25641,
    "note": "his existing order",
    "pct_from_ath": -72,
-   "pct_from_here": -53.4,
+   "pct_from_here": -53.2,
    "hit": false
   },
   {
    "btc": 31200,
-   "ibit": 17.83,
+   "ibit": 17.88,
    "amount": 500000,
    "shares": 28329,
    "note": "ring base target",
    "pct_from_ath": -75,
-   "pct_from_here": -57.8,
+   "pct_from_here": -57.7,
    "hit": false
   },
   {
    "btc": 28000,
-   "ibit": 16.0,
+   "ibit": 16.05,
    "amount": 400000,
    "shares": 25253,
    "note": null,
    "pct_from_ath": -78,
-   "pct_from_here": -62.1,
+   "pct_from_here": -62.0,
    "hit": false
   },
   {
    "btc": 25000,
-   "ibit": 14.28,
+   "ibit": 14.33,
    "amount": 300000,
    "shares": 21216,
    "note": null,
    "pct_from_ath": -80,
-   "pct_from_here": -66.2,
+   "pct_from_here": -66.1,
    "hit": false
   },
   {
    "btc": 22000,
-   "ibit": 12.57,
+   "ibit": 12.61,
    "amount": 200000,
    "shares": 16077,
    "note": null,
    "pct_from_ath": -82,
-   "pct_from_here": -70.2,
+   "pct_from_here": -70.1,
    "hit": false
   }
  ],
@@ -265,19 +265,13 @@
   "sell_target": 249456,
   "source": "engine2_plan.json (LOCKED 2026-08-07)"
  },
- "pct_from_ath": -40.7,
- "ls_ratio": 513,
+ "pct_from_ath": -40.9,
+ "ls_ratio": 510,
  "long_share_pct": 99.8,
  "missing_required": [],
  "quality_issues": [],
  "data_quality": "COMPLETE",
  "history": [
-  {
-   "ts": "2026-09-12T23:20:01+00:00",
-   "p": 77272.62,
-   "ls": 706.0,
-   "f": 63
-  },
   {
    "ts": "2026-09-12T23:40:01+00:00",
    "p": 77243.24,
@@ -26191,7 +26185,13 @@
    "p": 73931.21,
    "ls": 513.0,
    "f": 29
+  },
+  {
+   "ts": "2026-11-11T23:20:02+00:00",
+   "p": 73700.01,
+   "ls": 510.0,
+   "f": 29
   }
  ],
- "db_rows": 6932
+ "db_rows": 6933
 }
